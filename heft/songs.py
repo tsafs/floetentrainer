@@ -1,6 +1,7 @@
 # Melodien: Ton + Dauer (1/2/4/8/16), Punkt, r = Pause, | Taktstrich, || Schluss,
 # / Zeilenumbruch, ( ) Bindebogen (Melisma), ~ Haltebogen, , Atemzeichen, T4/4 Taktwechsel.
 # |: und :| Wiederholungszeichen; [1 / [2 nach einem Taktstrich beginnen die Klammer 1. / 2.
+# (Klammer und ihr Takt müssen in derselben Zeile stehen, kein / dazwischen.)
 # stanzas: weitere Strophen, Zeilen mit " / " getrennt.
 SONGS = [
     dict(chapter="Kinder- und Weihnachtslieder",
@@ -205,8 +206,8 @@ SONGS = [
          # Quelle: Ausgabe Peter Chubb, Mutopia 2002 (gemeinfrei), Sopranstimme und Text
          music="g'2 | g'4 fis'4 | g'4 a'4 | b'2 | b'4 d''4 | c''4 b'4 | b'4 a'4 | b'2 , | / "
                "g'2 | g'4 fis'4 | g'4 a'4 | b'2 | b'4 d''4 | c''4 b'4 | b'4 a'4 | b'2 , | / "
-               "b'2 | a'4 a'4 | g'4 g'4 | fis'2 , | e'2 | (e'8 f'8) g'4 | g'4 fis'4 | g'2 , | / "
-               "b'2 | a'4 a'4 | g'4 g'4 | fis'2 , | e'2 | (e'8 f'8) g'4 | g'4 fis'4 | g'2 ||",
+               "b'2 | a'4 a'4 | g'4 g'4 | fis'2 , | d'2 | (e'8 f'8) g'4 | g'4 fis'4 | g'2 , | / "
+               "b'2 | a'4 a'4 | g'4 g'4 | fis'2 , | d'2 | (e'8 f'8) g'4 | g'4 fis'4 | g'2 ||",
          lyrics="Bel-le qui tiens ma vi-e cap-ti-ve dans tes yeux, qui m’as l’â-me ra-vi-e d’un sou-ris gra-ci-eux. "
                 "Viens tôt me se-cou-rir ou me fau-dra mou-rir. Viens tôt me se-cou-rir ou me fau-dra mou-rir.",
          stanzas=["Pourquoi fuis-tu, mignarde, / si je suis près de toi? / Quand tes yeux je regarde, / je me perds dedans moi, / "

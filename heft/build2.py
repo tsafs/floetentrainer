@@ -183,7 +183,7 @@ def grundlagen_page(folio):
         (mini("g'4 a'4 h'4 |", time=(3, 4)), "Taktangabe", "3/4: drei Viertel pro Takt, 4/4: vier, 2/4: zwei, "
                                                           "6/8: sechs Achtel (zweimal drei)."),
         (mini("d'4 | g'4 a'4 h'4 |", time=(4, 4)), "Auftakt", "Manche Lieder beginnen mit einem unvollständigen Takt. "
-                                                              "Was dort fehlt, fehlt dafür im letzten Takt."),
+                                                              "Was dort fehlt, fehlt meist im letzten Takt."),
         (mini("|: g'4 a'4 | [1 h'2 :| [2 c''2 ||"), "Wiederholung",
          "Alles zwischen den Zeichen zweimal spielen. Mit Klammern: beim zweiten Mal Klammer 2 statt Klammer 1."),
     ]

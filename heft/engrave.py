@@ -241,17 +241,27 @@ def check_and_assign(song):
     bar_q = num * 4.0 / den
     # Taktprüfung
     acc, bars, idx = 0.0, [], 0
-    in_v1 = False
+    in_v1 = False          # innerhalb der 1. Klammer (bis zum :|)
+    pickup = None          # Länge des Auftakts nach dem letzten |: bzw. am Liedanfang
+    seg_start = True       # nächster Takt ist der erste nach |: bzw. Liedanfang
     for it in items:
         if it["kind"] in ("note", "rest"):
             acc += it["q"]
         elif it["kind"] == "bar":
-            if in_v1 and acc < bar_q:
-                acc = bar_q  # 1. Klammer ergänzt sich mit dem Auftakt nach der Wiederholung
+            if seg_start and acc > 0.0:
+                pickup = acc if acc < bar_q else 0.0
+                seg_start = False
+            if in_v1 and it.get("rep_end") and acc < bar_q and pickup and abs(acc + pickup - bar_q) < 1e-6:
+                acc = bar_q  # letzter Takt der 1. Klammer + Auftakt nach der Wiederholung = ganzer Takt
             if not (it.get("rep_start") and acc == 0.0):  # |: am Anfang/nach :| ist kein eigener Takt
                 bars.append((acc, bar_q, bool(it.get("rep_end"))))
             acc = 0.0
-            in_v1 = it.get("volta") == 1
+            if it.get("volta") == 1:
+                in_v1 = True
+            elif it.get("rep_end"):
+                in_v1 = False
+            if it.get("rep_start"):
+                seg_start = True
         elif it["kind"] == "time":
             bar_q = it["num"] * 4.0 / it["den"]
     # Takt, der an einer Wiederholung geteilt ist (Rest vor :|, Auftakt nach |:), zählt als ganz
