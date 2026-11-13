@@ -30,8 +30,8 @@ Deshalb entfernt:
 - Gottes Sohn ist kommen (religiös)
 
 ## Aufgenommen
-- **Jingle Bells**: Strophe „Dashing through the snow“ + Refrain nach de.wikibooks.org „Liederbuch/ Jingle Bells“.
-  Die weiteren Originalstrophen von 1857 fehlen noch (Text aus verlässlicher Quelle nötig).
+- **Jingle Bells**: Melodie der Strophe nach de.wikibooks.org „Liederbuch/ Jingle Bells“, Text aller vier
+  Strophen nach en.wikipedia.org „Jingle Bells“ (dort „bob tail“ belegt mit dem Originaldruck).
 - **All in a Garden Green** (Nr. 20): Vorlage thesession.org/tunes/14287, Fassung 2 (von der Nutzerin
   heruntergeladen, `docs/quellen/All_In_A_Garden_Green.abc`). Dort in 2/2, im Heft als 4/4 mit denselben
   Notenwerten. Fassung 1 (als Polka in 2/4) weicht im B-Teil in Takt 1 und 3 leicht ab (punktiert statt

@@ -54,9 +54,11 @@ def stanza_block(s):
         cols = 1
     if len(st) == 2 and cols == 3:
         cols = 2
+    if s.get("stanza_cols"):
+        cols = s["stanza_cols"]
     LH = 4.75
     rows = [lines[i:i + cols] for i in range(0, len(lines), cols)]
-    h = sum(max(len(x) for x in r) * LH + 3.5 for r in rows) + 6.5
+    h = sum(max(len(x) for x in r) * LH + 3.5 for r in rows) + 5.0
     items = []
     for n, x in enumerate(lines):
         items.append(f'<div class="stz"><span class="stn">{n + 2}.</span>'
@@ -65,7 +67,7 @@ def stanza_block(s):
     if s.get("stanza_note"):
         note = f'<div class="credit" style="margin:0 0 2mm 0">{html.escape(s["stanza_note"])}</div>'
         h += 5.5
-    return (f'<div style="margin-top:6mm; padding-left:9mm">{note}<div class="stanzas" '
+    return (f'<div style="margin-top:4.5mm; padding-left:9mm">{note}<div class="stanzas" '
             f'style="grid-template-columns: repeat({cols}, 1fr)">{"".join(items)}</div></div>'), h
 
 

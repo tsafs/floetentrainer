@@ -32,8 +32,9 @@ SONGS = [
          lyrics="Al-le mei-ne Ent-chen schwim-men auf dem See, schwim-men auf dem See, "
                 "Köpf-chen in das Was-ser, Schwänz-chen in die Höh."),
     dict(title="Jingle Bells", key="G", keyname="G-Dur", time=(4, 4),
-         credit="Text und Melodie: James Lord Pierpont, 1857",
-         # Strophe nach de.wikibooks.org „Liederbuch/ Jingle Bells“
+         credit="Text und Melodie: James Lord Pierpont, 1857 · nach jeder Strophe der Refrain",
+         # Melodie der Strophe nach de.wikibooks.org „Liederbuch/ Jingle Bells“,
+         # Text nach en.wikipedia.org „Jingle Bells“ (Abschnitt Lyrics)
          music="d'4 h'4 a'4 g'4 | d'2. d'8 d'8 | d'4 h'4 a'4 g'4 | e'2. r4 | / "
                "e'4 c''4 h'4 a'4 | fis'2. r4 | d''4 d''4 c''4 a'4 | h'2. r4 | / "
                "d'4 h'4 a'4 g'4 | d'2. r4 | d'4 h'4 a'4 g'4 | e'2. r8 e'8 | / "
@@ -43,10 +44,17 @@ SONGS = [
                "h'4 h'4 h'2 | h'4 h'4 h'2 | h'4 d''4 g'4. a'8 | h'1 , | / "
                "c''4 c''4 c''4. c''8 | c''4 h'4 h'4 h'8 h'8 | d''4 d''4 c''4 a'4 | g'1 ||",
          lyrics="Dash-ing through the snow in a one-horse o-pen sleigh, o’er the fields we go, laugh-ing all the way. "
-                "Bells on bob-tails ring, mak-ing spi-rits bright. What fun it is to ride and sing a sleigh-ing song to-night, oh! "
+                "Bells on bob tail ring, mak-ing spi-rits bright. What fun it is to ride and sing a sleigh-ing song to-night, oh! "
                 "Jin-gle bells, jin-gle bells, jin-gle all the way! Oh, what fun it is to ride "
                 "in a one-horse o-pen sleigh, hey! Jin-gle bells, jin-gle bells, jin-gle all the way! "
-                "Oh, what fun it is to ride in a one-horse o-pen sleigh!"),
+                "Oh, what fun it is to ride in a one-horse o-pen sleigh!",
+         stanza_cols=3,
+         stanzas=["A day or two ago / I thought I’d take a ride / And soon, Miss Fanny Bright / Was seated by my side, / "
+                  "The horse was lean and lank / Misfortune seemed his lot / He got into a drifted bank / And then we got up sot.",
+                  "A day or two ago, / The story I must tell / I went out on the snow, / And on my back I fell; / "
+                  "A gent was riding by / In a one-horse open sleigh, / He laughed as there I sprawling lie, / But quickly drove away.",
+                  "Now the ground is white / Go it while you’re young, / Take the girls tonight / And sing this sleighing song; / "
+                  "Just get a bobtailed bay / Two forty as his speed / Hitch him to an open sleigh / And snap! You’ll take the lead."]),
     dict(title="Morgen kommt der Weihnachtsmann", key="G", keyname="G-Dur", time=(4, 4),
          credit="Text: Hoffmann von Fallersleben · Melodie: französische Weise",
          music="g'4 g'4 d''4 d''4 | e''4 e''4 d''2 , | c''4 c''4 h'4 h'4 | a'2 g'2 , | / "

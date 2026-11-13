@@ -18,8 +18,10 @@ kurz den Plan abstimmen. Design: ruhig, elegant, viel Weißraum, schwarz-weiß d
   (Wunsch der Nutzerin) – deshalb pro Zeile genug Takte setzen, sonst wirkt es luftig.
 - Regeln für Inhalte und die Wunschliste: `docs/notizen.md` (nur zweifelsfrei Gemeinfreies!).
 - Vorlagen, die die Nutzerin selbst besorgt hat: `docs/quellen/`.
-- Netz: Die Arbeitsumgebung erreicht nur de.wikibooks.org (plus Websuche mit Zusammenfassungen).
-  Notenarchive (thesession.org, imslp.org …) sind gesperrt – Vorlagen lädt die Nutzerin ggf. selbst hoch.
+- Netz: Cloud-Umgebung „Floetentrainer“ benutzen. Sie erreicht de.wikibooks.org, thesession.org,
+  imslp.org, abcnotation.com, de./en.wikipedia.org, upload.wikimedia.org, www.ceolas.org.
+  www.cpdl.org und www.tunearch.org stehen auf der Liste, antworten aber mit 403 (sperren Programme aus).
+  Freigaben kann die Nutzerin nur am Computer bestätigen, nicht am Handy.
 
 ## Prüfen vor dem Abgeben
 Jede Seite als Bild ansehen (`pdftoppm`), Details vergrößert: Notenköpfe, Hilfslinien, Bögen,
