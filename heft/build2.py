@@ -222,7 +222,7 @@ EXTRA_CSS = """
 .stn { position: absolute; left: -6mm; font-family: 'Source Sans 3'; font-size: 8pt; top: 0.6mm; }
 .chapter { margin-bottom: 6mm; }
 table.toc { border-collapse: collapse; width: 100%; margin-top: 3mm; }
-table.toc td { padding: 0.75mm 0; font-size: 11pt; border-bottom: 0.2mm solid #efe7da; }
+table.toc td { padding: 0.45mm 0; font-size: 11pt; border-bottom: 0.2mm solid #efe7da; }
 table.toc td.n { font-family: 'Source Sans 3'; font-size: 7.5pt; letter-spacing: .14em; color: #b8a27e; width: 10mm; }
 table.toc td.k { font-family: 'Source Sans 3'; font-size: 7.5pt; letter-spacing: .08em; color: #9c8462; text-align: right; padding-right: 7mm; }
 table.toc td.p { font-family: 'Source Sans 3'; font-size: 8pt; color: #8c8379; text-align: right; width: 8mm; }

@@ -31,6 +31,10 @@ Deshalb entfernt:
 - Kein schöner Land (Wunsch der Nutzerin: komplett raus)
 
 ## Aufgenommen
+- **Morley: Now is the month of maying** – Oberstimme aus Messerschmidts Bläserfassung (Trompete in B,
+  eine große Sekunde tiefer notiert → hier zurück nach G-Dur), Ton für Ton mit Meylans Canto (Mensuralnotation)
+  verglichen; Text und Strophen nach Meylan. **It was a lover and his lass** – Cantus aus Baums Ausgabe
+  (Originaltonart, Originalnotenwerte); Takte 24–25 der Vorlage (je 6 Viertel) auf 4/4 verteilt. Alle in `docs/quellen/`.
 - **Holborne: The Honie-suckle (Nr. 60), The Fairie-round (Nr. 63)** – Cantus-Stimmen (Alpers bzw. Mondrup, IMSLP;
   in `docs/quellen/`). Fairie-round in Mondrups Fassung mit halbierten Notenwerten (6/8).
 - **Van Eyck: Onder de Linde groene** (Bd. II, bei Michel/Teske Nr. 100) – nur das Thema. Ergebnis der Prüfung:
@@ -54,7 +58,6 @@ Deshalb entfernt:
   noch nicht geprüft; ggf. als Gegenstück zu Nr. 20.
 - **Jacob van Eyck, Der Fluyten Lust-hof** (1644–49): weitere Themen, z. B.
   „Lavignone“, „Rosemont“, „Comagain“, „Amarilli mia bella“ (Nr. 9, 10, 32, 35 stehen in der Gomes-Ausgabe).
-- **Thomas Morley**: „It was a lover and his lass“, „Now is the month of maying“ (Oberstimme).
 - **Anthony Holborne**: Oberstimmen der Consort-Tänze, z. B. „The Honie-suckle“, „The Fairie Round“.
 - **Virgiliano, Bassano**: echte Solo-Ricercare, aber virtuos – für später.
 - Weitere Renaissance-Stücke: Tourdion (Attaingnant 1530), Pavane „Belle qui tiens ma vie“ und

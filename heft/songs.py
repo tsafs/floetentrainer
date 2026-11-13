@@ -194,6 +194,47 @@ SONGS = [
                "d''4 e''4 f''8 e''8 | d''2 c''4 | c''8 e''8 d''4 c''4 | h'4 h'8 h'4 h'8 :| / "
                "|: g''4 g'8 h'4 c''8 | d''4 g'8 d''4 e''8 | f''4. e''8 d''8 c''8 | h'2. , | / "
                "e'8 f'16 g'16 a'8 f'8 g'16 a'16 h'16 a'16 | g'8 a'16 h'16 c''8 a'8 h'16 c''16 d''16 c''16 | h'8 g'8 c''4. h'8 | c''4 c''8 c''4 c''8 :|"),
+    dict(title="Now is the month of maying", key="G", keyname="G-Dur", time=(4, 4),
+         credit="Thomas Morley, The First Booke of Balletts (1595) · Oberstimme",
+         # Quelle: Oberstimme nach Messerschmidt 2025 (IMSLP, Trompete in B, hier zurück in G),
+         # Tonhöhen und Text verglichen mit der Canto-Stimme von Bernard Meylan (IMSLP)
+         music="|: g'4 | g'4 g'4 a'4 a'4 | h'2 h'4 g'4 | h'4. a'8 h'4 cis''4 | d''2 d''4 a'8 h'8 , | / "
+               "c''4 c''4 h'4 g'4 | a'4 fis'4 d'4 d''8 c''8 | h'4 c''4 a'4 a'4 | g'2 r4 :| / "
+               "|: h'4 | a'4 d''4 d''4 cis''4 | d''2 r4 a'4 | c''4 c''4 h'4 h'4 | a'2 r4 d''8 c''8 | / "
+               "h'4 g'4 d''2 , | d'8 e'8 fis'8 g'8 a'8 h'8 c''4 | h'4. c''8 h'4 a'4 | g'2 r4 :|",
+         lyrics="Now is the month of May-ing, when mer-ry lads are play-ing, "
+                "Fa la la la la la la la la Fa la la la la la la. "
+                "Each with his bon-ny lass a-dan-cing on the grass. "
+                "Fa la la la la Fa la la la la la la la la la la la.",
+         stanzas=["The spring, clad all in gladness, / doth laugh at Winter’s sadness, Fa la … / "
+                  "And to the bagpipe’s sound / the nymphs tread out their ground. Fa la …",
+                  "Fie then, why sit we musing, / youth’s sweet delight refusing? Fa la … / "
+                  "Say, dainty nymphs, and speak, / shall we play barley-break? Fa la …"]),
+    dict(title="It was a lover and his lass", key="C", keyname="G-Dur (mixolydisch)", time=(4, 4),
+         credit="Text: William Shakespeare · Melodie: Thomas Morley, The First Booke of Ayres (1600)",
+         # Quelle: Cantus-Stimme, Ausgabe Christopher Baum 2018 (IMSLP, Originaltonart);
+         # Takte 24–25 der Vorlage (je 6 Viertel) hier auf 4/4-Takte verteilt
+         music="g'4 | h'4. c''8 d''4 d''4 | c''4 h'4 a'4 , a'8 h'8 | c''4 c''8 d''8 e''4 e''8 f''8 | g''2. f''8 e''8 | / "
+               "d''4 h'8 c''8 d''2~ | d''4 c''8 h'8 c''4 a'4 | g'1 | r2 r4 d''4 | d''4 d''4 e''4 d''4 | / "
+               "c''4 h'4 a'4 , a'4 | e''2 cis''4 a'4 | d''2 h'4 d''4 | g''2 e''4 c''4 | e''4 d''4 c''4 h'4 | / "
+               "d''2 h'4 , g'4 | c''4 h'4 a'4 d''4 | d''8 c''8 h'8 a'8 g'4 g''4 | g''8 f''8 e''8 d''8 c''4 e''4 | / "
+               "e''8 d''8 c''8 h'8 a'4 , c''4 | h'4. h'8 a'4. a'8 | g'4 g'4 d''2 | h'2 r2 | r4 d''4 g''2 | / "
+               "e''4 c''4 e''2 | d''4 c''2 h'4 | d''2 h'4 , g'4 | c''4 h'4 a'4 d''4 | d''8 c''8 h'8 a'8 g'4 g''4 | / "
+               "g''8 f''8 e''8 d''8 c''4 e''4 | e''8 d''8 c''8 h'8 a'4 , c''4 | h'4. h'8 a'4. a'8 | g'1 ||",
+         lyrics="It was a lo-ver and his lass, with a hey, with a ho, and a hey non-ny no, "
+                "and a hey non-ny non-ny no, that o’er the green corn-fields did pass "
+                "in spring-time, in spring-time, in spring-time, the on-ly pret-ty ring-time, "
+                "when birds do sing hey ding a ding a ding, hey ding a ding a ding, hey ding a ding a ding, "
+                "sweet lo-vers love the spring, in spring-time, in spring-time, the on-ly pret-ty ring-time, "
+                "when birds do sing hey ding a ding a ding, hey ding a ding a ding, hey ding a ding a ding, "
+                "sweet lo-vers love the spring.",
+         stanza_cols=3,
+         stanzas=["Between the acres of the rye, / with a hey, with a ho … / "
+                  "these pretty country fools would lie / in springtime …",
+                  "This carol they began that hour, / with a hey, with a ho … / "
+                  "how that a life was but a flower / in springtime …",
+                  "Then pretty lovers take the time, / with a hey, with a ho … / "
+                  "for love is crownèd with the prime / in springtime …"]),
     dict(title="Doen Daphne d’over schoone Maeght", key="C", keyname="d-Moll (dorisch)", time=(3, 4),
          credit="Jacob van Eyck, Der Fluyten Lust-hof (1649) · Thema ohne die Variationen",
          # Quelle: van Eyck, Der Fluyten Lust-hof I, Ausgabe Cayo Gomes 2024 (IMSLP, CC0), nur das Thema

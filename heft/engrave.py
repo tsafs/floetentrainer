@@ -736,6 +736,12 @@ def render_staff_system(events, sp, width, key, time_sig=None, base=9.0, show_di
                 hl = min(1.1, max(0.5, (xb - xa) * 0.4))
                 parts.append(f'<line x1="{mx - hl / 2:.3f}" y1="{lyr_y - lyr_size * 0.27:.3f}" x2="{mx + hl / 2:.3f}" '
                              f'y2="{lyr_y - lyr_size * 0.27:.3f}" stroke="{INK}" stroke-width="0.17"/>')
+        # Trennstrich am Zeilenende, wenn das Wort in der nächsten Zeile weitergeht
+        if syl_notes and events[syl_notes[-1]].get("hy"):
+            el = events[syl_notes[-1]]
+            xa = sy.xs[syl_notes[-1]] + text_w(el["syl"], lyr_size) / 2 + 0.6
+            parts.append(f'<line x1="{xa:.3f}" y1="{lyr_y - lyr_size * 0.27:.3f}" x2="{xa + 1.0:.3f}" '
+                         f'y2="{lyr_y - lyr_size * 0.27:.3f}" stroke="{INK}" stroke-width="0.17"/>')
         # Melisma-Linie, wenn Wortende über Bogen/Haltebogen
         for k, i in enumerate(note_items):
             e = events[i]
