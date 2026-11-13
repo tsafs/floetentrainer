@@ -45,6 +45,10 @@
   --hole-ring: #2b2724;
   --thumb-bg: none;
   --thumb-line: none;
+  /* Notensatz der Lieder: klingende Note, gewählter Abschnitt */
+  --mark: #2e6a93;
+  --mark-tint: #e2e5e0;
+  --mark-sel: #d0d9d8;
 }
 
 /* Dunkelmodus: folgt dem Handy, außer in den Einstellungen ist „Hell“ oder „Dunkel“ gewählt.
@@ -72,6 +76,9 @@
     --hole-ring: #e6dccb;
     --thumb-bg: var(--wood);
     --thumb-line: var(--wood-line);
+    --mark: #8fbcdc;
+    --mark-tint: #2f3234;
+    --mark-sel: #3b444a;
   }
 }
 :root[data-theme="dark"] {
@@ -96,6 +103,9 @@
   --hole-ring: #e6dccb;
   --thumb-bg: var(--wood);
   --thumb-line: var(--wood-line);
+  --mark: #8fbcdc;
+  --mark-tint: #2f3234;
+  --mark-sel: #3b444a;
 }
 
 * {
@@ -1184,4 +1194,58 @@ svg.acc {
 
 [hidden] {
   display: none !important;
+}
+
+/* Notensatz der Lieder (src/songs/engrave.ts): je Zeile ein SVG, Einheit 1 = ein Zwischenraum.
+   .n/.r = Note/Pause (data-id), .cur = gerade klingende Note, .takt = Tipp-Rechteck je Takt (data-bar),
+   .inloop = Takt im gewählten Abschnitt, .sel = gerade angetippter Takt. */
+.score {
+  display: block;
+}
+.score svg.sys {
+  display: block;
+  overflow: visible;
+  fill: var(--ink);
+  stroke: var(--ink);
+  -webkit-user-select: none;
+  user-select: none;
+}
+.score svg.sys * {
+  pointer-events: none;
+}
+.score path,
+.score rect,
+.score circle,
+.score text {
+  stroke: none;
+}
+.score .volta {
+  fill: none;
+  stroke: var(--ink);
+}
+.score text {
+  font-family: "EB Garamond", Georgia, serif;
+}
+.score .syl {
+  text-anchor: middle;
+}
+.score .bno {
+  font-style: italic;
+  fill: var(--soft);
+}
+.score .takt {
+  fill: transparent;
+  pointer-events: all;
+  cursor: pointer;
+  transition: fill 0.15s;
+}
+.score .takt.inloop {
+  fill: var(--mark-tint);
+}
+.score .takt.sel {
+  fill: var(--mark-sel);
+}
+.score .cur {
+  fill: var(--mark);
+  stroke: var(--mark);
 }

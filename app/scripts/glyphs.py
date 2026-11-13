@@ -13,7 +13,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 FONT = os.path.join(HERE, "..", "..", "heft", "fonts", "bravura.otf")
 OUT = os.path.join(HERE, "..", "src", "music", "bravura.ts")
 
-GLYPHS = {"clef": 0xE050, "whole": 0xE0A2, "sharp": 0xE262, "flat": 0xE260}
+GLYPHS = {"clef": 0xE050, "whole": 0xE0A2, "sharp": 0xE262, "flat": 0xE260,
+          # für den Notensatz der Lieder (src/songs/engrave.ts)
+          "half": 0xE0A3, "black": 0xE0A4, "natural": 0xE261, "dot": 0xE1E7,
+          "flag8Up": 0xE240, "flag8Down": 0xE241, "flag16Up": 0xE242, "flag16Down": 0xE243,
+          "rest1": 0xE4E3, "rest2": 0xE4E4, "rest4": 0xE4E5, "rest8": 0xE4E6, "rest16": 0xE4E7,
+          "breath": 0xE4CE}
+GLYPHS.update({f"time{n}": 0xE080 + n for n in range(10)})  # Ziffern der Taktangabe
 
 font = TTFont(FONT)
 upem = font["head"].unitsPerEm
@@ -51,3 +57,36 @@ lines.append("};")
 with open(OUT, "w", encoding="utf-8") as f:
     f.write("\n".join(lines) + "\n")
 print("geschrieben:", OUT)
+
+# ---------------------------------------------------------------- Laufweiten EB Garamond
+# Für den Notensatz der Lieder: Silbenbreiten ohne DOM berechnen (Umbruch im Voraus, auch in Vitest).
+# Kerning wird nicht berücksichtigt (macht bei Silben nur Bruchteile eines Pixels aus).
+TEXT_OUT = os.path.join(HERE, "..", "src", "music", "garamond.ts")
+FONTS = os.path.join(HERE, "..", "src", "fonts")
+
+
+def widths(fname):
+    f = TTFont(os.path.join(FONTS, fname))
+    em = f["head"].unitsPerEm
+    cm = f.getBestCmap()
+    hm = f["hmtx"]
+    chars = [c for c in sorted(cm) if c >= 0x20 and c != 0xFFFD]
+    return "".join(chr(c) for c in chars), [round(hm[cm[c]][0] * 1000 / em) for c in chars]
+
+
+def js_str(s):
+    return "".join(ch if ch.isprintable() and ch not in '"\\' else f"\\u{ord(ch):04x}" for ch in s)
+
+
+tl = [
+    "// Automatisch erzeugt von scripts/glyphs.py aus den EB-Garamond-Schnitten in src/fonts",
+    "// (SIL Open Font License 1.1, siehe public/fonts/OFL-EB-Garamond.txt).",
+    "// Laufweiten in Tausendstel der Schriftgröße, je Zeichen in derselben Reihenfolge wie die Zeichenkette.",
+]
+for key, fname in (("regular", "eb-garamond-latin-400-normal.woff2"), ("italic", "eb-garamond-latin-400-italic.woff2")):
+    chars, ws = widths(fname)
+    tl.append(f'export const {key.upper()}_CHARS = "{js_str(chars)}";')
+    tl.append(f"export const {key.upper()}_WIDTHS = [{','.join(map(str, ws))}];")
+with open(TEXT_OUT, "w", encoding="utf-8") as f:
+    f.write("\n".join(tl) + "\n")
+print("geschrieben:", TEXT_OUT)
