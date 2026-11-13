@@ -38,6 +38,8 @@ export function fluteSvg(fing: string, label = "Griffbild", attrs = ""): string 
   o.push(`<rect class="fd" x="-3.4" y="13.5" width="6.8" height="4.6" rx="0.9" stroke-width="${SW * 0.8}"/>`);
   o.push(`<line class="fl" x1="${-BW}" y1="123.5" x2="${BW}" y2="123.5" stroke-width="${SW * 0.7}" opacity="0.7"/>`);
   o.push(`<line class="fl" x1="-3.6" y1="73.5" x2="3.6" y2="73.5" stroke-width="${SW * 0.75}"/>`);
+  // Hintergrund fürs Daumenloch (nur im Dunkelmodus sichtbar, siehe styles.css)
+  o.push(`<circle class="tb" cx="${THUMB[0]}" cy="${THUMB[1]}" r="${R + 1.4}"/>`);
   o.push(hole(THUMB[0], THUMB[1], R, fing[0]));
   for (let i = 0; i < 7; i++) {
     const s = fing[i + 1];

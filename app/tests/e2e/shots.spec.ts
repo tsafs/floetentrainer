@@ -1,7 +1,8 @@
 // Bildschirmfotos für die Durchsicht (nur mit SHOTS=1): npx playwright test shots
 import { expect, test, type Page } from "@playwright/test";
 import { sampleData } from "./seed";
-import { answer, info, next, skipIntros } from "./util";
+import { answer, FAKE_MIC, info, next, skipIntros } from "./util";
+import { note, soundingFreq } from "../../src/music/notes";
 
 test.skip(!process.env.SHOTS, "nur auf Wunsch");
 
@@ -76,6 +77,32 @@ for (const s of SIZES) {
       }
       expect((await info(page)).step).toBe("intro");
       await page.screenshot({ path: p("5-vorstellung") });
+      // Sitzungsende
+      await page.getByRole("button", { name: "Sitzung beenden" }).click();
+      await page.screenshot({ path: p("9-ende") });
+    });
+    test("Spielen und Stimmgerät", async ({ page }) => {
+      await page.addInitScript(FAKE_MIC);
+      await seed(page);
+      const p = (x: string) => `${OUT}/${scheme}-${s.name}-${x}.png`;
+      const osc = (id: string) => page.evaluate((f) => (window as never as { __osc: { play(f: number): void } }).__osc.play(f), soundingFreq(note(id)));
+      await page.goto("./");
+      await page.getByRole("button", { name: /Spielen/ }).click();
+      await page.waitForFunction(() => (window as never as { __osc: unknown }).__osc !== null);
+      const t = (await info(page)).note;
+      await page.waitForTimeout(500);
+      await osc(t === "g1" ? "a1" : "g1");
+      await page.waitForTimeout(150);
+      await page.screenshot({ path: p("a-spielen-hoeren") });
+      await expect(page.getByTestId("panel")).toBeVisible();
+      await page.screenshot({ path: p("b-spielen-falsch") });
+      await page.goto("./");
+      await page.getByRole("link", { name: "Stimmgerät" }).click();
+      await page.waitForFunction(() => (window as never as { __osc: unknown }).__osc !== null);
+      await osc("b1");
+      await expect(page.getByTestId("tuner-name")).toHaveText("b1");
+      await page.waitForTimeout(200);
+      await page.screenshot({ path: p("c-stimmgeraet") });
     });
   });
 }

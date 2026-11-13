@@ -239,7 +239,7 @@ export const practiceView: View = (root, ctx) => {
       // Bei Griff→Note steht der Griff schon oben: im Feld die Note zeigen
       const pic = kind === "note" ? staffSvg(id, { variant: "narrow", label: `Note ${nameText(id)}` }) : flute(id);
       return (
-        `<div class="panel err" data-testid="panel"><div class="fl">${pic}</div><div class="txt"><span class="head">${head}</span>` +
+        `<div class="panel err" data-testid="panel"><div class="fl${kind === "note" ? " st" : ""}">${pic}</div><div class="txt"><span class="head">${head}</span>` +
         `<span class="name">${nameHtml(id)}</span><span class="sub">${hint}</span></div></div>` +
         `<button class="go" data-act="next">Weiter</button>`
       );

@@ -68,3 +68,30 @@ export async function skipIntros(page: Page) {
 export async function stored(page: Page) {
   return page.evaluate(() => JSON.parse(localStorage.getItem("floetentrainer")!));
 }
+
+/** Ersetzt das Mikrofon durch einen Oszillator, steuerbar über window.__osc.play(freq) / silence(). */
+export const FAKE_MIC = () => {
+  const w = window as unknown as { __osc: { play(f: number): void; silence(): void } | null };
+  w.__osc = null;
+  navigator.mediaDevices.getUserMedia = async () => {
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    gain.gain.value = 0;
+    const dest = ctx.createMediaStreamDestination();
+    osc.connect(gain).connect(dest);
+    osc.start();
+    await ctx.resume();
+    w.__osc = {
+      play(f: number) {
+        osc.frequency.setValueAtTime(f, ctx.currentTime);
+        gain.gain.setValueAtTime(0.4, ctx.currentTime);
+      },
+      silence() {
+        gain.gain.setValueAtTime(0, ctx.currentTime);
+      },
+    };
+    return dest.stream;
+  };
+};
+

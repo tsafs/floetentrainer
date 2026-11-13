@@ -37,10 +37,10 @@ self.addEventListener("fetch", (e) => {
   const req = e.request;
   if (req.method !== "GET" || new URL(req.url).origin !== self.location.origin) return;
   if (req.mode === "navigate") {
-    e.respondWith(caches.match("./index.html", { ignoreSearch: true }).then((r) => r || fetch(req)));
+    e.respondWith(caches.match("./index.html", { ignoreSearch: true, ignoreVary: true }).then((r) => r || fetch(req)));
     return;
   }
-  e.respondWith(caches.match(req, { ignoreSearch: true }).then((r) => r || fetch(req)));
+  e.respondWith(caches.match(req, { ignoreSearch: true, ignoreVary: true }).then((r) => r || fetch(req)));
 });
 `;
 

@@ -42,6 +42,7 @@
   --wood-dark: #cdb68f;
   --hole: #2b2724;
   --hole-open: #fffdf8;
+  --hole-ring: #2b2724;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -62,8 +63,9 @@
     --wood: #8d7a5f;
     --wood-line: #b8a07c;
     --wood-dark: #6c5b45;
-    --hole: #1a1613;
+    --hole: #16120f;
     --hole-open: #efe6d4;
+    --hole-ring: #e6dccb;
   }
 }
 
@@ -163,7 +165,17 @@ svg.acc {
   fill: var(--hole-open);
 }
 .flute .hr {
-  stroke: var(--hole);
+  stroke: var(--hole-ring);
+}
+.flute .tb {
+  fill: none;
+}
+@media (prefers-color-scheme: dark) {
+  .flute .tb {
+    fill: var(--wood);
+    stroke: var(--wood-line);
+    stroke-width: 0.5;
+  }
 }
 
 /* ---------------------------------------------------------------- Seitenrahmen */
@@ -299,6 +311,8 @@ svg.acc {
   padding-top: 10px;
 }
 .track {
+  color: inherit;
+  text-decoration: none;
   display: grid;
   grid-template-columns: 4.6rem 1fr auto;
   align-items: center;
@@ -333,7 +347,12 @@ svg.acc {
 .notes {
   display: grid;
   gap: 10px;
-  min-height: 0;
+}
+.home > * {
+  flex-shrink: 0;
+}
+.home > .spacer {
+  flex: 1 1 0;
 }
 .notes h2 {
   font-size: 1rem;
@@ -374,18 +393,19 @@ svg.acc {
   background: var(--err);
 }
 .home.dense {
-  gap: 16px;
+  gap: 14px;
 }
 .home.dense .chips {
-  grid-template-columns: repeat(auto-fill, minmax(42px, 1fr));
-  gap: 6px 6px;
+  grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+  gap: 4px 4px;
 }
 .home.dense .chip {
-  font-size: 1.12rem;
-  gap: 4px;
+  font-size: 1.08rem;
+  gap: 3px;
+  padding-top: 0.15em;
 }
 .home.dense .chip i {
-  width: 28px;
+  width: 26px;
   height: 3px;
 }
 .home.denser .notes {
@@ -588,6 +608,9 @@ svg.acc {
 .panel .fl .staff {
   height: 100%;
   width: auto;
+}
+.panel .fl.st {
+  height: clamp(92px, 14vh, 118px);
 }
 .panel .head {
   display: flex;
@@ -830,7 +853,8 @@ svg.acc {
 .cell .staff {
   width: 100%;
   height: auto;
-  grid-row: 1 / 3;
+  grid-row: 1;
+  grid-column: 1;
 }
 .cell .flute {
   height: 104px;
@@ -838,12 +862,14 @@ svg.acc {
   grid-column: 2;
 }
 .cell .cn {
-  grid-column: 1 / -1;
+  grid-row: 2;
+  grid-column: 1;
   font-size: 1.4rem;
   line-height: 1;
   padding-top: 0.3em;
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 2px 8px;
   align-items: baseline;
 }
 .cell .cn small {
@@ -1109,4 +1135,8 @@ svg.acc {
     display: grid;
     gap: 14px;
   }
+}
+
+[hidden] {
+  display: none !important;
 }
