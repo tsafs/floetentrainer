@@ -23,4 +23,7 @@ Silben, Atemzeichen, Seitenumbrüche.
 ## Offene Aufgaben
 1. „All in a Garden Green“ aus verlässlicher Quelle aufnehmen (Wunsch der Nutzerin).
 2. Weitere Stücke aus `docs/notizen.md`, v. a. Themen aus van Eycks „Fluyten Lust-hof“.
-3. Übungs-App: Auftrag in `docs/app-prompt.md`.
+3. Übungs-App: Auftrag in `docs/app-prompt.md`, **abgestimmte Entscheidungen in
+   `docs/app-entscheidungen.md`** (gehen vor). Entwurf zum Ansehen: `docs/entwurf/app-mock.html`
+   (`?s=home`, `?s=ok`, `?s=err`) und die Bildschirmfotos daneben. Plan ist mit der Nutzerin
+   abgestimmt; direkt mit der Umsetzung in `app/` beginnen, `heft/` nicht verändern.
