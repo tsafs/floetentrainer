@@ -31,6 +31,10 @@ Deshalb entfernt:
 - Kein schöner Land (Wunsch der Nutzerin: komplett raus)
 
 ## Aufgenommen
+- **Holborne: The Honie-suckle (Nr. 60), The Fairie-round (Nr. 63)** – Cantus-Stimmen (Alpers bzw. Mondrup, IMSLP;
+  in `docs/quellen/`). Fairie-round in Mondrups Fassung mit halbierten Notenwerten (6/8).
+- **Van Eyck: Onder de Linde groene** (Bd. II, bei Michel/Teske Nr. 100) – nur das Thema. Ergebnis der Prüfung:
+  NICHT dieselbe Melodie wie Playfords „All in a Garden Green“.
 - **Van Eyck: Doen Daphne d'over schoone Maeght (Nr. 3), Malle Symen (Nr. 5), Engels Nachtegaeltje (Nr. 27)** –
   jeweils nur das Thema, aus der Ausgabe von Cayo Gomes 2024 (IMSLP, CC0; liegt in `docs/quellen/`).
   „Onder de linde groene“ steht dort nicht (die Ausgabe reicht nur bis Nr. 41) – dafür wäre der zweite Teil
@@ -48,7 +52,7 @@ Deshalb entfernt:
 ## Wünsche und Ideen für später
 - Van Eycks „Onder de linde groene“ (Fluyten Lust-hof) gilt als Fassung von „All in a Garden Green“ –
   noch nicht geprüft; ggf. als Gegenstück zu Nr. 20.
-- **Jacob van Eyck, Der Fluyten Lust-hof** (1644–49): weitere Themen, z. B. „Onder de linde groene“,
+- **Jacob van Eyck, Der Fluyten Lust-hof** (1644–49): weitere Themen, z. B.
   „Lavignone“, „Rosemont“, „Comagain“, „Amarilli mia bella“ (Nr. 9, 10, 32, 35 stehen in der Gomes-Ausgabe).
 - **Thomas Morley**: „It was a lover and his lass“, „Now is the month of maying“ (Oberstimme).
 - **Anthony Holborne**: Oberstimmen der Consort-Tänze, z. B. „The Honie-suckle“, „The Fairie Round“.
@@ -69,12 +73,14 @@ Zugriff auf weitere Seiten (z. B. imslp.org, thesession.org, abcnotation.com, de
 - Wikimedia-Bilder: nur Vorschaubilder in Standardgrößen laden (z. B. 1920px), Originale geben Fehler 429.
 
 ## Download-Links für die Wunschliste (IMSLP, von der Nutzerin zu laden)
-- Van Eyck Bd. II (darin „Onder de linde groene“): Michel/Teske – https://imslp.org/images/4/45/PMLP201599-van_eyck_amadeus_v3.pdf
+- (erledigt) Van Eyck Bd. II: Michel/Teske – https://imslp.org/images/4/45/PMLP201599-van_eyck_amadeus_v3.pdf
   (Original 1654, S. 18: https://imslp.org/images/0/09/PMLP311380-der_fluyten_lusthof_1654.pdf)
 - Holborne, The Honie-suckle (Cantus, Alpers): https://imslp.org/images/a/ad/WIMA.5289-60_the_honie_suckle-1.pdf
 - Holborne, The Fairie-round (Cantus/Sopranflöte, Mondrup): https://imslp.org/images/1/1c/PMLP955838-Holb-FairieRound-Cantus.pdf
-- Morley, It was a lover and his lass (CC0): https://imslp.org/images/4/4e/PMLP879951-It_Was_A_Lover_And_His_Lass_morley_ronald.pdf
-- Morley, Now is the month of maying (Canto, Meylan): https://imslp.org/images/8/83/PMLP60454-canto.pdf
+- Morley, It was a lover and his lass (Originaltonart, Baum): https://imslp.org/images/a/a8/PMLP879951-It_was_a_lover_and_his_lass_%28orig_key%29.pdf
+  (ungeeignet: Bearbeitung von Landon Ronald, „…morley_ronald.pdf“)
+- Morley, Now is the month of maying (Messerschmidt 2025): https://imslp.org/images/f/f1/PMLP415491-Now_is_the_month_of_Maying_-_Score.pdf
+  (ungeeignet: Meylans Canto in alter Mensuralnotation ohne Taktstriche)
 - Attaingnant, Tourdion (Gouin): https://imslp.org/images/7/72/WIMA.fa8a-Attaignant_Tourdion.pdf
 - Arbeau, Belle qui tiens ma vie (Mutopia): https://imslp.org/images/c/cf/Arbeau_-_Pavan%2C_Belle_Qui_Tiens_Ma_Vie.pdf
 - Arbeau, Branle de l'Official (Fine, Flöte): https://imslp.org/images/d/d7/PMLP15048-Branle_L%27Official_flute_viola_and_cello_score_and_parts.pdf

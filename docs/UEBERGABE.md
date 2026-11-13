@@ -8,7 +8,7 @@ Antworten auf Deutsch, Technik in Worten erklären statt Code zu zitieren. Vor g
 kurz den Plan abstimmen. Design: ruhig, elegant, viel Weißraum, schwarz-weiß druckbar.
 
 ## Stand
-- `heft/pdf/Liederheft-Blockfloete-sw.pdf` – 19 Seiten, aktuell (22 Stücke). Seite 1 = Inhaltsverzeichnis.
+- `heft/pdf/Liederheft-Blockfloete-sw.pdf` – 21 Seiten, aktuell (25 Stücke). Seite 1 = Inhaltsverzeichnis.
 - Bauen mit `heft/bauen.sh`. Das Skript misst die echten Höhen der Liedblöcke im Browser und
   verteilt sie auf Seiten (kein Lied über einen Umbruch); am Ende gibt es je Seite die Unterkante in mm
   aus – Werte über ca. 276 heißen: Seite läuft über.
