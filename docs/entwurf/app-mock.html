@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Flötentrainer Entwurf</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Noto+Music&display=swap">
+<style>
+@font-face { font-family: Bravura; src: url("../../heft/fonts/bravura.otf"); }
+:root {
+  --paper: #fbf6ea; --ink: #2b2724; --soft: #82786d; --line: #d6c4a3; --track: #e8dcc6;
+  --btn: #fffdf8; --ok: #4c7350; --ok-tint: #edf0e1; --err: #9a4b3a; --err-tint: #f5e8de;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--paper); color: var(--ink); font-family: "EB Garamond", Georgia, serif; font-size: 19px; line-height: 1.4; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; }
+.screen { height: 100%; padding: 18px 20px 18px; }
+
+/* ---------- Startseite ---------- */
+.home { display: flex; flex-direction: column; gap: 22px; }
+.home h1 { margin: 0; font-size: 2rem; font-weight: 500; line-height: 1.1; }
+.today { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.stat { display: grid; gap: 2px; align-content: start; }
+.num { font-size: 2.9rem; line-height: 1; font-weight: 500; font-variant-numeric: oldstyle-nums; }
+.lbl { font-style: italic; color: var(--soft); }
+.week { display: flex; gap: 7px; margin-top: 6px; }
+.week span { display: grid; justify-items: center; gap: 2px; font-size: 0.72rem; color: var(--soft); }
+.week span::before { content: ""; width: 12px; height: 12px; border-radius: 50%; border: 1.3px solid var(--ink); }
+.week span.on::before { background: var(--ink); }
+.week span.now::before { box-shadow: 0 0 0 2.5px var(--paper), 0 0 0 3.8px var(--line); }
+.tracks { display: grid; gap: 10px; border-top: 1px solid var(--line); padding-top: 18px; }
+.track { display: grid; grid-template-columns: 4.6rem 1fr auto; align-items: center; gap: 12px; }
+.track .t { font-weight: 500; }
+.steps { display: grid; grid-template-columns: repeat(9, 1fr); gap: 3px; }
+.steps i { height: 6px; border-radius: 3px; background: var(--track); }
+.steps i.on { background: var(--ink); }
+.track .s { font-style: italic; color: var(--soft); }
+.spacer { flex: 1; }
+.notes { display: grid; gap: 10px; }
+.notes h2 { margin: 0; font-size: 1rem; font-weight: 400; font-style: italic; color: var(--soft); }
+.chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: 10px 8px; }
+.chip { display: grid; justify-items: center; gap: 5px; font-size: 1.35rem; line-height: 1; }
+.chip i { width: 34px; height: 4px; border-radius: 2px; background: var(--track); overflow: hidden; display: block; }
+.chip i b { display: block; height: 100%; background: var(--ink); }
+.chip.weak { color: var(--err); }
+.chip.weak i b { background: var(--err); }
+.actions { display: grid; gap: 12px; }
+.actions button { border-radius: 16px; padding: 12px 0 13px; display: grid; gap: 0; text-align: center; font-size: 1.4rem; line-height: 1.15; }
+.actions small { font-size: 0.9rem; font-style: italic; }
+.actions .main { background: var(--ink); color: var(--paper); }
+.actions .main small { color: #d9cdb9; }
+.actions .alt { border: 1.2px solid var(--ink); }
+.actions .alt small { color: var(--soft); }
+.links { display: flex; justify-content: space-around; font-style: italic; color: var(--soft); }
+.links button { padding: 10px 6px; }
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .screen { padding: 14px max(24px, env(safe-area-inset-right)) 12px max(24px, env(safe-area-inset-left)); }
+  .home { display: grid; grid-template-columns: 1fr 1fr; column-gap: 36px; row-gap: 14px;
+          grid-template-areas: "title act" "today act" "tracks nav"; grid-template-rows: auto 1fr auto; }
+  .home h1 { grid-area: title; font-size: 1.7rem; }
+  .today { grid-area: today; }
+  .tracks { grid-area: tracks; padding-top: 12px; gap: 8px; }
+  .spacer, .notes { display: none; }
+  .actions { grid-area: act; align-content: center; }
+  .links { grid-area: nav; align-self: end; }
+  .num { font-size: 2.5rem; }
+}
+
+/* ---------- Übungskarte ---------- */
+.prac { display: flex; flex-direction: column; gap: 14px; }
+.barrow { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px; }
+.x { width: 40px; height: 40px; margin-left: -8px; display: grid; place-items: center; }
+.bar { height: 3px; background: var(--track); border-radius: 2px; overflow: hidden; }
+.bar i { display: block; height: 100%; width: 35%; background: var(--ink); }
+.count { font-style: italic; color: var(--soft); font-variant-numeric: oldstyle-nums; }
+.stage { flex: 1; display: grid; align-content: center; justify-items: center; gap: 10px; min-height: 0; }
+.staff { width: 100%; max-width: 330px; height: auto; display: block; }
+.staff line { stroke: var(--ink); stroke-width: 1.1; }
+.staff .ledger { stroke-width: 1.5; }
+.staff text { fill: var(--ink); font-family: Bravura; }
+.o { font-size: 0.58em; position: relative; top: -0.72em; margin-left: 0.09em; line-height: 0; }
+.q { margin: 0; font-size: 1.3rem; text-align: center; }
+.answer { display: grid; gap: 12px; }
+.btns { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.btns button { background: var(--btn); border: 1px solid var(--line); border-radius: 14px; height: 64px; font-size: 1.8rem; line-height: 1; }
+.btns .right { border-color: var(--ok); box-shadow: inset 0 0 0 1.5px var(--ok); }
+.btns .dim { opacity: 0.4; }
+.panel { border-radius: 16px; padding: 14px 18px; display: grid; grid-template-columns: auto 1fr; gap: 6px 20px; align-items: center; }
+.panel.ok { background: var(--ok-tint); }
+.panel.err { background: var(--err-tint); }
+.panel .txt { display: grid; gap: 8px; align-content: center; }
+.panel .fl svg { height: 168px; width: auto; display: block; }
+.panel .head { display: flex; align-items: center; gap: 8px; font-size: 1.3rem; font-weight: 500; line-height: 1.1; }
+.panel.ok .head { color: var(--ok); }
+.panel.err .head { color: var(--err); }
+.panel .name { font-size: 3rem; line-height: 1; font-weight: 500; }
+.panel .sub { font-style: italic; line-height: 1.3; }
+.go { background: var(--ink); color: var(--paper); border-radius: 14px; height: 56px; font-size: 1.3rem; width: 100%; }
+.answer.err .btns { display: none; }
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .prac { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr; column-gap: 32px; row-gap: 6px; }
+  .barrow { grid-column: 1 / -1; }
+  .stage { align-content: center; }
+  .staff { max-width: none; width: auto; height: min(150px, 42vh); }
+  .q { font-size: 1.15rem; }
+  .answer { align-content: center; }
+  .btns { grid-template-columns: 1fr 1fr; }
+  .btns button { height: 58px; }
+  .answer.ok .btns { display: none; }
+  .panel .fl svg { height: 132px; }
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const p = new URLSearchParams(location.search);
+const screen = p.get("s") || "home";
+
+// Notenzeile: pos 0 = unterste Linie (e¹), halbe Zwischenräume
+function staff(pos) {
+  const sp = 14, b = 96, x = 170, hd = 0.82;           // Zwischenraum 14, Kopf auf 82 % verkleinert
+  const y = b - pos * sp / 2, fs = 4 * sp, hw = 1.688 * sp * hd;
+  let s = `<svg class="staff" viewBox="0 12 260 118" role="img">`;
+  for (let i = 0; i < 5; i++) s += `<line x1="4" x2="256" y1="${b - i * sp}" y2="${b - i * sp}"/>`;
+  for (let q = -2; q >= pos; q -= 2) s += `<line class="ledger" x1="${x - hw / 2 - 6}" x2="${x + hw / 2 + 6}" y1="${b - q * sp / 2}" y2="${b - q * sp / 2}"/>`;
+  for (let q = 10; q <= pos; q += 2) s += `<line class="ledger" x1="${x - hw / 2 - 6}" x2="${x + hw / 2 + 6}" y1="${b - q * sp / 2}" y2="${b - q * sp / 2}"/>`;
+  s += `<text x="12" y="${b - sp}" font-size="${fs}">\uE050</text>`;
+  s += `<text x="${x - hw / 2}" y="${y}" font-size="${fs * hd}">\uE0A2</text></svg>`;
+  return s;
+}
+
+// Griffbild nach heft/engrave.py, mit feineren Rändern und mehr Abstand bei den Doppellöchern
+function flute(fing) {
+  const WOOD = "#efe4cf", LINE = "#a58c68", DARK = "#cdb68f", HOLE = "#2b2724", OPEN = "#fffdf8";
+  const hh = 8, bw = 7, th = 134, rb = 5.5, sw = 0.7, hw = 0.5;
+  const ys = [44, 55, 66, 81, 92, 103, 114];
+  const o = [];
+  o.push(`<path d="M${-bw},26 L${-bw},${th - rb} Q${-bw},${th} ${-bw + rb},${th} L${bw - rb},${th} Q${bw},${th} ${bw},${th - rb} L${bw},26 Z" fill="${WOOD}" stroke="${LINE}" stroke-width="${sw}" stroke-linejoin="round"/>`);
+  o.push(`<path d="M${-hh},30 L${-hh},9 C${-hh},2.2 ${-hh + 3.5},0 0,0 C${hh - 3.5},0 ${hh},2.2 ${hh},9 L${hh},30 Z" fill="${WOOD}" stroke="${LINE}" stroke-width="${sw}" stroke-linejoin="round"/>`);
+  o.push(`<rect x="-3.4" y="13.5" width="6.8" height="4.6" rx="0.9" fill="${DARK}" stroke="${LINE}" stroke-width="${sw * 0.8}"/>`);
+  o.push(`<line x1="${-bw}" y1="123.5" x2="${bw}" y2="123.5" stroke="${LINE}" stroke-width="${sw * 0.7}" opacity="0.7"/>`);
+  o.push(`<line x1="-3.6" y1="73.5" x2="3.6" y2="73.5" stroke="${LINE}" stroke-width="${sw * 0.75}"/>`);
+  const hole = (x, y, r, s) => s === "h"
+    ? `<circle cx="${x}" cy="${y}" r="${r}" fill="${OPEN}"/><path d="M${x},${y - r} A${r},${r} 0 0 0 ${x},${y + r} Z" fill="${HOLE}"/><circle cx="${x}" cy="${y}" r="${r}" fill="none" stroke="${HOLE}" stroke-width="${hw}"/>`
+    : `<circle cx="${x}" cy="${y}" r="${r}" fill="${s === "x" ? HOLE : OPEN}" stroke="${HOLE}" stroke-width="${hw}"/>`;
+  o.push(hole(-13.6, 37, 3.0, fing[0]));
+  for (let i = 0; i < 7; i++) {
+    const s = fing[i + 1], y = ys[i];
+    if (i < 5) o.push(hole(0, y, 3.0, s));
+    else { o.push(hole(-2.0, y, 2.35, "xh".includes(s) ? "x" : "o")); o.push(hole(3.35, y, 1.4, s === "x" ? "x" : "o")); }
+  }
+  return `<svg viewBox="-17.5 -1 26.5 136" role="img" aria-label="Griffbild">${o.join("")}</svg>`;
+}
+
+const check = `<svg width="22" height="22" viewBox="0 0 34 34" aria-hidden="true"><circle cx="17" cy="17" r="15.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10.5 17.5l4.3 4.3 8.7-9.3" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const xicon = `<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M3 3l12 12M15 3L3 15" stroke="#2b2724" stroke-width="1.6" stroke-linecap="round"/></svg>`;
+
+const home = `
+<main class="screen home">
+  <h1>Flötentrainer</h1>
+  <section class="today">
+    <div class="stat"><span class="num">12</span><span class="lbl">Karten fällig</span></div>
+    <div class="stat"><span class="num">5</span><span class="lbl">Tage in Folge</span>
+      <div class="week"><span class="on">Mo</span><span class="on">Di</span><span class="on">Mi</span><span class="on">Do</span><span class="now">Fr</span><span>Sa</span><span>So</span></div>
+    </div>
+  </section>
+  <section class="tracks">
+    <div class="track"><span class="t">Lesen</span><div class="steps"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i></div><span class="s">Stufe 3</span></div>
+    <div class="track"><span class="t">Spielen</span><div class="steps"><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><span class="s">Stufe 1</span></div>
+  </section>
+  <section class="notes"><h2>Deine Töne beim Lesen</h2><div class="chips">
+    <span class="chip">h<span class="o">1</span><i><b style="width:100%"></b></i></span><span class="chip">a<span class="o">1</span><i><b style="width:95%"></b></i></span>
+    <span class="chip">g<span class="o">1</span><i><b style="width:90%"></b></i></span><span class="chip">c<span class="o">2</span><i><b style="width:85%"></b></i></span>
+    <span class="chip">d<span class="o">2</span><i><b style="width:80%"></b></i></span><span class="chip weak">e<span class="o">1</span><i><b style="width:45%"></b></i></span>
+    <span class="chip">d<span class="o">1</span><i><b style="width:60%"></b></i></span></div></section>
+  <div class="spacer"></div>
+  <section class="actions">
+    <button class="main">Üben<small>12 Karten · etwa 5 Minuten</small></button>
+    <button class="alt">Spielen<small>mit Flöte und Mikrofon</small></button>
+  </section>
+  <nav class="links"><button>Stimmgerät</button><button>Grifftabelle</button><button>Einstellungen</button></nav>
+</main>`;
+
+function prac(kind) {
+  const ok = kind === "ok";
+  const pos = ok ? 1 : -2;
+  const btns = ok
+    ? `<button class="dim">e<span class="o">1</span></button><button class="right">f<span class="o">1</span></button><button class="dim">g<span class="o">1</span></button><button class="dim">fis<span class="o">1</span></button>`
+    : `<button>d<span class="o">1</span></button><button>c<span class="o">1</span></button><button>e<span class="o">1</span></button><button>c<span class="o">2</span></button>`;
+  const panel = ok
+    ? `<div class="panel ok"><div class="fl">${flute("xxxxxoxx")}</div><div class="txt"><span class="head">${check}Richtig</span><span class="name">f<span class="o">1</span></span></div></div>`
+    : `<div class="panel err"><div class="fl">${flute("xxxxxxxx")}</div><div class="txt"><span class="head">Nicht ganz</span><span class="name">c<span class="o">1</span></span><span class="sub">Du hast d<span class="o">1</span> gewählt. c<span class="o">1</span> hat eine eigene Hilfslinie, d<span class="o">1</span> hängt unter der untersten Linie.</span></div></div><button class="go">Weiter</button>`;
+  return `
+<main class="screen prac">
+  <div class="barrow"><button class="x" aria-label="Sitzung beenden">${xicon}</button><div class="bar"><i></i></div><span class="count">7 von 20</span></div>
+  <div class="stage">${staff(pos)}<p class="q">Wie heißt diese Note?</p></div>
+  <div class="answer ${kind}"><div class="btns">${btns}</div>${panel}</div>
+</main>`;
+}
+
+document.getElementById("root").outerHTML = screen === "home" ? home : prac(screen);
+</script>
+</body>
+</html>

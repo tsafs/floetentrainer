@@ -29,5 +29,8 @@ Jede Seite als Bild ansehen (`pdftoppm`), Details vergrößert: Notenköpfe, Hil
 Silben, Atemzeichen, Seitenumbrüche.
 
 ## Offene Aufgaben
-1. Weitere Stücke aus `docs/notizen.md`, v. a. Themen aus van Eycks „Fluyten Lust-hof“.
-2. Übungs-App: Auftrag in `docs/app-prompt.md`.
+1. Wunschliste in `docs/notizen.md` ist abgearbeitet; weitere Themen aus van Eycks „Fluyten Lust-hof“ möglich.
+2. Übungs-App: umgesetzt in `app/` nach `docs/app-entscheidungen.md` (Vite + TypeScript, pitchy).
+   Tests: `npm test` (Vitest) und `npm run e2e` (Playwright) im Ordner `app/`. Bildschirmfotos für die
+   Durchsicht: `SHOTS=1 npx playwright test shots` (optional `SCHEME=dark`), landen in `app/shots/`.
+   Veröffentlichung über `.github/workflows/pages.yml` auf https://tsafs.github.io/floetentrainer/.
