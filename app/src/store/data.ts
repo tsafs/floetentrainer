@@ -2,6 +2,7 @@
 
 import { levelOf, stagesOf, type Kind, type Track } from "../music/levels";
 import { NOTES } from "../music/notes";
+import { TEMPO_MAX, TEMPO_MIN } from "../songs/tempo";
 import { isValidDayKey } from "./dates";
 
 export const DATA_VERSION = 1;
@@ -32,6 +33,16 @@ export interface CardState {
   session: number;
 }
 
+/**
+ * Was je Lied gemerkt wird (Schlüssel ist die Liedkennung, z. B. "jingle-bells").
+ * Optionales Feld ohne Versionssprung: fehlt es (ältere Daten), gilt {}. Eine ältere App, die es nicht
+ * kennt, lässt es beim Einlesen einfach weg. Später kommen hier z. B. Bestwerte vom Mitspielen hinzu.
+ */
+export interface SongPrefs {
+  /** Tempo in Prozent des Grundtempos (50–120) */
+  tempo?: number;
+}
+
 /** Eine gewertete Antwort: [richtig 1/0, Tag, Zeitpunkt in ms] */
 export type Answer = [0 | 1, string, number];
 
@@ -53,6 +64,8 @@ export interface AppData {
   days: string[];
   /** Zahl der begonnenen Sitzungen */
   sessions: number;
+  /** Einstellungen je Lied (Tempo) */
+  songs: Record<string, SongPrefs>;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -84,6 +97,7 @@ export function defaultData(): AppData {
     introduced: { lesen: [], spielen: [] },
     days: [],
     sessions: 0,
+    songs: {},
   };
 }
 
@@ -216,5 +230,14 @@ export function normalizeData(raw: unknown): AppData {
     out.days = [...new Set(d.days.filter(isValidDayKey))].sort();
   }
   if (isNum(d.sessions)) out.sessions = Math.max(0, Math.round(d.sessions));
+  // Einstellungen je Lied: Fehlerhaftes wird still übergangen (es geht nur um Bequemlichkeit)
+  if (isObj(d.songs)) {
+    for (const [id, p] of Object.entries(d.songs)) {
+      if (!isObj(p) || !/^[a-z0-9-]{1,80}$/.test(id)) continue;
+      const prefs: SongPrefs = {};
+      if (isNum(p.tempo)) prefs.tempo = Math.max(TEMPO_MIN, Math.min(TEMPO_MAX, Math.round(p.tempo)));
+      if (Object.keys(prefs).length) out.songs[id] = prefs;
+    }
+  }
   return out;
 }
