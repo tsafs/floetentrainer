@@ -2,6 +2,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { sampleData } from "./seed";
 import { answer, FAKE_MIC, info, next, skipIntros } from "./util";
+import { FAKE_AUDIO } from "./fake-audio";
 import { note, soundingFreq } from "../../src/music/notes";
 
 test.skip(!process.env.SHOTS, "nur auf Wunsch");
@@ -103,6 +104,38 @@ for (const s of SIZES) {
       await expect(page.getByTestId("tuner-name")).toHaveText("b1");
       await page.waitForTimeout(200);
       await page.screenshot({ path: p("c-stimmgeraet") });
+    });
+    test("Lieder", async ({ page }) => {
+      await page.addInitScript(FAKE_AUDIO);
+      await page.clock.install();
+      await seed(page);
+      const p = (x: string) => `${OUT}/${scheme}-${s.name}-${x}.png`;
+      await page.goto("./");
+      await page.evaluate(() => document.fonts.ready);
+      await page.screenshot({ path: p("l1-start") });
+      await page.getByRole("link", { name: "Lieder" }).click();
+      await expect(page.getByTestId("can-play")).toBeVisible();
+      await page.screenshot({ path: p("l2-liste"), fullPage: true });
+      // langes Lied mit Text beim Abspielen: Abschnitt gewählt, Markierung sichtbar
+      await page.goto("./#/lied/jingle-bells");
+      await page.locator('rect.takt[data-bar="4"]').click();
+      await page.locator('rect.takt[data-bar="7"]').click();
+      await page.getByRole("button", { name: "Abspielen" }).click();
+      await page.clock.runFor(5200);
+      await expect(page.locator(".score .cur").first()).toBeVisible();
+      await page.waitForTimeout(700); // sanftes Scrollen (läuft in Echtzeit)
+      await page.screenshot({ path: p("l3-lied-spielt") });
+      await page.getByRole("button", { name: "Stopp" }).click();
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+      await page.screenshot({ path: p("l4-lied-ende") });
+      // 6/8: Stille Nacht, beim Einzählen
+      await page.goto("./#/lied/stille-nacht-heilige-nacht");
+      await page.getByRole("button", { name: "Abspielen" }).click();
+      await page.clock.runFor(400);
+      await page.screenshot({ path: p("l5-stille-nacht-einzaehlen") });
+      await page.clock.runFor(6000);
+      await page.waitForTimeout(700);
+      await page.screenshot({ path: p("l6-stille-nacht") });
     });
   });
 }

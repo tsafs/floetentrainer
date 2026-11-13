@@ -34,3 +34,17 @@ Silben, Atemzeichen, Seitenumbrüche.
    Tests: `npm test` (Vitest) und `npm run e2e` (Playwright) im Ordner `app/`. Bildschirmfotos für die
    Durchsicht: `SHOTS=1 npx playwright test shots` (optional `SCHEME=dark`), landen in `app/shots/`.
    Veröffentlichung über `.github/workflows/pages.yml` auf https://tsafs.github.io/floetentrainer/.
+3. Lieder-Erweiterung (`docs/app-lieder.md`): **Runde 1 umgesetzt** (Liederliste `#/lieder`, Liedseite
+   `#/lied/<kennung>` mit Notensatz, Vorspielen, Tempo je Lied, Einzählen, Metronom, Abschnitt in
+   Schleife, Griffbild). Runde 2 (ABC-Dateien) und Runde 3 (Mitspielen) sind offen.
+   - Wo was liegt: `app/src/songs/` (Leser `parse.ts`, Modell, Zeitplan, Tempo, Spielbarkeit,
+     Notensatz `layout.ts`/`engrave.ts`), Klang `app/src/audio/flute-synth.ts` und `song-player.ts`,
+     Seiten `app/src/ui/songs.ts`, Tests `app/tests/unit/songs*.test.ts`, `timeline.test.ts`,
+     `engrave.test.ts`, `song-player.test.ts` und `app/tests/e2e/songs.spec.ts` (mit vorgetäuschter
+     Audio-Uhr `fake-audio.ts`).
+   - **`heft/songs.py` wird beim Bauen gelesen** (`app/scripts/heft-songs.py` + `heft-songs-plugin.ts`):
+     neue Lieder erscheinen automatisch, ein unlesbares Lied lässt den Bau scheitern. Die Notation dort
+     muss deshalb stabil bleiben; neue Zeichen erst im App-Leser nachziehen. Die Liedkennung entsteht aus
+     dem Titel – wird ein Titel geändert, geht das gemerkte Tempo dieses Lieds verloren. Grundtempo je
+     Titel in `app/src/songs/tempo.ts`.
+   - Daten: Tempo je Lied steht in `songs` (optionales Feld, Datenformat bleibt Version 1).
