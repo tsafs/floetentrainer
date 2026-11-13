@@ -45,36 +45,63 @@ export interface Timeline {
 
 const EPS = 1e-6;
 
+/** Durchgänge, in denen ein Takt einer Klammer gespielt wird (ABC: voltaNumbers, Heft: 1. oder 2.); sonst null. */
+function voltaPasses(b: Bar): number[] | null {
+  if (b.voltaNumbers?.length) return b.voltaNumbers;
+  return b.volta ? [b.volta] : null;
+}
+
+/** Zahl der Durchgänge eines Abschnitts, der mit dem :| in Takt i endet: höchste Klammernummer, mindestens 2. */
+function sectionPasses(bars: Bar[], i: number): number {
+  if (!voltaPasses(bars[i])) return 2;
+  let a = i;
+  let b = i;
+  while (a > 0 && voltaPasses(bars[a - 1])) a--;
+  while (b < bars.length - 1 && voltaPasses(bars[b + 1])) b++;
+  let n = 2;
+  for (let k = a; k <= b; k++) n = Math.max(n, ...voltaPasses(bars[k])!);
+  return n;
+}
+
 /**
- * Takte in Spielreihenfolge (Indizes in song.bars). Ein :| springt einmal zurück zum letzten |:
- * (ohne |: zum Liedanfang bzw. zum Takt nach der vorigen Wiederholung). Beim zweiten Durchgang
- * wird die 1. Klammer übersprungen und mit der 2. Klammer weitergespielt.
+ * Takte in Spielreihenfolge (Indizes in song.bars). Ein :| springt zurück zum letzten |:
+ * (ohne |: zum Liedanfang bzw. zum Takt nach der vorigen Wiederholung). Klammern werden nur im
+ * passenden Durchgang gespielt: Heft 1./2. Klammer, ABC auch 3. Klammer oder „1.–2.“ (dann wird so
+ * oft wiederholt, wie die höchste Klammernummer sagt). Nach der letzten Klammer ist der Abschnitt fertig.
  */
 export function playOrder(song: Song): number[] {
   const bars = song.bars;
   const order: number[] = [];
-  let start = 0;
-  let second = false;
+  let start = 0; // Ziel des nächsten Rücksprungs
+  let pass = 1; // Durchgang durch den aktuellen Abschnitt
+  let inEndings = false; // in diesem Durchgang schon bei den Klammern angekommen
   let i = 0;
-  while (i < bars.length) {
+  while (i < bars.length && order.length < 100000) {
     const b = bars[i];
-    if (b.repeatStart && !second) start = i;
-    if (second && b.volta === 1) {
-      if (b.barline === "repeatEnd") {
-        second = false;
-        start = i + 1;
+    const nums = voltaPasses(b);
+    if (!nums && inEndings) {
+      // die Klammern liegen hinter uns: Abschnitt fertig
+      pass = 1;
+      start = i;
+      inEndings = false;
+    }
+    if (b.repeatStart && pass === 1) start = i;
+    if (nums) {
+      inEndings = true;
+      if (!nums.includes(pass)) {
+        i++;
+        continue;
       }
-      i++;
-      continue;
     }
     order.push(i);
     if (b.barline === "repeatEnd") {
-      if (!second) {
-        second = true;
+      inEndings = false;
+      if (pass < sectionPasses(bars, i)) {
+        pass++;
         i = start;
         continue;
       }
-      second = false;
+      pass = 1;
       start = i + 1;
     }
     i++;

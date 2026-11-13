@@ -1,0 +1,41 @@
+%abc-2.1
+% Mehrere Stücke in einer Datei (zum Auswählen beim Einlesen).
+% Bruder Jakob und Greensleeves enthalten Begleitakkorde, Verzierungen und Vorschläge,
+% die der Leser weglässt und meldet.
+
+X:1
+T:Bruder Jakob
+T:Frère Jacques
+C:Volksweise
+O:Frankreich
+M:4/4
+L:1/4
+Q:1/4=92
+K:G
+"G"G A B G | G A B G | "D"B c "G"d2 | B c d2 |
+w: Bru-der Ja-kob, Bru-der Ja-kob, schläfst du noch? Schläfst du noch?
+"G"d/e/ d/c/ B G | d/e/ d/c/ B G | "D7"G D "G"G2 | "D7"G D "G"G2 |]
+w: Hörst du nicht die Glo-cken? Hörst du nicht die Glo-cken? Ding, dang, dong! Ding, dang, dong!
+
+X:2
+T:Kuckuck, Kuckuck, ruft’s aus dem Wald
+C:Text: Hoffmann von Fallersleben
+C:Melodie: Volksweise
+M:3/4
+L:1/4
+K:G
+d2 B | d2 B | A G A | G3 !breath! | A A B | c2 A !breath! | B B c | d2 B !breath! |
+d2 B | d2 B | c B A | G3 |]
+w: Ku-ckuck, Ku-ckuck, ruft’s aus dem Wald. Las-set uns sin-gen, tan-zen und sprin-gen!
++: Früh-ling, Früh-ling wird es nun bald.
+
+X:3
+T:Greensleeves
+O:England, 16. Jahrhundert
+M:6/8
+L:1/8
+K:Ador
+A | "Am"c2 d e>f e | "G"d2 B G>A B | "Am"c2 A A>^G A | "E"B2 ^G E2 !breath! A |
+"Am"c2 d ~e>f e | "G"d2 B G>A B | "Am"c>B A "E"^G>F ^G | "Am"A2 A A2 z !breath! |
+"C"g3 g>f e | "G"d2 B G>A B | "Am"c2 A {B}A>^G A | "E"B2 ^G E3 !breath! |
+"C"g3 g>f e | "G"d2 B G>A B | "Am"c>B A "E"^G>F ^G | "Am"!fermata!A3 A2 |]
