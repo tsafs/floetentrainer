@@ -67,3 +67,17 @@ Zugriff auf weitere Seiten (z. B. imslp.org, thesession.org, abcnotation.com, de
   geschützt – Claude kann sie nicht laden. Die Nutzerin lädt PDFs selbst und schickt sie (direkter Link:
   imslp.org/images/…/Dateiname.pdf, Pfad über die API `prop=imageinfo&iiprop=url` ermitteln).
 - Wikimedia-Bilder: nur Vorschaubilder in Standardgrößen laden (z. B. 1920px), Originale geben Fehler 429.
+
+## Download-Links für die Wunschliste (IMSLP, von der Nutzerin zu laden)
+- Van Eyck Bd. II (darin „Onder de linde groene“): Michel/Teske – https://imslp.org/images/4/45/PMLP201599-van_eyck_amadeus_v3.pdf
+  (Original 1654, S. 18: https://imslp.org/images/0/09/PMLP311380-der_fluyten_lusthof_1654.pdf)
+- Holborne, The Honie-suckle (Cantus, Alpers): https://imslp.org/images/a/ad/WIMA.5289-60_the_honie_suckle-1.pdf
+- Holborne, The Fairie-round (Cantus/Sopranflöte, Mondrup): https://imslp.org/images/1/1c/PMLP955838-Holb-FairieRound-Cantus.pdf
+- Morley, It was a lover and his lass (CC0): https://imslp.org/images/4/4e/PMLP879951-It_Was_A_Lover_And_His_Lass_morley_ronald.pdf
+- Morley, Now is the month of maying (Canto, Meylan): https://imslp.org/images/8/83/PMLP60454-canto.pdf
+- Attaingnant, Tourdion (Gouin): https://imslp.org/images/7/72/WIMA.fa8a-Attaignant_Tourdion.pdf
+- Arbeau, Belle qui tiens ma vie (Mutopia): https://imslp.org/images/c/cf/Arbeau_-_Pavan%2C_Belle_Qui_Tiens_Ma_Vie.pdf
+- Arbeau, Branle de l'Official (Fine, Flöte): https://imslp.org/images/d/d7/PMLP15048-Branle_L%27Official_flute_viola_and_cello_score_and_parts.pdf
+- Susato, Ronde I „Pour quoy“ (Apke): https://imslp.org/images/5/5b/PMLP989046-Susato_T-Ronde_1%2Bmid.pdf
+- Isaac, Innsbruck ich muss dich lassen (Diskantlied, den Teuling): https://imslp.org/images/9/99/PMLP388462-isainsbruck.pdf
+- Bach, Musette D-Dur BWV Anh. 126: https://imslp.org/images/4/41/PMLP301429-JS_Bach_BWV_Anh_126.pdf
