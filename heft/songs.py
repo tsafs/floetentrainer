@@ -177,6 +177,41 @@ SONGS = [
                "|: d''4 d''8 d''8 d''4 d''4 | e''4 fis''4 g''2 , | h'4 h'8 h'8 h'4 g'4 | a'4 h'4 c''2 , | "
                "h'4. a'8 g'8 a'8 h'4 | / c''4. h'8 a'8 h'8 c''4 , | d''4. c''8 h'8 c''8 d''4 | "
                "e''4. d''8 c''8 d''8 h'8 c''8 | a'4 g'4 g'4 fis'4 | g'1 :|"),
+    dict(title="Innsbruck, ich muss dich lassen", key="F", keyname="F-Dur", time=(4, 4),
+         credit="Heinrich Isaac (um 1490), Liedsatz · Oberstimme",
+         # Quelle: Diskantlied-Fassung, Ausgabe Arnold den Teuling (IMSLP), Oberstimme
+         music="f'2 | f'4 g'4 a'2 | c''2 b'2 | a'2 r4 a'4 | c''4. b'8 g'2 | / "
+               "a'2 f'2 | e'2 r4 f'4 | g'4 f'4 e'4 f'4 | g'2 r4 g'4 | / "
+               "f'4 g'4 a'2 | c''2 b'2 | a'2 r4 a'4 | c''4. b'8 g'2 | / "
+               "a'2 f'2 | e'2 r4 g'4 | f'4 g'4 a'2 | / "
+               "b'4. a'8 g'8 f'8 g'4~ | g'8 f'8 f'2 e'4 | f'2 r4 g'4 | / "
+               "f'4 g'4 a'2 | b'4. a'8 g'8 f'8 g'4~ | g'8 f'8 f'2 e'4 | f'1 ||"),
+    dict(title="Tourdion", key="e", keyname="e-Moll (dorisch)", time=(3, 4),
+         credit="Pierre Attaingnant, Paris 1530 · Oberstimme · zum Schluss den ersten Teil noch einmal",
+         # Quelle: Sopranstimme, Ausgabe Pierre Gouin 2007 (IMSLP/WIMA); späterer Text weggelassen
+         music="|: e'8 fis'8 g'8 a'8 g'8 fis'8 | e'4. fis'8 g'8 a'8 | h'8 a'8 g'8 g'8 a'8 fis'8 | (g'4 fis'8 e'8) d'4 , | / "
+               "e'8 fis'8 g'8 a'8 g'8 fis'8 | e'4 g'4 fis'4 | e'2 d'4 | e'2. :| / "
+               "|: h'4. a'8 h'8 cis''8 | h'2 h'4 | d''8 cis''8 h'8 a'8 g'8 fis'8 | (g'4. fis'8) e'4 , | / "
+               "h'4. a'8 h'8 cis''8 | h'4 a'8 g'8 fis'4 | e'2 d'4 | e'2. :|"),
+    dict(title="Belle qui tiens ma vie", key="F", keyname="g-Moll (dorisch)", time=(2, 4),
+         credit="Thoinot Arbeau, Orchésographie (1589) · Pavane, Oberstimme",
+         # Quelle: Ausgabe Peter Chubb, Mutopia 2002 (gemeinfrei), Sopranstimme und Text
+         music="g'2 | g'4 fis'4 | g'4 a'4 | b'2 | b'4 d''4 | c''4 b'4 | b'4 a'4 | b'2 , | / "
+               "g'2 | g'4 fis'4 | g'4 a'4 | b'2 | b'4 d''4 | c''4 b'4 | b'4 a'4 | b'2 , | / "
+               "b'2 | a'4 a'4 | g'4 g'4 | fis'2 , | e'2 | (e'8 f'8) g'4 | g'4 fis'4 | g'2 , | / "
+               "b'2 | a'4 a'4 | g'4 g'4 | fis'2 , | e'2 | (e'8 f'8) g'4 | g'4 fis'4 | g'2 ||",
+         lyrics="Bel-le qui tiens ma vi-e cap-ti-ve dans tes yeux, qui m’as l’â-me ra-vi-e d’un sou-ris gra-ci-eux. "
+                "Viens tôt me se-cou-rir ou me fau-dra mou-rir. Viens tôt me se-cou-rir ou me fau-dra mou-rir.",
+         stanzas=["Pourquoi fuis-tu, mignarde, / si je suis près de toi? / Quand tes yeux je regarde, / je me perds dedans moi, / "
+                  "car tes perfections / changent mes actions.",
+                  "Tes beautés et ta grâce / et tes divins propos / ont échauffé la glace / qui me gelait les os, / "
+                  "et ont rempli mon cœur / d’une amoureuse ardeur."]),
+    dict(title="Branle de l’Official", key="G", keyname="G-Dur", time=(4, 4),
+         credit="Thoinot Arbeau, Orchésographie (1589) · nach der Flötenstimme von Elaine Fine, eine Oktave tiefer",
+         # Quelle: Elaine Fine 2023 (IMSLP, CC BY-SA), Flöte T. 5–20 ohne die Einleitung
+         music="|: g'4 g'4 a'8 g'8 fis'8 e'8 | d'2. d'4 | e'4 g'4 g'4 fis'4 | g'2 g'2 :| / "
+               "|: d''4. c''8 h'8 c''8 d''8 h'8 | c''4. h'8 a'8 h'8 c''8 a'8 | h'4. a'8 g'8 a'8 h'8 g'8 | a'4. g'8 fis'8 g'8 a'8 fis'8 , | / "
+               "g'4. fis'8 e'8 fis'8 g'8 e'8 | fis'4. e'8 d'4 d'4 | e'4 g'4 g'4 fis'4 | g'2 g'2 :|"),
     dict(title="The Honie-suckle", key="C", keyname="C-Dur", time=(4, 4),
          credit="Anthony Holborne, Pavans, Galliards, Almains (1599), Nr. 60 · Oberstimme",
          # Quelle: Cantus-Stimme, Ausgabe Ulrich Alpers (IMSLP/WIMA)
@@ -275,6 +310,14 @@ SONGS = [
                "a'4 h'4 (h'8 c''8) | d''2. c''8 c''8 | h'4 (a'8 g'8) h'2~ | h'4 , a'4 g'4 e'4 | d'2. d'4 | e'4 g'4 g'2~ | g'4 ||",
          lyrics="The wa-ter is wide, I can-not get o’er, and nei-ther have I wings to fly. "
                 "Give me a boat that can car-ry two, and both shall row, my love and I."),
+    dict(title="Musette", key="D", keyname="D-Dur", time=(2, 4),
+         credit="Notenbüchlein für Anna Magdalena Bach (1725), BWV Anh. 126 · rechte Hand, letzter Ton eine Oktave höher",
+         # Quelle: Ausgabe RSB 2012 (IMSLP, CC BY), rechte Hand
+         music="|: a''4 g''16 fis''16 e''16 d''16 | a''4 g''16 fis''16 e''16 d''16 | fis'16 g'16 a'8 g'8 fis'8 | e'8 a'8 fis'8 d'8 | / "
+               "a''4 g''16 fis''16 e''16 d''16 | a''4 g''16 fis''16 e''16 d''16 | fis'16 g'16 a'8 g'8 fis'8 | e'8 a'8 d'4 :| / "
+               "|: cis''16 d''16 e''8 cis''16 d''16 e''8 | a''8 e''8 e''4 | a''8 e''8 a''8 e''8 | d''16 cis''16 h'16 a'16 h'8 e'8 | / "
+               "e''8 dis''8 e'8 d''8~ | d''8 cis''8 a''8 gis''8 | e''8 dis''8 e'8 d''8~ | d''8 cis''8 a''8 gis''8 | / "
+               "e''16 dis''16 cis''16 dis''16 e''16 dis''16 cis''16 dis''16 | e''8 gis'8 a'8 d''8 | cis''16 d''16 e''8 a'8 d'8 | cis'16 d'16 e'8 a'4 :|"),
 ]
 
 EXERCISES = [

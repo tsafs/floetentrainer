@@ -31,6 +31,13 @@ Deshalb entfernt:
 - Kein schöner Land (Wunsch der Nutzerin: komplett raus)
 
 ## Aufgenommen
+- **Isaac: Innsbruck, ich muss dich lassen** – Oberstimme aus den Teulings Diskantlied-Fassung. Ohne Text
+  (Silbenverteilung in den Melismen der letzten Zeile nicht sicher).
+- **Attaingnant: Tourdion** – Sopran aus Gouins Ausgabe; der französische Trinktext („Quand je bois du vin clairet“)
+  ist später und ohne geklärten Urheber → weggelassen. Da capo als Hinweis in der Quellenzeile.
+- **Arbeau: Belle qui tiens ma vie** – Sopran mit Text (Str. 1 unter den Noten, 2–3 darunter), Mutopia (gemeinfrei).
+- **Arbeau: Branle de l'Official** – Flötenstimme von E. Fine (T. 5–20, ohne Einleitung), eine Oktave tiefer notiert.
+- **Musette D-Dur BWV Anh. 126** – rechte Hand; letzter Ton (a) eine Oktave höher, weil unter dem Umfang.
 - **Morley: Now is the month of maying** – Oberstimme aus Messerschmidts Bläserfassung (Trompete in B,
   eine große Sekunde tiefer notiert → hier zurück nach G-Dur), Ton für Ton mit Meylans Canto (Mensuralnotation)
   verglichen; Text und Strophen nach Meylan. **It was a lover and his lass** – Cantus aus Baums Ausgabe
@@ -58,12 +65,10 @@ Deshalb entfernt:
   noch nicht geprüft; ggf. als Gegenstück zu Nr. 20.
 - **Jacob van Eyck, Der Fluyten Lust-hof** (1644–49): weitere Themen, z. B.
   „Lavignone“, „Rosemont“, „Comagain“, „Amarilli mia bella“ (Nr. 9, 10, 32, 35 stehen in der Gomes-Ausgabe).
-- **Anthony Holborne**: Oberstimmen der Consort-Tänze, z. B. „The Honie-suckle“, „The Fairie Round“.
 - **Virgiliano, Bassano**: echte Solo-Ricercare, aber virtuos – für später.
-- Weitere Renaissance-Stücke: Tourdion (Attaingnant 1530), Pavane „Belle qui tiens ma vie“ und
-  Branle de l'Official (Arbeau 1589), Ronde aus Susatos Danserye (1551), „Innsbruck, ich muss dich
-  lassen“ (Isaac). („Es ist ein Ros entsprungen“ gestrichen: religiös.)
-- Weitere Lieder: Fuchs du hast die Gans gestohlen, Musette (J. S. Bach).
+- Susato, Ronde aus der Danserye (1551): Apkes Datei (in `docs/quellen/`) taugt nicht – Faksimile zu klein,
+  Gitarrensatz. Bessere Ausgabe suchen. („Es ist ein Ros entsprungen“ gestrichen: religiös.)
+- Weitere Lieder: Fuchs du hast die Gans gestohlen.
 
 Quellen: de.wikibooks.org „Liederbuch/…“ war erreichbar. Für die Liste oben braucht die Arbeitsumgebung
 Zugriff auf weitere Seiten (z. B. imslp.org, thesession.org, abcnotation.com, de.wikipedia.org).

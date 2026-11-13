@@ -222,7 +222,7 @@ EXTRA_CSS = """
 .stn { position: absolute; left: -6mm; font-family: 'Source Sans 3'; font-size: 8pt; top: 0.6mm; }
 .chapter { margin-bottom: 6mm; }
 table.toc { border-collapse: collapse; width: 100%; margin-top: 3mm; }
-table.toc td { padding: 0.45mm 0; font-size: 11pt; border-bottom: 0.2mm solid #efe7da; }
+table.toc td { padding: 0.75mm 0; font-size: 11pt; border-bottom: 0.2mm solid #efe7da; }
 table.toc td.n { font-family: 'Source Sans 3'; font-size: 7.5pt; letter-spacing: .14em; color: #b8a27e; width: 10mm; }
 table.toc td.k { font-family: 'Source Sans 3'; font-size: 7.5pt; letter-spacing: .08em; color: #9c8462; text-align: right; padding-right: 7mm; }
 table.toc td.p { font-family: 'Source Sans 3'; font-size: 8pt; color: #8c8379; text-align: right; width: 8mm; }
@@ -232,12 +232,18 @@ table.toc td.p { font-family: 'Source Sans 3'; font-size: 8pt; color: #8c8379; t
 MEASURED = {}
 
 
+TOC_ROWS = 32  # Zeilen, die auf eine Inhaltsseite passen
+
+
 def liederheft2():
-    p1, p_scales = grifftabelle(scale_names=False, as_pages=True, folios=("2", "5"))
+    n_chap = sum(1 for s in SONGS if s.get("chapter"))
+    n_toc = 1 if 4 + len(SONGS) + n_chap <= TOC_ROWS else 2  # Inhalt: eine oder zwei Seiten
+    off = n_toc - 1
+    p1, p_scales = grifftabelle(scale_names=False, as_pages=True, folios=(str(2 + off), str(5 + off)))
     p_scales = p_scales.replace("Erst aufwärts, dann abwärts.",
                                 "Erst aufwärts, dann abwärts. Die Namen der Töne stehen in der Grifftabelle.")
-    pages = [p1, grundlagen_page("3"), uebungen_page("4"), p_scales]  # Seite 1 = Inhalt (wird zuletzt erzeugt)
-    pageno = 6
+    pages = [p1, grundlagen_page(str(3 + off)), uebungen_page(str(4 + off)), p_scales]  # Inhalt kommt zuletzt nach vorn
+    pageno = 6 + off
     toc = []
     SONG_GAP = 13.0
     chapters = []
@@ -284,19 +290,25 @@ def liederheft2():
             pageno += 1
             first = False
     # Inhalt
-    rows = ['<tr><td class="n"></td><td>Grifftabelle</td><td class="k"></td><td class="p">2</td></tr>',
-            '<tr><td class="n"></td><td>Noten lesen</td><td class="k"></td><td class="p">3</td></tr>',
-            '<tr><td class="n"></td><td>Erste Übungen</td><td class="k"></td><td class="p">4</td></tr>',
-            '<tr><td class="n"></td><td>Übe-Tonleitern</td><td class="k"></td><td class="p">5</td></tr>']
+    rows = [f'<tr><td class="n"></td><td>{t}</td><td class="k"></td><td class="p">{k + 2 + off}</td></tr>'
+            for k, t in enumerate(["Grifftabelle", "Noten lesen", "Erste Übungen", "Übe-Tonleitern"])]
+    chap_rows = []
     for t in toc:
         if t[0] == "chapter":
+            chap_rows.append(len(rows))
             rows.append(f'<tr><td colspan="4" style="border:none; padding-top:3.5mm"><span class="kicker">{html.escape(t[1])}</span></td></tr>')
         else:
             _, n, s, lo, hi, pg = t
             rows.append(f'<tr><td class="n">{n:02d}</td><td>{html.escape(s["title"])}</td>'
                         f'<td class="k">{s["keyname"]} · {disp_name(lo)}–{disp_name(hi)}</td><td class="p">{pg}</td></tr>')
-    pages.insert(0, page(KICKER + '<h1>Inhalt</h1><div class="rule"></div>'
-                         f'<table class="toc">{"".join(rows)}</table>', "1"))
+    if n_toc == 1:
+        parts = [rows]
+    else:  # an einem Kapitelanfang teilen
+        cut = max([c for c in chap_rows if c <= TOC_ROWS] or [TOC_ROWS])
+        parts = [rows[:cut], rows[cut:]]
+    for k, r in reversed(list(enumerate(parts))):
+        pages.insert(0, page(KICKER + '<h1>Inhalt</h1><div class="rule"></div>'
+                             f'<table class="toc">{"".join(r)}</table>', str(k + 1)))
     h = doc("Liederheft Blockflöte", pages)
     h = h.replace("</style>", EXTRA_CSS + "</style>")
     return h
