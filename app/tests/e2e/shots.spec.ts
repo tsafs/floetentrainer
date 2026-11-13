@@ -4,6 +4,26 @@ import { sampleData } from "./seed";
 import { answer, FAKE_MIC, info, next, skipIntros } from "./util";
 import { FAKE_AUDIO } from "./fake-audio";
 import { note, soundingFreq } from "../../src/music/notes";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
+const abcPath = (name: string) => fileURLToPath(new URL(`../unit/abc/${name}`, import.meta.url));
+const abcText = (name: string) => readFileSync(abcPath(name), "utf8");
+/** Beispieldaten mit eigenen Liedern (Irish Washerwoman, Drunken Sailor, Greensleeves) */
+function ownData() {
+  const coll = abcText("sammlung.abc");
+  const o = (id: string, title: string, abc: string, number = 1) => ({ id, title, abc, number, index: 0, shift: 0, added: Date.UTC(2026, 10, 13, 12) });
+  return {
+    ...sampleData(),
+    version: 2,
+    ownSongs: [
+      o("abc-the-irish-washerwoman", "The Irish Washerwoman", abcText("irish-washerwoman.abc")),
+      o("abc-drunken-sailor", "Drunken Sailor", abcText("drunken-sailor.abc")),
+      o("abc-greensleeves", "Greensleeves", coll.slice(coll.indexOf("X:3")), 3),
+    ],
+  };
+}
+const TOO_LOW = "X:4\nT:Tiefes Lied\nM:3/4\nL:1/4\nK:D\nD, E, F, | G,2 A, | B, A, G, | F,3 |]\n";
 
 test.skip(!process.env.SHOTS, "nur auf Wunsch");
 
@@ -136,6 +156,45 @@ for (const s of SIZES) {
       await page.clock.runFor(6000);
       await page.waitForTimeout(700);
       await page.screenshot({ path: p("l6-stille-nacht") });
+    });
+    test("Eigene Lieder", async ({ page }) => {
+      await page.addInitScript(FAKE_AUDIO);
+      await page.clock.install();
+      await seed(page, ownData());
+      const p = (x: string) => `${OUT}/${scheme}-${s.name}-${x}.png`;
+      await page.goto("./#/lieder");
+      await page.evaluate(() => document.fonts.ready);
+      await page.screenshot({ path: p("e1-liste-eigene"), fullPage: true });
+      // Lied hinzufügen: leer, dann Sammlung mit Auswahl und Weggelassenem
+      await page.getByRole("link", { name: "Lied hinzufügen" }).click();
+      await page.screenshot({ path: p("e2-hinzufuegen") });
+      await page.getByTestId("abc-file").setInputFiles(abcPath("sammlung.abc"));
+      await page.getByTestId("tune-0").locator("label").click();
+      await page.getByTestId("tune-2").locator("label").click();
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.screenshot({ path: p("e3-hinzufuegen-auswahl") });
+      await page.screenshot({ path: p("e3-hinzufuegen-auswahl-ganz"), fullPage: true });
+      // Fehlerstück und Tonumfang
+      await page.getByRole("button", { name: "Andere Eingabe" }).click();
+      await page.getByTestId("abc-text").fill(abcText("mit-fehler.abc") + "\n" + TOO_LOW);
+      await page.getByRole("button", { name: "Noten lesen" }).click();
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.screenshot({ path: p("e4-hinzufuegen-fehler-umfang"), fullPage: true });
+      // Liedseite: Irish Washerwoman (Wiederholungen mit Klammern), beim Abspielen
+      await page.goto("./#/lied/abc-the-irish-washerwoman");
+      await page.getByRole("button", { name: "Abspielen" }).click();
+      await page.clock.runFor(3500);
+      await expect(page.locator(".score .cur").first()).toBeVisible();
+      await page.waitForTimeout(700);
+      await page.screenshot({ path: p("e5-lied-abc") });
+      await page.getByRole("button", { name: "Stopp" }).click();
+      await page.getByRole("button", { name: "Lied löschen" }).click();
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+      await page.screenshot({ path: p("e6-lied-abc-loeschen") });
+      // Greensleeves: Weggelassenes auf der Liedseite
+      await page.goto("./#/lied/abc-greensleeves");
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+      await page.screenshot({ path: p("e7-lied-abc-hinweise") });
     });
   });
 }

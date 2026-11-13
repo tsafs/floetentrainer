@@ -151,6 +151,8 @@ export function engraveScore(song: Song, opts: { width: number; sp?: number }): 
           }
           break;
         case "final":
+          // Schlussstrich mitten in der Zeile vor |: (nur ABC): dort steht allein das Wiederholungszeichen
+          if (next?.repeatStart && !lineEnd) break;
           o.push(line(bx - 0.75 + BAR_W / 2, -4, bx - 0.75 + BAR_W / 2, 0, BAR_W, "bl"));
           o.push(rect(bx - 0.5 + BAR_W / 2, -4 - 0.065, 0.5, 4.13));
           break;

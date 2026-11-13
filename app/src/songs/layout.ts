@@ -216,6 +216,8 @@ export const BAR_W = 0.16;
 export const DOUBLE_GAP = 0.55;
 /** Lücke zwischen Auflösungszeichen und neuer Vorzeichnung beim Tonartwechsel */
 export const CANCEL_GAP = 0.3;
+/** Taktstrich → erstes Zeichen eines Tonartwechsels */
+const KEY_CHANGE_PAD = 0.8;
 
 // ---------------------------------------------------------------- Tonarten (Wechsel nur bei ABC)
 
@@ -250,9 +252,9 @@ export function keySwitch(from: KeyInfo, to: KeyInfo): KeySwitch | null {
   return { cancel: from.signature.filter((a) => !to.alter[letterAt(a.pos)]).map((a) => a.pos), sig: to.signature };
 }
 
-/** Breite der Zeichen eines Tonartwechsels (ohne Rand davor), mit Platz danach */
+/** Breite der Zeichen eines Tonartwechsels (ohne Rand davor und danach; je Zeichen ein Schritt) */
 export function keySwitchWidth(ks: KeySwitch): number {
-  return (ks.cancel.length + ks.sig.length) * KEY_STEP + (ks.cancel.length && ks.sig.length ? CANCEL_GAP : 0) + KEY_PAD - 0.2;
+  return (ks.cancel.length + ks.sig.length) * KEY_STEP + (ks.cancel.length && ks.sig.length ? CANCEL_GAP : 0);
 }
 
 /** Breite einer Taktangabe (die breitere der beiden Ziffernfolgen) */
@@ -341,7 +343,7 @@ function measureBars(song: Song, m: Metrics, stems: Map<number, Stem>): BarMeasu
       lFix,
       timeW: bar.timeChange ? timeSigWidth(bar.time) + TIME_PAD + 0.3 : 0,
       keySw,
-      keyW: keySw ? 0.55 + keySwitchWidth(keySw) : 0,
+      keyW: keySw ? KEY_CHANGE_PAD + keySwitchWidth(keySw) + KEY_PAD + 0.2 : 0,
     };
   });
   // letzte Note eines Takts: bis zum Taktstrich, innerhalb der Zeile und am Zeilenende
@@ -461,7 +463,7 @@ function headerKey(song: Song, ms: BarMeasure[], first: number): KeyInfo {
 /** Platz für die Ankündigung eines Tonartwechsels am Ende einer Zeile, die vor Takt j endet */
 function courtesyWidth(ms: BarMeasure[], j: number): number {
   const sw = ms[j]?.keySw;
-  return sw ? 0.6 + keySwitchWidth(sw) - KEY_PAD + 0.25 : 0;
+  return sw ? KEY_CHANGE_PAD + keySwitchWidth(sw) + 0.3 : 0;
 }
 
 /** Gesamtbreite der Takte i … j−1 als eine Zeile bei Dehnung s */
@@ -574,7 +576,7 @@ function placeSystem(
     if ((b.timeW || b.keyW) && !lineStart) {
       // Reihenfolge nach dem Taktstrich: Wiederholungszeichen, Tonartwechsel, Taktangabe
       const cx = x + 0.55 + (b.bar.repeatStart ? REP_W : 0);
-      if (b.keySw) keyChange = { x: cx, sw: b.keySw };
+      if (b.keySw) keyChange = { x: cx - 0.55 + KEY_CHANGE_PAD, sw: b.keySw };
       if (b.timeW) timeX = cx + b.keyW;
       x += b.timeW + b.keyW;
     }
@@ -616,6 +618,6 @@ function placeSystem(
     justified,
     right: x1,
     scale,
-    courtesy: ms[j]?.keySw ? { x: x1 + 0.6, sw: ms[j].keySw! } : null,
+    courtesy: ms[j]?.keySw ? { x: x1 + KEY_CHANGE_PAD, sw: ms[j].keySw! } : null,
   };
 }

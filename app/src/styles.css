@@ -1644,6 +1644,7 @@ ul.songs li + li {
   display: grid;
   place-items: center;
   margin-top: 10px;
+  max-width: 380px;
   text-align: center;
   text-decoration: none;
 }
@@ -1654,6 +1655,9 @@ ul.songs li + li {
   color: var(--err);
 }
 
+.screen.songadd {
+  max-width: 600px;
+}
 .songadd .addsrc {
   gap: 12px;
 }
@@ -1707,6 +1711,7 @@ ul.songs li + li {
 }
 .srcline .textbtn,
 .selall .textbtn {
+  margin-left: auto;
   margin-right: -10px;
 }
 .selall > span {

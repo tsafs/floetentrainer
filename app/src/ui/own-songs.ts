@@ -260,7 +260,7 @@ export function mountOwnBox(el: HTMLElement, ctx: Ctx, entry: OwnEntry, onDelete
     el.innerHTML =
       `<div class="ownnotes">${lines.join("")}</div>` +
       (confirm
-        ? `<div class="confirm"><p>„${esc(title)}“ wirklich löschen? Das gemerkte Tempo geht mit verloren. Die Heft-Lieder bleiben, wie sie sind.</p><div class="btnrow"><button class="big danger" data-act="del-yes">Ja, löschen</button><button class="big alt" data-act="del-no">Abbrechen</button></div></div>`
+        ? `<div class="confirm"><p>„${esc(title)}“ wirklich löschen? Das gemerkte Tempo geht mit verloren.</p><div class="btnrow"><button class="big danger" data-act="del-yes">Ja, löschen</button><button class="big alt" data-act="del-no">Abbrechen</button></div></div>`
         : `<button class="big alt" data-act="del">Lied löschen</button>`);
     const on = (act: string, fn: () => void) => el.querySelector(`[data-act="${act}"]`)?.addEventListener("click", fn);
     on("del", () => {

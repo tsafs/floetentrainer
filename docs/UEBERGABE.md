@@ -36,7 +36,7 @@ Silben, Atemzeichen, Seitenumbrüche.
    Veröffentlichung über `.github/workflows/pages.yml` auf https://tsafs.github.io/floetentrainer/.
 3. Lieder-Erweiterung (`docs/app-lieder.md`): **Runde 1 umgesetzt** (Liederliste `#/lieder`, Liedseite
    `#/lied/<kennung>` mit Notensatz, Vorspielen, Tempo je Lied, Einzählen, Metronom, Abschnitt in
-   Schleife, Griffbild). Runde 2 (ABC-Dateien) und Runde 3 (Mitspielen) sind offen.
+   Schleife, Griffbild). Runde 2 (ABC-Dateien) umgesetzt, Runde 3 (Mitspielen) ist offen.
    - Wo was liegt: `app/src/songs/` (Leser `parse.ts`, Modell, Zeitplan, Tempo, Spielbarkeit,
      Notensatz `layout.ts`/`engrave.ts`), Klang `app/src/audio/flute-synth.ts` und `song-player.ts`,
      Seiten `app/src/ui/songs.ts`, Tests `app/tests/unit/songs*.test.ts`, `timeline.test.ts`,
@@ -47,4 +47,16 @@ Silben, Atemzeichen, Seitenumbrüche.
      muss deshalb stabil bleiben; neue Zeichen erst im App-Leser nachziehen. Die Liedkennung entsteht aus
      dem Titel – wird ein Titel geändert, geht das gemerkte Tempo dieses Lieds verloren. Grundtempo je
      Titel in `app/src/songs/tempo.ts`.
-   - Daten: Tempo je Lied steht in `songs` (optionales Feld, Datenformat bleibt Version 1).
+   - Daten: Tempo je Lied steht in `songs` (optionales Feld, kam ohne Versionssprung dazu).
+   - **Runde 2, eigene Lieder (ABC):** Liederliste → „Lied hinzufügen“ (`#/lied-hinzufuegen`,
+     `app/src/ui/own-songs.ts`): Datei wählen oder Text einfügen, bei mehreren Stücken auswählen,
+     Fehlerstücke mit Zeile und Grund, Weggelassenes je Stück, Oktav-Angebot (angehakt) bzw. Hinweis auf
+     Töne außerhalb c¹–d³. Kapitel „Eigene Lieder“ steht oben nach „Kannst du schon spielen“; spielbare
+     eigene Lieder stehen wie Heft-Lieder ganz oben. Liedseite wie bei Heft-Liedern, dazu Kasten mit
+     Hinweisen und „Lied löschen“ (Bestätigung in der Seite).
+   - Gespeichert wird je Lied nur der **ABC-Quelltext** des Stücks (X: bis Leerzeile) samt Oktav-
+     verschiebung, X:-Nummer und Zeitpunkt in `ownSongs` (`app/src/store/data.ts`); beim Start liest
+     `app/src/songs/own.ts` ihn neu. Unlesbare Stücke bleiben und erscheinen mit Hinweis. **Datenformat
+     Version 2** (Umwandlung aus 1): eine ältere App hätte die eigenen Lieder sonst beim Speichern still
+     verworfen, so lehnt sie die Daten ab. Kommen mit in die Sicherung; Tests `own-songs.test.ts`,
+     `app/tests/e2e/abc.spec.ts`, Bildschirmfotos `*-e1…e7-*.png`.
