@@ -92,6 +92,7 @@ Zugriff auf weitere Seiten (z. B. imslp.org, thesession.org, abcnotation.com, de
 - Attaingnant, Tourdion (Gouin): https://imslp.org/images/7/72/WIMA.fa8a-Attaignant_Tourdion.pdf
 - Arbeau, Belle qui tiens ma vie (Mutopia): https://imslp.org/images/c/cf/Arbeau_-_Pavan%2C_Belle_Qui_Tiens_Ma_Vie.pdf
 - Arbeau, Branle de l'Official (Fine, Flöte): https://imslp.org/images/d/d7/PMLP15048-Branle_L%27Official_flute_viola_and_cello_score_and_parts.pdf
-- Susato, Ronde I „Pour quoy“ (Apke): https://imslp.org/images/5/5b/PMLP989046-Susato_T-Ronde_1%2Bmid.pdf
+- Susato, Rondes I–VI für Blockflöten (Grayson, CC BY): https://imslp.org/images/6/64/PMLP201907-Susato-Ronde1-Pour-Quoy.pdf
+  (ungeeignet: Apkes Gitarrensatz mit kleinem Faksimile)
 - Isaac, Innsbruck ich muss dich lassen (Diskantlied, den Teuling): https://imslp.org/images/9/99/PMLP388462-isainsbruck.pdf
 - Bach, Musette D-Dur BWV Anh. 126: https://imslp.org/images/4/41/PMLP301429-JS_Bach_BWV_Anh_126.pdf
