@@ -1,0 +1,8 @@
+{
+  "name": "liederheft",
+  "private": true,
+  "description": "Erzeugt das Blockflöten-Liederheft als PDF (HTML/SVG -> Chromium)",
+  "devDependencies": {
+    "playwright": "^1.48.0"
+  }
+}
