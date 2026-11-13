@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toneFreq } from "../../src/audio/flute-synth";
+import { GLIDE, toneFreq } from "../../src/audio/flute-synth";
 import {
   BREATH_GAP,
   FADE,
@@ -10,8 +10,9 @@ import {
   type PlayerPosition,
 } from "../../src/audio/song-player";
 import { songById } from "../../src/songs/library";
-import { buildTimeline, type Timeline, type TimelineBar } from "../../src/songs/timeline";
-import { Harness } from "./audio-fake";
+import { buildTimeline, sectionTimeline, type Timeline, type TimelineBar } from "../../src/songs/timeline";
+import { Harness, type FakeGain } from "./audio-fake";
+import { song } from "./songs-helpers";
 
 type T = [start: number, dur: number, midi: number, breath?: boolean];
 
@@ -38,6 +39,17 @@ function timeline(tones: T[], o: { beats?: number[]; barDur?: number; total?: nu
     countInDur: barDur,
     countInBeats: beats.length,
   };
+}
+
+/** Töne mit den Indizes `idx` an den nächsten binden (Bindebogen) */
+function slur(tl: Timeline, ...idx: number[]): Timeline {
+  for (const i of idx) tl.tones[i].slurToNext = true;
+  return tl;
+}
+
+/** Zeitplan ohne Ton */
+function empty(o: Partial<Timeline> = {}): Timeline {
+  return { tones: [], bars: [], total: 4, countIn: [], countInDur: 0, countInBeats: 0, ...o };
 }
 
 function setup(tl: Timeline, opts: Partial<PlayOptions> = {}) {
@@ -368,5 +380,189 @@ describe("Abspieler: Tempo, Stopp, Rückmeldungen", () => {
     expect(tones[0].stop!).toBeLessThanOrEqual(1 + FADE + 0.011);
     close(tones[1].freq, toneFreq(72));
     expect(player.playing).toBe(true);
+  });
+});
+
+describe("Abspieler: Bindebogen (legato)", () => {
+  const flutes = (h: Harness) => h.ctx.oscs.filter((o) => o.type === "custom");
+
+  it("kein neuer Einsatz: eine Stimme, die Tonhöhe gleitet kurz, Ende erst nach dem letzten Ton", () => {
+    const { h } = setup(slur(timeline([[0, 1, 60], [1, 1, 62], [2, 1, 64], [3, 1, 65]]), 0, 1), { countIn: false });
+    h.advance(3);
+    expect(flutes(h).length).toBe(2); // c'–d'–e' gebunden, f' neu
+    const tones = h.ctx.tones();
+    expect(tones.map((t) => [t.osc, t.legato])).toEqual([
+      [tones[0].osc, false],
+      [tones[0].osc, true],
+      [tones[0].osc, true],
+      [tones[3].osc, false],
+    ]);
+    [60, 62, 64, 65].forEach((m, i) => close(tones[i].freq, toneFreq(m)));
+    [0, 0.5, 1, 1.5].forEach((d, i) => close(tones[i].start, S + d));
+    close(tones[2].end!, S + 1.5); // der gebundene Klang endet normal mit dem letzten Ton
+    // Einschwingen (Rampe der Lautstärke) nur einmal
+    const env = flutes(h)[0].outs[0] as FakeGain;
+    expect(env.gain.events.filter((e) => e.type === "linear").length).toBe(1);
+    expect(env.gain.events.filter((e) => e.type === "target" && e.value === 0).length).toBe(1);
+    // Gleiten: schnell, aber nicht sprunghaft
+    const fe = flutes(h)[0].frequency.events;
+    expect(fe.map((e) => e.type)).toEqual(["set", "exp", "set", "exp"]);
+    close(fe[1].time - fe[0].time, GLIDE);
+    expect(GLIDE).toBeGreaterThanOrEqual(0.015);
+    expect(GLIDE).toBeLessThanOrEqual(0.025);
+    close(fe[0].value, toneFreq(60));
+    // kein neues Anblasgeräusch und kein neues Anschleifen
+    expect(flutes(h)[0].detune.events.length).toBe(2);
+  });
+
+  it("Tonwiederholung unter dem Bogen: kurz getrennt und neu angestoßen", () => {
+    const { h } = setup(slur(timeline([[0, 1, 67], [1, 1, 67], [2, 1, 69]]), 0, 1), { countIn: false });
+    h.advance(3);
+    const [a, b, c] = h.ctx.tones();
+    expect(a.osc).not.toBe(b.osc);
+    close(a.end!, S + 0.5 - REPEAT_GAP);
+    close(b.start, S + 0.5);
+    expect(c.osc).toBe(b.osc); // g'→a' gebunden
+    expect(c.legato).toBe(true);
+  });
+
+  it("Atemzeichen am Bogenende: Lücke nach der Dauer des letzten Tons, nicht des ganzen Bogens", () => {
+    const { h } = setup(slur(timeline([[0, 4, 60], [4, 0.5, 62, true], [4.5, 3.5, 64]]), 0), { countIn: false });
+    h.advance(5);
+    const [a, b, c] = h.ctx.tones();
+    expect(b.osc).toBe(a.osc);
+    close(b.end!, S + 2.25 - 0.4 * 0.25);
+    expect(c.osc).not.toBe(b.osc);
+    close(c.start, S + 2.25);
+  });
+
+  it("Heft: Stille Nacht – gebundene Töne auf derselben Stimme, alle Töne zur richtigen Zeit", () => {
+    const tl = buildTimeline(songById("stille-nacht-heilige-nacht")!);
+    const spq = 0.3;
+    const { h, ended } = setup(tl, { secPerQuarter: spq, countIn: false });
+    h.advance(tl.total * spq + 1);
+    expect(ended()).toBe(1);
+    const tones = h.ctx.tones();
+    expect(tones.length).toBe(tl.tones.length);
+    tl.tones.forEach((t, i) => {
+      close(tones[i].freq, toneFreq(t.midi));
+      close(tones[i].start, S + t.start * spq);
+      expect(tones[i].legato).toBe(!!tl.tones[i - 1]?.slurToNext);
+    });
+    const bound = tl.tones.filter((t) => t.slurToNext).length;
+    expect(bound).toBe(3);
+    expect(flutes(h).length).toBe(tl.tones.length - bound);
+    // erster Ton: g' gebunden zu a', danach ein neuer Einsatz auf g'
+    expect(tones[1].osc).toBe(tones[0].osc);
+    expect(tones[2].osc).not.toBe(tones[1].osc);
+    close(tones[1].end!, S + tl.tones[2].start * spq);
+  });
+
+  it("Tempoänderung mitten im Bogen: weiter gebunden, danach im neuen Tempo", () => {
+    const tl = timeline(Array.from({ length: 12 }, (_, i) => [i, 1, 60 + (i % 2) * 2] as T));
+    slur(tl, ...Array.from({ length: 11 }, (_, i) => i));
+    const { h, player } = setup(tl, { countIn: false });
+    h.advance(1.0);
+    player.setTempo(0.25);
+    h.advance(4);
+    expect(flutes(h).length).toBe(1);
+    const tones = h.ctx.tones();
+    expect(tones.length).toBe(12);
+    const diffs = tones.slice(1).map((t, i) => Number((t.start - tones[i].start).toFixed(6)));
+    const k = diffs.indexOf(0.25);
+    expect(k).toBeGreaterThan(0);
+    expect(diffs.slice(0, k).every((d) => d === 0.5)).toBe(true);
+    expect(diffs.slice(k).every((d) => d === 0.25)).toBe(true);
+    close(tones[11].end!, tones[11].start + 0.25);
+  });
+
+  it("Stopp mitten im Bogen: die Stimme endet nach dem Ausblenden, spätere Wechsel erklingen nicht", () => {
+    const tl = timeline(Array.from({ length: 16 }, (_, i) => [i, 1, 60 + (i % 3)] as T));
+    slur(tl, ...Array.from({ length: 15 }, (_, i) => i));
+    const { h, player } = setup(tl, { countIn: false });
+    h.advance(1.6);
+    player.stop();
+    const osc = flutes(h)[0];
+    expect(osc.stopAt!).toBeLessThanOrEqual(1.6 + FADE + 0.011);
+    h.advance(2);
+    expect(flutes(h).length).toBe(1);
+    for (const t of h.ctx.tones()) expect(t.start).toBeLessThan(osc.stopAt!);
+  });
+
+  it("Schleife: am Ende des Durchgangs neuer Einsatz, im Durchgang weiter gebunden", () => {
+    // auch wenn der letzte Ton (fälschlich) als gebunden markiert ist: nie über die Schleifengrenze
+    const tl = slur(timeline([[0, 2, 60], [2, 2, 62]]), 0, 1);
+    const { h } = setup(tl, { countIn: false, loop: true });
+    h.advance(S + 3 * 2 + 0.1);
+    const tones = h.ctx.tones();
+    expect(tones.length).toBeGreaterThanOrEqual(6);
+    expect(tones.slice(0, 6).map((t) => t.legato)).toEqual([false, true, false, true, false, true]);
+    tones.slice(0, 6).forEach((t, i) => close(t.start, S + i));
+    close(tones[1].end!, S + 2); // Übergang zum nächsten Durchgang ohne Lücke
+    expect(tones[2].osc).not.toBe(tones[1].osc);
+  });
+
+  it("Abschnitt aus Stille Nacht in Schleife: Bindung über den Taktstrich, Durchgänge nahtlos", () => {
+    const s = songById("stille-nacht-heilige-nacht")!;
+    // Takte 19–20: (c''2. | e''2.)
+    const tl = sectionTimeline(s, 18, 19);
+    expect(tl.tones.map((t) => [t.midi, !!t.slurToNext])).toEqual([
+      [72, true],
+      [76, false],
+    ]);
+    const { h } = setup(tl, { countIn: false, loop: true, secPerQuarter: 0.25 });
+    h.advance(S + 2 * 6 * 0.25 + 0.1);
+    const tones = h.ctx.tones();
+    expect(tones.slice(0, 4).map((t) => [Math.round(t.freq), t.legato])).toEqual([
+      [Math.round(toneFreq(72)), false],
+      [Math.round(toneFreq(76)), true],
+      [Math.round(toneFreq(72)), false],
+      [Math.round(toneFreq(76)), true],
+    ]);
+    close(tones[2].start, S + 6 * 0.25);
+  });
+});
+
+describe("Abspieler: Zeitplan ohne Ton", () => {
+  it("ohne Ton und ohne Zählzeit in Schleife: keine Endlosschleife, Durchgänge laufen im Takt weiter", () => {
+    const { h, player, positions, ended } = setup(empty({ total: 4 }), { loop: true });
+    expect(player.playing).toBe(true);
+    h.advance(S + 3 * 4 * 0.5 + 0.1); // drei Durchgänge zu je 4 Vierteln
+    expect(player.playing).toBe(true);
+    expect(ended()).toBe(0);
+    expect(h.ctx.oscs.length).toBe(0);
+    expect(Math.max(...positions.map((p) => p.pass))).toBe(3);
+    player.stop();
+    expect(player.playing).toBe(false);
+  });
+
+  it("Länge 0: keine Schleife, endet sofort; ohne Schleife endet ein stiller Abschnitt nach seiner Länge", () => {
+    const zero = setup(empty({ total: 0 }), { loop: true });
+    zero.h.advance(1);
+    expect(zero.player.playing).toBe(false);
+    expect(zero.ended()).toBe(1);
+    zero.player.setLoop(true);
+    const once = setup(empty({ total: 4 }));
+    once.h.advance(S + 2 - 0.05);
+    expect(once.player.playing).toBe(true);
+    once.h.advance(0.5);
+    expect(once.player.playing).toBe(false);
+    expect(once.ended()).toBe(1);
+  });
+
+  it("Schleife über einen Pausentakt: Metronom klickt im Takt weiter", () => {
+    const s = song("c'1 | r1 | d'1 ||");
+    const tl = sectionTimeline(s, 1, 1);
+    expect(tl.tones).toEqual([]);
+    const { h, player } = setup(tl, { loop: true, metronome: true });
+    h.advance(S + 2 + 3 * 2 + 0.1);
+    expect(player.playing).toBe(true);
+    const clicks = h.ctx.clicks();
+    expect(clicks.length).toBeGreaterThanOrEqual(4 + 12);
+    clicks.slice(0, 16).forEach((c, i) => close(c.start, S + i * 0.5));
+    expect(clicks.slice(4, 16).map((c) => c.freq === ACCENT)).toEqual(
+      Array.from({ length: 12 }, (_, i) => i % 4 === 0),
+    );
+    expect(h.ctx.tones().length).toBe(0);
   });
 });

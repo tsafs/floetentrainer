@@ -1,5 +1,6 @@
 // Zeitplan eines Lieds fürs Vorspielen: Wiederholungen ausgeschrieben (mit 1./2. Klammer),
 // Haltebögen zu einem Ton zusammengefasst (auch über Taktstriche), Pausen ohne Ton.
+// Bindebögen bleiben einzelne Töne, aber mit slurToNext: Der Abspieler bindet sie legato.
 // Zeiten in Vierteln; der Abspieler rechnet sie mit secPerQuarter (./tempo.ts) in Sekunden um.
 
 import type { Bar, Song } from "./model";
@@ -13,6 +14,13 @@ export interface Tone {
   ids: number[]; // Kennungen der Noten im Notenbild (bei Haltebogen mehrere), für die Markierung
   bar: number; // Index des Takts im Notenbild (0-basiert), in dem der Ton beginnt
   breathAfter: boolean; // Atemzeichen nach diesem Ton
+  /**
+   * Bindebogen zum nächsten Ton im Zeitplan: Er schließt ohne Lücke an und ist auch im Notenbild der
+   * Nachfolger (nicht an einer Sprungstelle der Wiederholung), kein Atemzeichen dazwischen. Der
+   * Abspieler setzt dann nicht neu an, nur die Tonhöhe wechselt (bei gleicher Höhe trennt er kurz).
+   * Fehlt das Feld, ist der Ton nicht gebunden.
+   */
+  slurToNext?: boolean;
 }
 /** Ein Takt im Zeitplan (Wiederholungen ausgeschrieben, also in Spielreihenfolge). */
 export interface TimelineBar {
@@ -84,13 +92,30 @@ export function barBeats(bar: Bar): number[] {
   return full.filter((b) => b < bar.length - EPS);
 }
 
+/**
+ * Bindebögen im Notenbild: Kennung einer Note → Kennung der im Notenbild folgenden Note, falls ein
+ * Bindebogen von der einen zur anderen reicht (auch über den Taktstrich).
+ */
+function slurSuccessors(song: Song): Map<number, number> {
+  const next = new Map<number, number>();
+  let inSlur = false;
+  song.notes.forEach((n, i) => {
+    if (n.slurStart) inSlur = true;
+    if (n.slurEnd) inSlur = false;
+    if (inSlur && i + 1 < song.notes.length) next.set(n.id, song.notes[i + 1].id);
+  });
+  return next;
+}
+
 /** Zeitplan aus einer Folge von Takt-Indizes (in Spielreihenfolge). */
 export function timelineOfBars(song: Song, order: number[]): Timeline {
   const tones: Tone[] = [];
   const bars: TimelineBar[] = [];
+  const slurNext = slurSuccessors(song);
   let t = 0;
   let open: Tone | null = null; // Ton, dessen letzte Note einen Haltebogen hat
   let openMidi = -1;
+  let prev: Tone | null = null; // zuletzt angefangener Ton (für den Bindebogen zum nächsten)
   for (const idx of order) {
     const bar = song.bars[idx];
     bars.push({ index: idx, start: t, dur: bar.length, beats: barBeats(bar), pickup: bar.pickup });
@@ -98,6 +123,7 @@ export function timelineOfBars(song: Song, order: number[]): Timeline {
       const start = t + e.offset;
       if (e.kind === "rest") {
         open = null;
+        prev = null;
         continue;
       }
       if (open && openMidi === e.pitch.midi && Math.abs(open.start + open.dur - start) < EPS) {
@@ -106,7 +132,18 @@ export function timelineOfBars(song: Song, order: number[]): Timeline {
         open.breathAfter = e.breath;
       } else {
         open = { start, dur: e.q, midi: e.pitch.midi, ids: [e.id], bar: idx, breathAfter: e.breath };
+        // Bindebogen vom vorigen Ton hierher: nur, wenn diese Note im Notenbild wirklich folgt (nach
+        // einem Rücksprung der Wiederholung ist das nicht so) und der Ton lückenlos anschließt
+        if (
+          prev &&
+          !prev.breathAfter &&
+          slurNext.get(prev.ids[prev.ids.length - 1]) === e.id &&
+          Math.abs(prev.start + prev.dur - start) < EPS
+        ) {
+          prev.slurToNext = true;
+        }
         tones.push(open);
+        prev = open;
       }
       openMidi = e.pitch.midi;
       if (!e.tie) open = null;

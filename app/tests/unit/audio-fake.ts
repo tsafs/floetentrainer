@@ -132,15 +132,31 @@ export class FakeAudioContext {
     return {};
   }
 
-  /** Flötentöne (eigene Wellenform) mit Beginn, Ende (Beginn des Ausklingens) und Frequenz */
+  /**
+   * Flötentöne (eigene Wellenform) mit Beginn, Ende (Beginn des Ausklingens) und Frequenz.
+   * Ein gebundener Tonwechsel (setValueAtTime + exponentialRamp auf der Frequenz, siehe Voice.glide)
+   * zählt als eigener Ton mit `legato: true`; der Ton davor endet dort, wo das Gleiten beginnt.
+   * `osc` ist der Index des Oszillators in `oscs` (gebundene Töne teilen sich einen).
+   */
   tones() {
-    return this.oscs
-      .filter((o) => o.type === "custom")
-      .map((o) => {
-        const env = o.outs[0] as FakeGain;
-        const rel = env.gain.events.find((e) => e.type === "target" && e.value === 0);
-        return { freq: o.frequency.value, start: o.startAt!, end: rel ? rel.time : null, stop: o.stopAt };
+    const out: { freq: number; start: number; end: number | null; stop: number | null; legato: boolean; osc: number }[] = [];
+    this.oscs.forEach((o, osc) => {
+      if (o.type !== "custom") return;
+      const env = o.outs[0] as FakeGain;
+      const rel = env.gain.events.find((e) => e.type === "target" && e.value === 0);
+      const fe = o.frequency.events;
+      const segs = [{ freq: o.frequency.value, start: o.startAt!, legato: false }];
+      for (let i = 0; i + 1 < fe.length; i++) {
+        // Wechsel, die erst nach dem harten Ende (Stopp) kämen, erklingen nicht
+        const cutBefore = o.stopAt !== null && fe[i].time >= o.stopAt;
+        if (fe[i].type === "set" && fe[i + 1].type === "exp" && !cutBefore) segs.push({ freq: fe[i + 1].value, start: fe[i].time, legato: true });
+      }
+      segs.forEach((sg, k) => {
+        const last = k === segs.length - 1;
+        out.push({ ...sg, end: last ? (rel ? rel.time : null) : segs[k + 1].start, stop: last ? o.stopAt : segs[k + 1].start, osc });
       });
+    });
+    return out;
   }
 
   /** Klicks (Sinus) mit Beginn und Frequenz */

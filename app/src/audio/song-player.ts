@@ -10,6 +10,10 @@
 // Die Umrechnung in Sekunden ist stückweise linear (Anker); eine Tempoänderung setzt einen neuen
 // Anker an der Stelle, bis zu der schon eingeplant ist – so springt nichts.
 //
+// Bindebogen (Tone.slurToNext): Der gebundene Ton bekommt kein „off“, der nächste ein „on“ mit
+// legato – dieselbe Stimme läuft weiter und gleitet zur neuen Höhe (Voice.glide). Bei gleicher Höhe
+// unter dem Bogen wird wie bei jeder Tonwiederholung kurz getrennt und neu angestoßen.
+//
 // Positionsmeldungen für die Oberfläche kommen aus requestAnimationFrame, abgeleitet aus currentTime.
 // AudioContext und Zeitgeber lassen sich für Tests austauschen (PlayerEnv).
 
@@ -88,7 +92,7 @@ type Gap = "none" | "repeat" | "breath";
 type Ev =
   | { kind: "off"; g: number; id: number; gap: Gap }
   | { kind: "click"; g: number; accent: boolean; metro: boolean }
-  | { kind: "on"; g: number; id: number; midi: number };
+  | { kind: "on"; g: number; id: number; midi: number; legato: boolean };
 
 const ORDER = { off: 0, click: 1, on: 2 } as const;
 
@@ -135,17 +139,22 @@ function passEvents(tl: Timeline, wrap: boolean): Ev[] {
     if (t.start < L - EPS) idx.push(i);
   });
   const evs: Ev[] = [];
+  let legato = false; // der aktuelle Ton schließt gebunden an den vorigen an
   idx.forEach((ti, j) => {
     const t = tl.tones[ti];
     const end = Math.min(t.start + t.dur, L);
     let next: { start: number; midi: number } | null = null;
     if (j + 1 < idx.length) next = tl.tones[idx[j + 1]];
     else if (wrap && idx.length) next = { start: tl.tones[idx[0]].start + L, midi: tl.tones[idx[0]].midi };
+    const adjacent = !!next && Math.abs(next.start - end) < EPS;
+    // gebunden nur innerhalb des Durchgangs (nicht über die Schleifengrenze) und zu einer anderen Höhe
+    const slur = !!t.slurToNext && !t.breathAfter && j + 1 < idx.length && adjacent && next!.midi !== t.midi;
     let gap: Gap = "none";
     if (t.breathAfter) gap = "breath";
-    else if (next && Math.abs(next.start - end) < EPS && next.midi === t.midi) gap = "repeat";
-    evs.push({ kind: "on", g: t.start, id: j, midi: t.midi });
-    evs.push({ kind: "off", g: end, id: j, gap });
+    else if (adjacent && next!.midi === t.midi) gap = "repeat";
+    evs.push({ kind: "on", g: t.start, id: j, midi: t.midi, legato });
+    if (!slur) evs.push({ kind: "off", g: end, id: j, gap });
+    legato = slur;
   });
   tl.bars.forEach((b) => {
     b.beats.forEach((beat, k) => {
@@ -208,7 +217,8 @@ interface Run {
   /** alles eingeplant; Ende der Musik bei endG */
   done: boolean;
   endG: number;
-  voices: Map<string, Voice>;
+  /** klingende Stimmen je Ton (`at`: Beginn des aktuellen Tons, bei Bindebogen später als voice.start) */
+  voices: Map<string, { voice: Voice; at: number }>;
   live: { voice: Voice; until: number }[];
   clicks: { click: Click; metro: boolean }[];
   last: PlayerPosition | null;
@@ -312,7 +322,7 @@ export class SongPlayer {
     run.bus.gain.cancelScheduledValues(now);
     run.bus.gain.setValueAtTime(OUT_GAIN, now);
     run.bus.gain.linearRampToValueAtTime(0, end);
-    for (const v of run.voices.values()) v.cut(end + 0.01);
+    for (const { voice } of run.voices.values()) voice.cut(end + 0.01);
     for (const { voice } of run.live) voice.cut(end + 0.01);
     for (const { click } of run.clicks) click.cut(end + 0.01);
     this.fading.push({ bus: run.bus, until: end + 0.05 });
@@ -419,6 +429,9 @@ export class SongPlayer {
     const horizon = now + this.lookahead() + MAX_GAP;
     while (!run.done) {
       if (run.i >= run.segEvs.length) {
+        // Schleife: der nächste Durchgang beginnt erst hinter dem Horizont → beim nächsten Mal weiter.
+        // Sonst liefe ein Durchgang ohne Ereignisse (nur Pausen ohne Zählzeiten) hier endlos durch.
+        if (this.loop && run.seg >= 0 && this.timeOf(run, this.segStart(run, run.seg + 1)) >= horizon) break;
         this.nextSegment(run);
         continue;
       }
@@ -451,13 +464,23 @@ export class SongPlayer {
     const t = Math.max(this.timeOf(run, g), now);
     const key = `${run.seg}:${"id" in ev ? ev.id : ""}`;
     if (ev.kind === "on") {
-      run.voices.set(key, run.synth.tone(ev.midi, t, run.a4));
+      const prevKey = `${run.seg}:${ev.id - 1}`;
+      const bound = ev.legato ? run.voices.get(prevKey) : undefined;
+      if (bound) {
+        // Bindebogen: dieselbe Stimme klingt weiter, nur die Tonhöhe wechselt
+        run.voices.delete(prevKey);
+        bound.voice.glide(ev.midi, t, run.a4);
+        run.voices.set(key, { voice: bound.voice, at: t });
+      } else {
+        run.voices.set(key, { voice: run.synth.tone(ev.midi, t, run.a4), at: t });
+      }
     } else if (ev.kind === "off") {
-      const voice = run.voices.get(key);
-      if (!voice) return;
+      const entry = run.voices.get(key);
+      if (!entry) return;
       run.voices.delete(key);
+      const { voice } = entry;
       const end = this.timeOf(run, g);
-      const u = Math.max(end - gapSeconds(ev.gap, end - voice.start), voice.minEnd, now);
+      const u = Math.max(end - gapSeconds(ev.gap, end - entry.at), voice.minEnd, now);
       voice.release(u);
       run.live.push({ voice, until: u + RELEASE_TAIL });
     } else if (!ev.metro || this.metronome) {

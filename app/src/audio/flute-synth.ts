@@ -3,10 +3,13 @@
 // Ein Ton: ein Oszillator mit wenigen, leisen Obertönen (PeriodicWave), weicher Einsatz mit einem
 // kleinen Anschleifen der Tonhöhe, dazu ein Hauch gefiltertes Rauschen (Anblasgeräusch), das im
 // Einsatz etwas deutlicher ist. Ausklingen mit setTargetAtTime, damit nichts knackst.
+// Gebundene Töne (Bindebogen): derselbe Klang läuft weiter, nur die Tonhöhe gleitet in GLIDE
+// Sekunden zur neuen (Voice.glide) – kein neuer Einsatz, kein neues Anblasgeräusch.
 // Ein Klick: ein sehr kurzer Sinus-Pieks, die betonte Eins lauter und höher.
 //
-// Hinweis: Die Browser-Attrappe in tests/e2e/fake-audio.ts erkennt Flötentöne am Wellentyp
-// "custom" und Klicks am Typ "sine". Bei Änderungen dort mitziehen.
+// Hinweis: Die Attrappen (tests/e2e/fake-audio.ts, tests/unit/audio-fake.ts) erkennen Flötentöne am
+// Wellentyp "custom" und Klicks am Typ "sine"; einen gebundenen Tonwechsel an setValueAtTime gefolgt
+// von exponentialRampToValueAtTime auf osc.frequency. Bei Änderungen dort mitziehen.
 
 import { soundingFreq } from "../music/notes";
 
@@ -25,6 +28,8 @@ const NOISE_ATTACK = 0.022;
 const NOISE_SUSTAIN = 0.004;
 /** Anschleifen: Beginn so viele Cent zu tief */
 const SCOOP_CENTS = -14;
+/** Gleiten der Tonhöhe beim gebundenen Tonwechsel in s: schnell, aber ohne Knacken */
+export const GLIDE = 0.02;
 /** Obertöne (Amplituden ab Grundton), wenig wie bei der Blockflöte */
 const HARMONICS = [1, 0.1, 0.06, 0.02, 0.01];
 
@@ -40,6 +45,11 @@ export interface Voice {
   readonly start: number;
   /** frühester erlaubter Zeitpunkt für das Ende (nach dem Einschwingen) */
   readonly minEnd: number;
+  /**
+   * Gebundener Wechsel zur notierten Höhe `midi` ab `at` (Bindebogen): kein neuer Einsatz, die
+   * Tonhöhe gleitet in GLIDE Sekunden zur neuen. Nach release oder cut ohne Wirkung.
+   */
+  glide(midi: number, at: number, a4?: number): void;
   /** Ende einplanen: ab `at` klingt der Ton aus. */
   release(at: number): void;
   /** Knoten zum Zeitpunkt `at` hart beenden (beim Stopp, die Lautstärke regelt dann der Ausgang). */
@@ -127,6 +137,8 @@ export class FluteSynth {
 
     let released = false;
     let stopAt = Infinity;
+    let curFreq = freq;
+    let glideEnd = at; // Ende des letzten Gleitens (Wechsel nie davor einplanen)
     const stop = (t: number) => {
       if (t >= stopAt) return;
       stopAt = t;
@@ -136,6 +148,18 @@ export class FluteSynth {
     return {
       start: at,
       minEnd: attackEnd + 0.005,
+      glide(m: number, t: number, a4b = a4) {
+        if (released || stopAt < Infinity) return;
+        const f = toneFreq(m, a4b);
+        const u = Math.max(t, glideEnd);
+        glideEnd = u + GLIDE;
+        // von der bisherigen Höhe aus gleiten (exponentiell = gleichmäßig in Cent)
+        osc.frequency.setValueAtTime(curFreq, u);
+        osc.frequency.exponentialRampToValueAtTime(f, glideEnd);
+        band.frequency.setValueAtTime(Math.min(curFreq * 2, 9000), u);
+        band.frequency.exponentialRampToValueAtTime(Math.min(f * 2, 9000), glideEnd);
+        curFreq = f;
+      },
       release(t: number) {
         if (released || stopAt < Infinity) return;
         released = true;

@@ -9,6 +9,11 @@
 //   { kind: "tone" | "click" | "noise", freq, start, stop } (Zeiten auf der vorgetäuschten Uhr).
 //   `stop` ist das Ende des Knotens: bei Tönen Tonende + Ausklingen (RELEASE_TAIL = 0,18 s).
 //   Flötentöne erkennt sie an der eigenen Wellenform ("custom"), Klicks am Sinus (siehe flute-synth.ts).
+// - Gebundene Töne (Bindebogen) laufen auf demselben Oszillator weiter, nur die Tonhöhe gleitet
+//   (setValueAtTime + exponentialRampToValueAtTime auf `frequency`, siehe Voice.glide). Jeder solche
+//   Wechsel wird als eigener Ton protokolliert: { kind: "tone", freq: Zielhöhe, start: Beginn des
+//   Gleitens, legato: true }. Der Ton davor bekommt als `stop` diesen Beginn; der letzte das Knotenende.
+//   Wechsel, die erst nach einem harten Stopp kämen, bekommen stop = start (wie abgesagte Töne).
 // Die Knoten selbst bleiben echte Web-Audio-Knoten (headless harmlos), damit ein echtes Mikrofon bzw.
 // FAKE_MIC daneben weiter funktioniert. Der echte Kontext bleibt als `window.__RealAudioContext`.
 import type { Page } from "@playwright/test";
@@ -18,10 +23,12 @@ export interface AudioLogEntry {
   freq: number | null;
   start: number;
   stop: number | null;
+  /** gebundener Tonwechsel auf einem schon klingenden Oszillator (Bindebogen) */
+  legato?: boolean;
 }
 
 export const FAKE_AUDIO = (opts?: { clock?: "manual" | "performance" }) => {
-  type Entry = { kind: string; freq: number | null; start: number; stop: number | null };
+  type Entry = { kind: string; freq: number | null; start: number; stop: number | null; legato?: boolean };
   const w = window as unknown as Record<string, unknown>;
   const Real = w.AudioContext as typeof AudioContext | undefined;
   if (!Real || w.__RealAudioContext) return;
@@ -41,19 +48,49 @@ export const FAKE_AUDIO = (opts?: { clock?: "manual" | "performance" }) => {
   };
 
   type Src = AudioScheduledSourceNode & { start(when?: number, offset?: number): void };
+  /** Protokoll eines Knotens; gibt die Liste seiner Einträge zurück (mehrere bei gebundenen Tönen) */
   const track = (node: Src, kind: () => string, freq: () => number | null) => {
     const start = node.start.bind(node);
     const stop = node.stop.bind(node);
-    let entry: Entry | null = null;
+    const entries: Entry[] = [];
     node.start = (when = 0, offset?: number) => {
-      entry = { kind: kind(), freq: freq(), start: when, stop: null };
+      const entry = { kind: kind(), freq: freq(), start: when, stop: null };
+      entries.push(entry);
       log.push(entry);
       if (offset === undefined) start(when);
       else start(when, offset);
     };
     node.stop = (when = 0) => {
-      if (entry) entry.stop = when;
+      entries.forEach((e, k) => {
+        if (k === 0 || e.start < when) {
+          if (e.stop === null || e.stop > when) e.stop = when;
+        } else e.stop = e.start; // kommt erst nach dem Ende: erklingt nicht
+      });
       stop(when);
+    };
+    return entries;
+  };
+
+  /** Gebundene Tonwechsel auf der Frequenz eines Flötentons mitschreiben (Voice.glide) */
+  const trackGlides = (o: OscillatorNode, entries: Entry[]) => {
+    const f = o.frequency;
+    const set = f.setValueAtTime.bind(f);
+    const ramp = f.exponentialRampToValueAtTime.bind(f);
+    let setAt: number | null = null;
+    f.setValueAtTime = (value: number, time: number) => {
+      setAt = time;
+      return set(value, time);
+    };
+    f.exponentialRampToValueAtTime = (value: number, time: number) => {
+      const prev = entries[entries.length - 1];
+      if (prev && o.type === "custom" && setAt !== null) {
+        if (prev.stop === null || prev.stop > setAt) prev.stop = setAt;
+        const entry: Entry = { kind: "tone", freq: value, start: setAt, stop: null, legato: true };
+        entries.push(entry);
+        log.push(entry);
+      }
+      setAt = null;
+      return ramp(value, time);
     };
   };
 
@@ -76,7 +113,8 @@ export const FAKE_AUDIO = (opts?: { clock?: "manual" | "performance" }) => {
     }
     createOscillator() {
       const o = super.createOscillator();
-      track(o as Src, () => (o.type === "custom" ? "tone" : "click"), () => o.frequency.value);
+      const entries = track(o as Src, () => (o.type === "custom" ? "tone" : "click"), () => o.frequency.value);
+      trackGlides(o, entries);
       return o;
     }
     createBufferSource() {

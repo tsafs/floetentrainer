@@ -117,6 +117,33 @@ test("Abspielen: Einzählen, dann läuft die Markierung zur richtigen Zeit mit, 
   await expect(page.getByRole("button", { name: "Stopp" })).toBeVisible();
 });
 
+test("Bindebogen (Stille Nacht): gebundene Töne stehen einzeln im Protokoll, Markierung läuft mit", async ({ page }) => {
+  await open(page, "#/lied/stille-nacht-heilige-nacht");
+  await expect(page.locator(".score svg.sys").first()).toBeVisible();
+  await page.getByRole("button", { name: "Abspielen" }).click();
+  const tl = (await lied(page))!;
+  // erst g'4. a'8 unter einem Bogen, dann g'4 neu angesetzt; die Markierung folgt jedem Ton
+  let log = await tones(page);
+  for (let k = 0; k < 4; k++) {
+    while (log.length <= k) {
+      await page.clock.runFor(50);
+      log = await tones(page);
+    }
+    await runTo(page, log[k].start + 0.03);
+    expect(await curIds(page)).toEqual(tl.tones[k].ids);
+    log = await tones(page);
+  }
+  const cl = await clicks(page);
+  const spq = (cl[1].start - cl[0].start) / 1.5; // 6/8: Einzählen auf punktierten Vierteln
+  for (let k = 0; k < 4; k++) {
+    expect(log[k].freq).toBeCloseTo(freqOf(tl.tones[k].midi), 1);
+    expect(log[k].start - log[0].start).toBeCloseTo((tl.tones[k].start - tl.tones[0].start) * spq, 3);
+  }
+  expect(log.slice(0, 3).map((t) => !!t.legato)).toEqual([false, true, false]);
+  // der gebundene Ton endet, wo der nächste gleitet: kein neuer Einsatz dazwischen
+  expect(log[0].stop).toBeCloseTo(log[1].start, 6);
+});
+
 test("Tempo ändert die Abstände, wirkt sofort und wird je Lied gemerkt", async ({ page }) => {
   await open(page, "#/lied/haenschen-klein");
   await page.getByRole("button", { name: "Abspielen" }).click();

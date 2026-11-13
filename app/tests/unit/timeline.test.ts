@@ -242,3 +242,72 @@ describe("Abschnitt wiederholen", () => {
     expect(sectionTimeline(s, 2, 3).bars.map((b) => b.index)).toEqual([2, 3]);
   });
 });
+
+describe("Bindebögen im Zeitplan (slurToNext)", () => {
+  const slurs = (m: string, extra = {}) => buildTimeline(song(m, extra)).tones.map((t) => !!t.slurToNext);
+
+  it("Töne unter dem Bogen sind an den nächsten gebunden, der letzte nicht", () => {
+    expect(slurs("(c'4 d'4 e'4) f'4 ||")).toEqual([true, true, false, false]);
+    // ohne Bogen: das Feld fehlt ganz
+    expect(buildTimeline(song("c'4 d'4 e'4 f'4 ||")).tones.every((t) => !("slurToNext" in t))).toBe(true);
+  });
+
+  it("auch über den Taktstrich und mit Haltebogen im Bogen", () => {
+    expect(slurs("c'2 (d'2 | e'2) f'2 ||")).toEqual([false, true, false, false]);
+    const tl = buildTimeline(song("(c'2~ c'4 d'4) e'1 ||"));
+    expect(tl.tones.map((t) => [t.dur, t.midi, !!t.slurToNext])).toEqual([
+      [3, 60, true],
+      [1, 62, false],
+      [4, 64, false],
+    ]);
+  });
+
+  it("Atemzeichen im Bogen trennt; Tonwiederholung im Bogen bleibt als Bindung vermerkt", () => {
+    expect(slurs("(c'4 , d'4 e'4) f'4 ||")).toEqual([false, true, false, false]);
+    expect(slurs("(g'4 g'4 a'4) r4 ||")).toEqual([true, true, false]);
+  });
+
+  it("Wiederholung: am Rücksprung nicht gebunden, beim zweiten Mal zum notierten Nachfolger schon", () => {
+    const s = song("|: (c'2 d'2 :| e'1) ||");
+    expect(playOrder(s)).toEqual([0, 0, 1]);
+    const tl = buildTimeline(s);
+    expect(tl.tones.map((t) => [t.midi, !!t.slurToNext])).toEqual([
+      [60, true],
+      [62, false], // danach kommt wieder c' (Rücksprung), nicht das notierte e'
+      [60, true],
+      [62, true],
+      [64, false],
+    ]);
+  });
+
+  it("2. Klammer: der Bogen in die 1. Klammer gilt nicht für den Sprung in die 2.", () => {
+    const tl = buildTimeline(song("|: c'2 (d'2 | [1 e'1) :| [2 f'1 ||"));
+    expect(tl.tones.map((t) => [t.midi, !!t.slurToNext])).toEqual([
+      [60, false],
+      [62, true],
+      [64, false],
+      [60, false],
+      [62, false], // nächster gespielter Ton ist f' (2. Klammer), notiert folgt e'
+      [65, false],
+    ]);
+  });
+
+  it("Abschnitt: der Bogen über das Abschnittsende hinaus wird nicht gebunden", () => {
+    const s = song("(c'2 d'2 | e'1) ||");
+    expect(sectionTimeline(s, 0, 0).tones.map((t) => !!t.slurToNext)).toEqual([true, false]);
+    expect(sectionTimeline(s, 0, 1).tones.map((t) => !!t.slurToNext)).toEqual([true, true, false]);
+  });
+
+  it("Heft: Stille Nacht – drei Bindebögen, je ein gebundener Übergang (auch über den Taktstrich)", () => {
+    const s = songById("stille-nacht-heilige-nacht")!;
+    const tl = buildTimeline(s);
+    const bound = tl.tones.flatMap((t, i) => (t.slurToNext ? [i] : []));
+    expect(bound.map((i) => [tl.tones[i].midi, tl.tones[i + 1].midi])).toEqual([
+      [67, 69], // (g'4. a'8)
+      [72, 76], // (c''2. | e''2.)
+      [62, 60], // (d'4 | c'2.)
+    ]);
+    // gebundene Töne schließen lückenlos an
+    for (const i of bound) expect(tl.tones[i + 1].start).toBeCloseTo(tl.tones[i].start + tl.tones[i].dur, 9);
+  });
+});
