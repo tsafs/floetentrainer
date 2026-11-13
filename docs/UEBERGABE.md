@@ -27,3 +27,6 @@ Silben, Atemzeichen, Seitenumbrüche.
    `docs/app-entscheidungen.md`** (gehen vor). Entwurf zum Ansehen: `docs/entwurf/app-mock.html`
    (`?s=home`, `?s=ok`, `?s=err`) und die Bildschirmfotos daneben. Plan ist mit der Nutzerin
    abgestimmt; direkt mit der Umsetzung in `app/` beginnen, `heft/` nicht verändern.
+4. Erweiterung „Lieder“ für die App (Vorspielen mit mitlaufenden Noten, ABC-Import, Mitspielen):
+   Plan in `docs/app-lieder.md`, drei Runden. Erst nach der ersten App-Fassung beginnen.
+   Die App liest die Lieder aus `heft/songs.py`: Die Notation dort bitte stabil halten.
