@@ -23,4 +23,7 @@ Silben, Atemzeichen, Seitenumbrüche.
 ## Offene Aufgaben
 1. „All in a Garden Green“ aus verlässlicher Quelle aufnehmen (Wunsch der Nutzerin).
 2. Weitere Stücke aus `docs/notizen.md`, v. a. Themen aus van Eycks „Fluyten Lust-hof“.
-3. Übungs-App: Auftrag in `docs/app-prompt.md`.
+3. Übungs-App: umgesetzt in `app/` nach `docs/app-entscheidungen.md` (Vite + TypeScript, pitchy).
+   Tests: `npm test` (Vitest) und `npm run e2e` (Playwright) im Ordner `app/`. Bildschirmfotos für die
+   Durchsicht: `SHOTS=1 npx playwright test shots` (optional `SCHEME=dark`), landen in `app/shots/`.
+   Veröffentlichung über `.github/workflows/pages.yml` auf https://tsafs.github.io/floetentrainer/.
