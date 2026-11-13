@@ -27,9 +27,12 @@ Deshalb entfernt:
 - ABC, die Katze lief im Schnee, Strophe 2 (Herkunft nicht belegt)
 - Alle Jahre wieder, Strophe 4 (nicht sicher von Wilhelm Hey)
 - Scarborough Fair (Melodie erst 1947 aufgezeichnet; aus Vorsicht)
-- Gottes Sohn ist kommen (religiös)
+- Gottes Sohn ist kommen, Es kommt ein Schiff geladen, Ihr Kinderlein kommet (religiös)
+- Kein schöner Land (Wunsch der Nutzerin: komplett raus)
 
 ## Aufgenommen
+- **Kling, Glöckchen**: de.wikibooks.org „Liederbuch/ Kling Glöckchen“ – Melodie aus dem Notenbild
+  (Wikimedia Commons, in C, 2/4), Strophen 2–3 wie dort. Text Karl Enslin († 1875).
 - **Jingle Bells**: Melodie der Strophe nach de.wikibooks.org „Liederbuch/ Jingle Bells“, Text aller vier
   Strophen nach en.wikipedia.org „Jingle Bells“ (dort „bob tail“ belegt mit dem Originaldruck).
 - **All in a Garden Green** (Nr. 20): Vorlage thesession.org/tunes/14287, Fassung 2 (von der Nutzerin
@@ -48,8 +51,14 @@ Deshalb entfernt:
 - **Virgiliano, Bassano**: echte Solo-Ricercare, aber virtuos – für später.
 - Weitere Renaissance-Stücke: Tourdion (Attaingnant 1530), Pavane „Belle qui tiens ma vie“ und
   Branle de l'Official (Arbeau 1589), Ronde aus Susatos Danserye (1551), „Innsbruck, ich muss dich
-  lassen“ (Isaac), „Es ist ein Ros entsprungen“ (1599).
-- Weitere Lieder: Kling Glöckchen, Fuchs du hast die Gans gestohlen, Musette (J. S. Bach).
+  lassen“ (Isaac). („Es ist ein Ros entsprungen“ gestrichen: religiös.)
+- Weitere Lieder: Fuchs du hast die Gans gestohlen, Musette (J. S. Bach).
 
 Quellen: de.wikibooks.org „Liederbuch/…“ war erreichbar. Für die Liste oben braucht die Arbeitsumgebung
 Zugriff auf weitere Seiten (z. B. imslp.org, thesession.org, abcnotation.com, de.wikipedia.org).
+
+## Quellen-Hinweise
+- IMSLP: Van Eyck, Fluyten Lust-hof Bd. I in moderner Ausgabe von Cayo Gomes (CC0), Datei
+  „PMLP201599-Der_Fluyten_Lust-Hof_vol._I_-_(Eyck,_Jacob_van).pdf“. IMSLP-Downloads laufen über eine
+  Hinweisseite zu den Nutzungsbedingungen; die darf Claude nur mit ausdrücklicher Erlaubnis der Nutzerin bestätigen.
+- Wikimedia-Bilder: nur Vorschaubilder in Standardgrößen laden (z. B. 1920px), Originale geben Fehler 429.

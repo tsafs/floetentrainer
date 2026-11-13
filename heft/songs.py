@@ -62,6 +62,23 @@ SONGS = [
                "g'4 g'4 d''4 d''4 | e''4 e''4 d''2 , | c''4 c''4 h'4 h'4 | a'2 g'2 ||",
          lyrics="Mor-gen kommt der Weih-nachts-mann, kommt mit sei-nen Ga-ben. Trom-mel, Pfei-fen und Ge-wehr, "
                 "Fahn und Sä-bel und noch mehr, ja ein gan-zes Krie-ges-heer möcht ich ger-ne ha-ben."),
+    dict(title="Kling, Glöckchen", key="C", keyname="C-Dur", time=(2, 4),
+         credit="Text: Karl Enslin · Melodie: 19. Jahrhundert",
+         # Quelle: de.wikibooks.org „Liederbuch/ Kling Glöckchen“ (Notenbild auf Wikimedia Commons, in C)
+         music="g'4 e'8 f'8 | g'16 a'16 g'16 a'16 g'4 | f'4 d'8 g'8 | e'2 , | / "
+               "d'8 d'8 e'8 c'8 | e'4 d'4 | f'8 f'8 g'8 d'8 | f'4 e'4 , | / "
+               "d'8 d'8 e'8 fis'8 | g'4 d'4 | e'8 a'8 g'8 fis'8 | a'4 g'4 , | / "
+               "g'4 e'8 f'8 | g'16 a'16 g'16 a'16 g'4 | f'4 d'8 g'8 | c'2 ||",
+         lyrics="Kling, Glöck-chen, klin-ge-lin-ge-ling, kling, Glöck-chen, kling! "
+                "Lasst mich ein, ihr Kin-der, ist so kalt der Win-ter, "
+                "öff-net mir die Tü-ren, lasst mich nicht er-frie-ren! "
+                "Kling, Glöck-chen, klin-ge-lin-ge-ling, kling, Glöck-chen, kling!",
+         stanzas=["Kling, Glöckchen, klingelingeling, / kling, Glöckchen, kling! / Mädchen, hört, und Bübchen, / "
+                  "macht mir auf das Stübchen, / bring euch viele Gaben, / sollt euch dran erlaben. / "
+                  "Kling, Glöckchen, klingelingeling, / kling, Glöckchen, kling!",
+                  "Kling, Glöckchen, klingelingeling, / kling, Glöckchen, kling! / Hell erglühn die Kerzen, / "
+                  "öffnet mir die Herzen! / Will drin wohnen fröhlich, / frommes Kind, wie selig. / "
+                  "Kling, Glöckchen, klingelingeling, / kling, Glöckchen, kling!"]),
     dict(title="Bruder Jakob", key="G", keyname="G-Dur", time=(4, 4),
          credit="Volksweise (Frère Jacques)",
          music="g'4 a'4 h'4 g'4 | g'4 a'4 h'4 g'4 , | h'4 c''4 d''2 , | h'4 c''4 d''2 , | / "
@@ -128,17 +145,6 @@ SONGS = [
                "g'8. g'16 fis'8 d'8 h'8. h'16 a'8 , d''8 | a'8. g'16 fis'8 e'8 d'4 r4 ||",
          lyrics="A, B, C, die Kat-ze lief im Schnee. Und als sie dann nach Hau-se kam, "
                 "da hatt sie wei-ße Stie-fel an. O je-mi-ne, o je-mi-ne, die Kat-ze lief im Schnee."),
-    dict(title="Ihr Kinderlein, kommet", key="G", keyname="G-Dur", time=(4, 4),
-         credit="Text: Christoph von Schmid · Melodie: Johann Abraham Peter Schulz",
-         music="d''4 | d''4 h'8 d''8 d''4 h'8 d''8 | c''4 a'8 c''8 h'4 r8 / d''8 | "
-               "d''4 h'8 d''8 d''4 h'8 d''8 | c''4 a'8 c''8 h'4 r8 / h'8 | "
-               "a'4 a'8 a'8 c''4 c''8 c''8 | h'4 h'8 h'8 e''4 r8 / e''8 | "
-               "d''4 d''8 d''8 g''4 d''8 h'8 | c''4 a'8 fis'8 g'4 ||",
-         lyrics="Ihr Kin-der-lein, kom-met, o kom-met doch all! Zur Krip-pe her kom-met in Beth-le-hems Stall "
-                "und seht, was in die-ser hoch-hei-li-gen Nacht der Va-ter im Him-mel für Freu-de uns macht!",
-         stanzas=["O seht in der Krippe im nächtlichen Stall, / seht hier bei des Lichtleins hellglänzendem Strahl / den lieblichen Knaben, das himmlische Kind, / viel schöner und holder, als Engelein sind.",
-                  "Da liegt es, ihr Kinder, auf Heu und auf Stroh, / Maria und Josef betrachten es froh; / die redlichen Hirten knien betend davor, / hoch oben schwebt jubelnd der himmlische Chor.",
-                  "O beugt wie die Hirten anbetend die Knie, / erhebet die Händlein und danket wie sie! / Stimmt freudig, ihr Kinder, wer wollt sich nicht freun, / stimmt freudig zum Jubel der Engel mit ein!"]),
     dict(title="Stille Nacht, heilige Nacht", key="C", keyname="C-Dur", time=(6, 8),
          credit="Text: Joseph Mohr · Melodie: Franz Xaver Gruber",
          music="(g'4. a'8) g'4 | e'2. , | g'4. a'8 g'4 | e'2. , | d''2 d''4 | h'2. , | c''2 c''4 | g'2. , | / "
@@ -151,13 +157,7 @@ SONGS = [
 
     # ---------------------------------------------------------------- alte Melodien
     dict(chapter="Alte Lieder und Tänze",
-         title="Es kommt ein Schiff, geladen", key="e", keyname="e-Moll", time=(3, 4),
-         credit="Text: nach Johannes Tauler · Melodie: 1608",
-         music="e'4 | e'2 e'4 | fis'2 fis'4 | (g'4 a'4 h'4) | h'2 h'4 , | a'2 a'4 | d'2 fis'4 | / "
-               "T4/4 g'2 r4 g'4 | h'4 d''4 e''4 e''4 | (d''8 c''8 h'8 a'8) g'4 , a'4 | h'4 a'4 g'4 fis'4 | e'2. ||",
-         lyrics="Es kommt ein Schiff, ge-la-den bis an sein höchs-ten Bord, trägt Got-tes Sohn voll Gna-den, des Va-ters e-wigs Wort.",
-         stanzas=["Das Schiff geht still im Triebe, / es trägt ein teure Last; / das Segel ist die Liebe, / der Heilig Geist der Mast."]),
-    dict(title="Noël nouvelet", key="G", keyname="a-Moll (dorisch)", time=(4, 4),
+         title="Noël nouvelet", key="G", keyname="a-Moll (dorisch)", time=(4, 4),
          credit="Französisch, 15. Jahrhundert · Melodie ohne Text",
          music="a'4 e''4 fis''4 d''4 | e''2 c''2 | d''4 d''8 e''8 c''4 h'4 | a'1 , | / "
                "a'4 e''4 fis''4 d''4 | e''2 c''2 | d''4 d''8 e''8 c''4 h'4 | a'1 , | / "
@@ -180,17 +180,7 @@ SONGS = [
 
     # ---------------------------------------------------------------- hübsche Melodien
     dict(chapter="Schöne Melodien",
-         title="Kein schöner Land", key="G", keyname="G-Dur", time=(3, 4),
-         credit="Text und Melodie: Anton Wilhelm von Zuccalmaglio · nach G-Dur gesetzt",
-         music="d'8 d'8 d'8 | g'4 h'4 a'8 g'8 | a'4. , d'8 d'8 d'8 | g'4 h'4 a'8 g'8 | a'4. , / "
-               "h'8 g'8 a'8 | (h'8 d''8) c''8 h'8 a'8 g'8 | (a'8 c''8) h'8 a'8 g'8 a'8 | h'4. , / "
-               "h'8 g'8 a'8 | (h'8 d''8) c''8 h'8 a'8 g'8 | (a'8 c''8) h'8 a'8 g'8 fis'8 | g'4. ||",
-         lyrics="Kein schö-ner Land in die-ser Zeit, als hier das uns-re weit und breit, "
-                "wo wir uns fin-den wohl un-ter Lin-den zur A-bend-zeit, wo wir uns fin-den wohl un-ter Lin-den zur A-bend-zeit.",
-         stanzas=["Da haben wir so manche Stund / gesessen da in frohem Rund / und taten singen, / die Lieder klingen / im Eichengrund.",
-                  "Dass wir uns hier in diesem Tal / noch treffen so viel hundertmal, / Gott mag es schenken, / Gott mag es lenken, / er hat die Gnad.",
-                  "Jetzt, Brüder, eine gute Nacht, / der Herr im hohen Himmel wacht! / In seiner Güten / uns zu behüten / ist er bedacht."]),
-    dict(title="The Water Is Wide", key="G", keyname="G-Dur", time=(4, 4),
+         title="The Water Is Wide", key="G", keyname="G-Dur", time=(4, 4),
          credit="Schottisch-englisches Volkslied",
          music="d'4 g'8 a'8 a'4 | h'2. a'8 a'8 | g'4 e'4 d'2~ | d'4 , g'4 g'4 fis'4 | g'2. a'4 | h'4 (c''8 h'8) a'2~ | a'4 , / "
                "a'4 h'4 (h'8 c''8) | d''2. c''8 c''8 | h'4 (a'8 g'8) h'2~ | h'4 , a'4 g'4 e'4 | d'2. d'4 | e'4 g'4 g'2~ | g'4 ||",
