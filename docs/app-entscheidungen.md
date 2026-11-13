@@ -1,23 +1,37 @@
 # Flötentrainer-App: Entscheidungen
 
-Ergebnis der Abstimmung mit der Nutzerin (13.11.2026). Ergänzt und präzisiert `docs/app-prompt.md`.
-**Bei Widersprüchen gilt dieses Dokument.** Visueller Entwurf: `docs/entwurf/app-mock.html`
-(im Browser öffnen, `?s=home`, `?s=ok` oder `?s=err` anhängen) und die Bildschirmfotos daneben.
+Ergebnis der Abstimmung mit der Nutzerin (13.11.2026), danach unabhängig geprüft und nachgeschärft.
+Ergänzt und präzisiert `docs/app-prompt.md`. **Bei Widersprüchen gilt dieses Dokument.**
+
+Visueller Entwurf: `docs/entwurf/app-mock.html` (im Browser öffnen, `?s=home`, `?s=ok` oder `?s=err`
+anhängen) und die Bildschirmfotos daneben. Der Entwurf zeigt Aussehen und Anordnung. Wo er von diesem
+Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeitszahlen).
 
 ## 1. Sitzungen
 
 - Zwei Knöpfe auf der Startseite:
-  - **Üben**: Note→Name, Note→Griff und Griff→Note bunt gemischt.
-  - **Spielen**: nur Spielen-Karten mit Mikrofon (Flöte und ruhiger Raum nötig).
-- Eine Sitzung endet nach 5 Minuten oder 20 Karten, je nachdem, was zuerst eintritt (beides einstellbar).
-  Eine angefangene Karte wird noch zu Ende gespielt.
-- Reihenfolge: fällige Karten zuerst (die am längsten überfälligen vorn), dann neue Karten
-  der freigeschalteten Töne.
-- Falsch beantwortete Karten kommen in derselben Sitzung nochmal, nach 2–3 anderen Karten, falls es
-  noch andere gibt. Diese Wiederholung zählt nicht zur Kartengrenze von 20.
-- **Nichts fällig, nichts neu:** Die App meldet „Für heute alles erledigt“ und bietet „Trotzdem üben“
-  an. Dann kommen zufällige Karten der freigeschalteten Töne, schwache Töne bevorzugt. Diese Antworten
-  zählen für die Trefferquote (Abschnitt 3), ändern aber **keine** Fächer und Termine.
+  - **Üben:** Note→Name, Note→Griff und Griff→Note gemischt.
+  - **Spielen:** nur Spielen-Karten mit Mikrofon.
+- Jeder Knopf zeigt die Zahl der fälligen Karten seiner Art.
+- Eine Sitzung endet nach **5 Minuten oder 20 Karten**, je nachdem, was zuerst eintritt (beides
+  einstellbar). Die angefangene Karte wird noch zu Ende gespielt.
+- **Zusammensetzung**, in dieser Reihenfolge:
+  1. **Fällige Karten**, die am längsten überfälligen vorn.
+  2. **Neue Karten** der freigeschalteten Töne, **höchstens 6 je Sitzung**. Vor der ersten Karte
+     eines neuen Tons kommt dessen Vorstellung (Abschnitt 4).
+  3. **Zusatzkarten**, bis die Sitzung voll ist: zufällige Karten der freigeschalteten Töne,
+     schwache Töne dreifach gewichtet. Zusatzkarten zählen für die Trefferquote (Abschnitt 3),
+     **verändern aber keine Fächer und Termine.**
+- Derselbe Ton kommt nie zweimal direkt hintereinander. Sonst würde die Auflösung der einen Karte
+  die Antwort der nächsten verraten.
+- **Fehler in der Sitzung:**
+  - Eine falsch beantwortete Karte kommt nach 2–3 anderen Karten nochmal, höchstens zweimal.
+  - Diese Wiederholungen zählen nicht zur Kartengrenze, nicht zur Trefferquote und ändern das Fach
+    nicht.
+  - Steht beim Sitzungsende noch eine Wiederholung aus, entfällt sie.
+- **Abbrechen mit ×:** Bereits beantwortete Karten bleiben gewertet, alles andere bleibt unverändert.
+- **Nichts fällig, nichts neu:** Die Startseite meldet „Für heute alles erledigt“, und der Knopf
+  heißt dann „Trotzdem üben“. Die Sitzung besteht dann nur aus Zusatzkarten.
 
 ## 2. Karten und Wiederholung (Leitner)
 
@@ -26,123 +40,172 @@ Ergebnis der Abstimmung mit der Nutzerin (13.11.2026). Ergänzt und präzisiert 
 
   | Fach | wieder fällig |
   |---|---|
-  | 1 | in derselben Sitzung |
+  | 1 | in der nächsten Sitzung |
   | 2 | nach 1 Tag |
   | 3 | nach 3 Tagen |
   | 4 | nach 7 Tagen |
   | 5 | nach 14 Tagen |
   | 6 | nach 30 Tagen |
 
-- Richtig: ein Fach höher. Falsch: zurück in Fach 1.
-- Fälligkeit nach Kalendertagen in der lokalen Zeitzone: „nach 1 Tag“ heißt ab dem nächsten Kalendertag.
-- Eine neue Karte startet in Fach 1.
-- Serie: Anzahl der Kalendertage in Folge mit mindestens einer beantworteten Karte, egal welcher Art.
+  „Nach n Tagen“ wird in Kalendertagen der lokalen Zeitzone gezählt.
+- Richtig: ein Fach höher, Fach 6 bleibt Fach 6. Falsch: Fach 1.
+- Eine neue Karte wird bei ihrer ersten Antwort einsortiert: richtig in Fach 2, falsch in Fach 1.
+- **Serie:** die Kalendertage in Folge mit mindestens einer gewerteten Antwort, egal welcher Art.
+  - Hat sie heute noch nicht geübt, zählt die Serie bis gestern und bleibt stehen. Der heutige Punkt
+    bleibt offen.
+  - Die Wochenpunkte zeigen Mo–So der laufenden Woche.
 
 ## 3. Fortschritt: zwei getrennte Spuren
 
 - **Lesen** (die drei Tipp-Übungen zusammen) und **Spielen** haben jeweils eine eigene Stufe.
-- **Freischalten:** Die nächste Stufe einer Spur kommt automatisch, sobald *jeder* bisher
-  freigeschaltete Ton in dieser Spur
-  - mindestens 10 Antworten hat und
-  - von seinen letzten 20 Antworten mehr als 90 % richtig sind.
+- **Trefferquote eines Tons** in einer Spur: Anteil richtig unter seinen letzten 20 gewerteten
+  Antworten. Gewertet sind normale Karten und Zusatzkarten, aber keine Wiederholungen und keine
+  Vorstellungen.
+- **Freischalten:** Die nächste Stufe einer Spur kommt automatisch, sobald *jeder* freigeschaltete Ton
+  dieser Spur
+  - mindestens 10 gewertete Antworten hat,
+  - mindestens **90 %** richtig hat (z. B. 18 von 20 oder 9 von 10) und
+  - Antworten an **mindestens 2 verschiedenen Kalendertagen** unter diesen letzten 20 hat.
 
-  Bei Lesen werden die Antworten aller drei Tipp-Übungen eines Tons zusammengezählt. Danach erscheint
-  eine kurze Meldung, zum Beispiel „Neu: c² und d²“.
+  Die Prüfung läuft nach jeder Antwort. Die Meldung („Neu: c² und d²“) erscheint am Sitzungsende,
+  und die neuen Töne kommen ab der nächsten Sitzung.
 - **Spielen kann Lesen nie überholen:** Die Spielen-Stufe ist höchstens so hoch wie die Lesen-Stufe.
-  Lesen darf beliebig vorauslaufen.
-- **Von Hand:** In den Einstellungen lässt sich jede Spur verstellen. Spielen bleibt dabei auf die
-  Lesen-Stufe begrenzt. Wird Lesen unter die Spielen-Stufe gesenkt, sinkt Spielen mit.
-- Die Fächer bestimmen nur, *wann* eine Karte wiederkommt, nicht das Freischalten.
-- **Stufen** (die acht aus dem Auftrag, dazu eine neunte):
-  1. h¹ a¹ g¹
-  2. c² d²
-  3. e¹ d¹
-  4. fis¹
-  5. e² f¹
-  6. c¹
-  7. cis² f² g²
-  8. cis¹ es¹ gis¹ b¹ es² fis² gis² a² b² h² c³
-  9. Andere Schreibweisen: des¹ dis¹ ges¹ as¹ ais¹ des² dis² ges² as² ais²
+- **Von Hand:** In den Einstellungen lässt sich jede Spur verstellen.
+  - Spielen bleibt dabei auf die Lesen-Stufe begrenzt. Wird Lesen unter Spielen gesenkt, sinkt Spielen
+    mit.
+  - Nach einem Senken zählen für das Freischalten nur Antworten ab diesem Zeitpunkt. Sonst würde die
+    Stufe sofort wieder steigen.
+  - Daten von Tönen, die dadurch wieder gesperrt sind, bleiben erhalten.
+- **Stufen** (die Stufe „Rest“ aus dem Auftrag ist auf Wunsch in vier Stufen geteilt):
 
-  Die Nutzerin wollte die anderen Schreibweisen „in der letzten Stufe“. Deshalb kommen sie
-  als eigene Schlussstufe nach allen Tönen der Grifftabelle. Jede andere Schreibweise hat denselben
-  Griff wie ihr Partner in der Tabelle.
+  | Stufe | Töne | Anmerkung |
+  |---|---|---|
+  | 1 | h¹ a¹ g¹ | |
+  | 2 | c² d² | |
+  | 3 | e¹ d¹ | |
+  | 4 | fis¹ | |
+  | 5 | e² f¹ | |
+  | 6 | c¹ | |
+  | 7 | cis² f² g² | |
+  | 8 | a² h² c³ | hohe Stammtöne |
+  | 9 | b¹ es¹ | häufigste ♭-Töne |
+  | 10 | cis¹ gis¹ fis² | ♯-Töne |
+  | 11 | es² gis² b² | schwierige hohe Griffe |
+  | 12 | dis¹ dis² as¹ as² ais¹ ais² | andere Schreibweisen, **nur Lesen** |
+
+  Lesen hat also 12 Stufen, Spielen 11.
+- Stufen haben feste Kennungen (z. B. `hoch-stamm`), nicht nur Nummern, damit sich die Einteilung
+  später ändern lässt.
+- **Andere Schreibweisen (Stufe 12):**
+  - Nur dis, as und ais (keine des, ges).
+  - Nur in Note→Name und Note→Griff, nicht in Griff→Note: Ein Griff hätte sonst zwei richtige
+    Antworten. Auch nicht beim Spielen, weil der Klang derselbe ist.
+  - Der Griff ist jeweils der des Partners in der Tabelle (dis¹ = es¹, as¹ = gis¹, ais¹ = b¹).
 
 ## 4. Übungsarten im Detail
 
+- **Vorstellung neuer Töne:** Vor der ersten Abfrage eines neuen Tons erscheint eine Vorstellungskarte
+  mit Note, Name, Griffbild und einem Satz zur Lage.
+  - Beispiele für den Satz: „c² liegt im dritten Zwischenraum“, „c¹ hat eine eigene Hilfslinie unter
+    den Linien“.
+  - Dazu ein kurzer Griff-Tipp, wo er hilft, z. B. „Daumen nur einen Spalt offen“. Diese Tipps werden
+    je Ton von Hand formuliert.
+  - Knopf „Verstanden“.
+  - In der Spielen-Spur bittet die Karte zusätzlich, den Ton einmal zu spielen. Die App zeigt, was sie
+    hört, und es geht weiter, wenn der Ton stimmt oder bei „Weiter“.
+  - Eine Vorstellung zählt nicht als Antwort.
 - **Note→Name:**
-  - Anfangs 4 Namen zur Auswahl.
-  - Hat die Karte Fach 3 erreicht, kommen Knöpfe für **alle** freigeschalteten Töne der Lesen-Spur,
-    nach Tonhöhe geordnet. Fällt sie zurück in Fach 1 oder 2, gibt es wieder 4 Namen.
-- **Note→Griff:** 4 Griffbilder zur Auswahl.
-- **Griff→Note:** Ein Griffbild wird gezeigt, zur Wahl stehen 4 kleine Notenzeilen.
-  - Nur Töne aus der Grifftabelle, keine anderen Schreibweisen: Ein Griff hätte sonst zwei richtige
-    Antworten.
-- **Falsche Antworten möglichst verwechselbar:** Nachbartöne, ähnliche Griffe (wenige Löcher anders),
-  derselbe Ton in der anderen Oktave.
-  - Reichen die freigeschalteten Töne nicht für 4 Möglichkeiten (z. B. Stufe 1), kommen Nachbartöne
-    aus späteren Stufen dazu. Diese werden selbst nie abgefragt.
+  - In Fach 1 und 2: 4 Namen.
+  - Ab Fach 3: **8 Namen** in zwei Reihen zu 4. Gibt es nicht genug passende Töne, entsprechend
+    weniger, mindestens 4.
+  - Die Knöpfe stehen nach Tonhöhe geordnet.
+- **Note→Griff:** 4 Griffbilder. **Griff→Note:** ein Griffbild, zur Wahl 4 kleine Notenzeilen.
+- **Falsche Antworten möglichst verwechselbar:** Nachbartöne, dieselbe Note mit ♯/♭, ähnliche Griffe
+  (wenige Löcher anders), derselbe Ton in der anderen Oktave.
+  - Reichen die freigeschalteten Töne nicht, kommen Töne aus späteren Stufen dazu. Diese werden selbst
+    nie abgefragt.
   - Nie zwei Möglichkeiten mit demselben Griff und nie zwei Schreibweisen desselben Tons.
+- **„Weiß nicht“:** Bei jeder Übungsart gibt es einen kleinen Knopf „Weiß nicht“. Er zeigt die
+  Auflösung und zählt als Fehler.
 - **Notennamen:** Deutsch (c d e f g a h, cis, es, b …), immer mit Oktavzahl.
   - Die Schreibweise in der Notenzeile folgt dem Namen: es¹ mit ♭, cis¹ mit ♯, b¹ mit ♭.
+  - Was die App beim Spielen und im Stimmgerät *hört*, benennt sie immer mit der Schreibweise der
+    Grifftabelle (cis, es, fis, gis, b).
 - **Spielen:**
   - Die Note wird gezeigt, die App hört zu (Bibliothek „pitchy“).
   - Die Sopranflöte klingt eine Oktave höher als notiert: notiertes c¹ ≈ 523,25 Hz bei a = 440 Hz.
-  - Richtig: Der gesuchte Ton klingt 0,3 s stabil innerhalb der Toleranz (Standard ±40 Cent).
-  - Ein stabiler falscher Ton (0,3 s, gleiche Regel) zählt als Fehler, die Karte kommt in Fach 1. Die App
-    zeigt „Du spielst a¹“, und die Nutzerin darf weiterspielen, bis der richtige Ton kommt.
-    Danach geht es weiter.
-  - Knopf „Weiß nicht“: Lösung zeigen, gilt als Fehler.
-  - Laufend wird angezeigt, welchen Ton die App hört.
-  - Einstellbar sind Toleranz, Haltedauer (Standard 0,3 s) und Stimmton (Standard a = 440 Hz).
+  - **Richtig:** Der gesuchte Ton klingt 0,3 s stabil innerhalb der Toleranz (Standard ±40 Cent).
+  - **Falsch:** Ein anderer Ton klingt 0,3 s stabil.
+    - Gewertet wird erst ab einem neuen Toneinsatz nach der Kartenanzeige, also nach Stille oder einem
+      Tonwechsel und frühestens 400 ms nach der Anzeige. Ein Nachklang der vorigen Karte zählt so nicht.
+    - Ein Fehler wird höchstens einmal je Karte gewertet. „Erst falsch, dann richtig“ ist ein Fehler.
+    - Die App zeigt dann „Du spielst a¹“ und das Griffbild des gesuchten Tons. Die Nutzerin spielt
+      weiter, bis der richtige Ton kommt, oder tippt „Weiter“.
+  - **Weiß nicht:** Das Griffbild erscheint, und sie darf den Ton danach spielen. Es zählt als Fehler.
+  - **Erkennung, damit nichts ungerecht gewertet wird:**
+    - Tonhöhe nur, wenn pitchy eine Klarheit von mindestens etwa 0,9 meldet und die Lautstärke über
+      einer Schwelle liegt.
+    - Nur Frequenzen zwischen etwa 480 und 2300 Hz gelten.
+    - Ein Oktavfehler, also derselbe Ton eine Oktave daneben, wird erst bei besonders hoher Klarheit
+      als falsch gewertet.
+  - Laufend wird angezeigt, welchen Ton die App hört, mit Abweichung in Cent.
+  - Einstellbar sind Toleranz, Haltedauer und Stimmton (Standard a = 440 Hz).
+- **Hinweis nach einem Fehler:** ein Satz aus festen Vorlagen. Je nach Verwechslung geht es um
+  Hilfslinien, Linie oder Zwischenraum, die Oktave (Daumen), ♯/♭ oder die Nachbarnote. Beispiel:
+  „Du hast d¹ gewählt. c¹ hat eine eigene Hilfslinie, d¹ hängt unter der untersten Linie.“
 
 ## 5. Rückmeldung
 
 - **Richtig:**
-  - Ein grün getöntes Feld erscheint mit Häkchen, „Richtig“, dem Namen groß und dem Griffbild.
-    Text und Griffbild stehen senkrecht mittig nebeneinander.
+  - Ein grün getöntes Feld erscheint: Häkchen und „Richtig“, darunter groß der Name. Daneben steht
+    das Griffbild, Text und Bild senkrecht mittig zueinander.
   - Nach etwa 1 Sekunde geht es von selbst weiter, Tippen geht schneller.
   - Im Hochformat bleiben die Knöpfe sichtbar (der richtige hervorgehoben, die anderen blass).
     Im Querformat ersetzt das Feld die Knöpfe.
 - **Falsch:**
-  - Ein rötlich getöntes Feld ersetzt die Knöpfe: „Nicht ganz“, der richtige Name, das Griffbild,
-    die eigene Antwort und ein kurzer Hinweis (z. B. „c¹ hat eine eigene Hilfslinie …“).
+  - Ein rötlich getöntes Feld ersetzt die Knöpfe. Darin stehen „Nicht ganz“, der richtige Name, das
+    Griffbild und der Hinweis.
   - Darunter ein großer Knopf „Weiter“, es geht nicht von selbst weiter.
   - Die Note bleibt oben stehen, sodass Note, Name und Griff zusammen sichtbar sind.
-- **Keine Beschreibung in Worten, welche Löcher zu sind.** Das Griffbild reicht.
+- **Keine Beschreibung in Worten, welche Löcher zu sind.** Das Griffbild reicht. Griff-Tipps gibt es
+  nur bei der Vorstellung.
 
 ## 6. Seiten
 
 - **Startseite** (Entwurf `?s=home`):
-  - Titel, die Zahl der fälligen Karten, „Tage in Folge“ und die Woche als Punkte Mo–So.
-  - Die beiden Spuren als Stufenleisten.
-  - „Deine Töne beim Lesen“: Namen mit kleinem Trefferquote-Balken, schwache Töne in Rot.
+  - Titel; die fälligen Karten für Lesen und Spielen jeweils auf ihrem Knopf.
+  - „Tage in Folge“ mit den Wochenpunkten Mo–So.
+  - Die beiden Spuren als Stufenleisten (12 bzw. 11 Abschnitte).
+  - „Deine Töne beim Lesen“: Namen mit Trefferquote-Balken. Rot ist ein Ton mit mindestens 5 Antworten
+    und unter 80 %.
   - Unten die großen Knöpfe Üben und Spielen, darunter Stimmgerät · Grifftabelle · Einstellungen.
-- **Übung** (Entwurf `?s=ok`, `?s=err`): oben ein ×-Knopf zum Beenden, ein feiner Fortschrittsstrich und
+- **Übung** (Entwurf `?s=ok`, `?s=err`): oben ein ×-Knopf, ein feiner Fortschrittsstrich und
   „7 von 20“, darunter Notenzeile, Frage, Antworten und Rückmeldung.
-- **Sitzungsende:** eine kurze Zusammenfassung (wie viele richtig, welche Töne schwierig waren, ggf.
-  neu freigeschaltete Töne), dann zurück zur Startseite.
+- **Sitzungsende:** wie viele richtig, welche Töne schwierig waren und gegebenenfalls „Neu: …“.
+  Danach zurück zur Startseite.
 - **Fortschritt:** Trefferquote je Ton, getrennt nach Lesen und Spielen. Erreichbar durch Tippen auf
-  die Spuren der Startseite.
+  die Spuren.
 - **Stimmgerät:** freies Spielen mit laufender Anzeige der gehörten Note (auf den Linien, als Name und
   Griffbild) und der Abweichung in Cent.
 - **Grifftabelle:** alle Töne c¹–c³ mit Note, Name und Griffbild. Noch nicht freigeschaltete Töne
-  erscheinen blass.
+  (Lesen-Spur) erscheinen blass.
 - **Einstellungen:**
-  - Sitzungslänge (Minuten, Karten)
+  - Sitzungslänge
   - Toleranz, Haltedauer und Stimmton
   - beide Stufen von Hand
-  - Sicherung als Datei herunterladen und wieder einlesen
+  - Sicherung herunterladen und einlesen
   - alles zurücksetzen, mit Bestätigung in der Seite selbst
 
 ## 7. Gestaltung
 
-- **Schrift:** ausschließlich EB Garamond (normal 400 und 500, kursiv 400), lokal eingebunden.
-  - Die woff2-Dateien liegen in `heft/fonts/`; die App bekommt Kopien mitsamt Lizenztext.
+- **Schrift:** ausschließlich EB Garamond, lokal eingebunden. Aus `heft/fonts/` werden normal 400,
+  normal 500 und kursiv 400 in die App kopiert, mit Lizenztext.
+  - Keine anderen Schnitte und kein Laden von Google Fonts. Der Entwurf tut das nur zur Ansicht.
   - Nebeninfos stehen kursiv in gedämpfter Farbe.
-  - Keine Sans-Schrift: Die Nutzerin fand die Mischung mit Source Sans 3 unnatürlich.
-- **Notennamen mit Hochzahl:** Buchstaben plus eigenes Element für die Oktavzahl
-  (etwa 0,58 em groß, etwa 0,72 em angehoben, 0,09 em Abstand links).
+  - Keine Sans-Schrift: Die Nutzerin fand die Mischung unnatürlich.
+- **Notennamen mit Hochzahl:** Buchstaben plus eigenes Element für die Oktavzahl, CSS genau wie im
+  Entwurf (`.o`: `font-size: 0.58em; position: relative; top: -0.72em; margin-left: 0.09em;
+  line-height: 0`).
   - Nicht die Unicode-Zeichen ¹ ² ³: Das ¹ stößt in Garamond an den Bogen des f.
 - **Farben (hell):**
 
@@ -160,14 +223,16 @@ Ergebnis der Abstimmung mit der Nutzerin (13.11.2026). Ergänzt und präzisiert 
   - Holzfarben des Griffbilds wie in `heft/engrave.py`.
   - **Dunkelmodus** folgt automatisch der Systemeinstellung: dunkler, warmer Grund, helle Tinte,
     gedämpftes Holz. Die Werte legt die Umsetzung fest, mit gutem Kontrast.
-- **Notenzeile:** Violinschlüssel und Notenköpfe aus Bravura (`heft/fonts/bravura.otf`, SMuFL:
-  Violinschlüssel U+E050, ganze Note U+E0A2, ♯ U+E262, ♭ U+E260).
+- **Notenzeile:** Violinschlüssel, Notenköpfe und Vorzeichen aus Bravura (`heft/fonts/bravura.otf`,
+  SMuFL: Violinschlüssel U+E050, ganze Note U+E0A2, ♯ U+E262, ♭ U+E260).
+  - Die Umrisse werden **als SVG-Pfade** in die App übernommen. Die Schrift wird nicht geladen, damit
+    nichts beim Laden flackert. Der Lizenztext kommt mit.
   - Ganze Note ohne Hals.
   - Der Notenkopf ist auf **82 %** verkleinert, damit er im Zwischenraum frei steht und keine Linie
     berührt (ausdrücklicher Wunsch).
-  - Hilfslinien für c¹ und ab a².
-  - Die Bravura-Schrift möglichst auf die benötigten Zeichen verkleinern oder die Umrisse als SVG-Pfade
-    übernehmen.
+  - Hilfslinien für c¹ und ab a², c³ hat zwei.
+  - Der Bildausschnitt muss oben und unten genug Platz für c³ und Vorzeichen lassen. Im Entwurf ist er
+    oben zu knapp.
 - **Griffbild** wie `flute()` in `heft/engrave.py` (gleiche Maße und Farben), aber feiner:
 
   | Maß | Heft | App |
@@ -181,7 +246,7 @@ Ergebnis der Abstimmung mit der Nutzerin (13.11.2026). Ergänzt und präzisiert 
   Siehe `flute()` in `docs/entwurf/app-mock.html`.
 - **Hoch- und Querformat** müssen auf allen Handygrößen gut aussehen, ohne Scrollen auf Start- und
   Übungsseite.
-  - Querformat-Regel im Entwurf: `(orientation: landscape) and (max-height: 520px)`.
+  - Querformat-Regel: `(orientation: landscape) and (max-height: 520px)`.
   - Startseite quer: links Zahlen und Spuren, rechts die Knöpfe; die Tonübersicht entfällt.
   - Übung quer: links die Note, rechts Antworten bzw. Rückmeldung.
   - Tablet und Desktop: dieselben Seiten, mittig mit begrenzter Breite.
@@ -189,24 +254,46 @@ Ergebnis der Abstimmung mit der Nutzerin (13.11.2026). Ergänzt und präzisiert 
 
 ## 8. Technik
 
-- Ort und Werkzeuge:
+- **Ort und Werkzeuge:**
   - Alles im Ordner `app/`. **`heft/` nicht verändern.**
   - Vite + TypeScript ohne UI-Framework.
-  - Laufzeit-Bibliothek nur `pitchy`; als Entwicklungswerkzeuge Vitest und Playwright, für die
-    Offline-Fähigkeit `vite-plugin-pwa` (oder ein kleiner eigener Service Worker).
-- Gerät: Hauptgerät ist ein **Android-Handy mit Chrome**. Mikrofon und Installation („Zum
-  Startbildschirm hinzufügen“) dort testen bzw. absichern.
-- Daten in `localStorage` mit Versionsnummer im Datenformat. Sicherung als JSON-Datei herunterladen
-  und wieder einlesen, mit Prüfung der Datei.
-- Veröffentlichung:
-  - GitHub Actions baut bei jedem Push auf `main` und veröffentlicht auf GitHub Pages
-    (`https://tsafs.github.io/floetentrainer/`, Basis-Pfad `/floetentrainer/`).
-  - Die Nutzerin muss Pages einmal selbst einschalten: Settings → Pages → Source „GitHub Actions“.
-- Tests:
-  - Vitest: Grifftabelle (alle 25 Griffe aus `app-prompt.md`), Namen, andere Schreibweisen,
-    Frequenzen, Leitner-Logik, Freischalt-Regel, Auswahl der falschen Antworten.
-  - Playwright: die Übungsabläufe, auch das Spielen mit vorgetäuschtem Mikrofonsignal.
-- Vor dem Fertigmelden: Bildschirmfotos zeigen, mindestens 360×740 und 412×915 hoch, dieselben
-  Größen quer, dazu Desktop.
-- Vor dem Pushen `git pull`. Zum Schluss ein Pull Request nach `main` und eine Schritt-für-Schritt-Anleitung
-  für Mergen und Pages.
+  - Laufzeit-Bibliothek nur `pitchy`; als Entwicklungswerkzeuge Vitest und Playwright, dazu
+    `vite-plugin-pwa` oder ein kleiner eigener Service Worker.
+- **Hauptgerät: Android-Handy mit Chrome.**
+- **Mikrofon:**
+  - `getUserMedia` mit `echoCancellation`, `noiseSuppression` und `autoGainControl` auf `false`.
+    Sonst verfälscht Android gehaltene Töne.
+  - AudioContext erst beim Tippen auf „Spielen“ bzw. „Stimmgerät“ anlegen und fortsetzen.
+  - Während Spielen und Stimmgerät den Bildschirm wachhalten (Wake Lock), denn die Hände sind an der
+    Flöte.
+  - Verweigert sie das Mikrofon, erscheint eine verständliche Erklärung, wie sie es erlaubt.
+- **PWA:**
+  - Manifest mit `start_url` und `scope` `/floetentrainer/`.
+  - Ein App-Symbol in 192 und 512 px (schlicht, Papierton, z. B. Notenkopf oder Flöte), auch als
+    maskierbares Symbol.
+  - Seitenwechsel über `#`-Adressen, weil tiefe Links auf GitHub Pages sonst 404 ergeben.
+  - Updates lädt die App im Hintergrund und übernimmt sie erst auf der Startseite, nie mitten in einer
+    Sitzung.
+- **Daten:**
+  - In `localStorage`, mit Versionsnummer im Datenformat und Umwandlung älterer Versionen.
+  - Je Ton und Spur werden nur die letzten 20 Antworten gespeichert (richtig/falsch und Tag).
+  - Die Stufen werden über ihre Kennungen gespeichert.
+  - Mit `navigator.storage.persist()` um dauerhaften Speicher bitten.
+  - Bei einem Lesefehler nie still löschen. Stattdessen Meldung und Angebot, eine Sicherung einzulesen.
+  - Die Sicherung ist eine JSON-Datei zum Herunterladen und Einlesen. Beim Einlesen wird sie geprüft
+    und gegebenenfalls umgewandelt.
+- **Veröffentlichung:**
+  - Ein GitHub-Actions-Workflow baut bei jedem Push auf `main` und veröffentlicht auf GitHub Pages:
+    `https://tsafs.github.io/floetentrainer/`, Basis-Pfad `/floetentrainer/`.
+  - Die Nutzerin muss Pages **vor** dem ersten Lauf auf `main` einmal einschalten: Settings → Pages →
+    Source „GitHub Actions“.
+- **Tests:**
+  - Vitest: alle 25 Griffe aus `app-prompt.md`, Namen, andere Schreibweisen, Frequenzen,
+    Leitner-Logik samt Randfällen, Freischalt-Regel (auch die 2-Tage-Bedingung), Zusammensetzung der
+    Sitzung, falsche Antworten (nie gleicher Griff, nie zwei Schreibweisen).
+  - Playwright: die Übungsabläufe. Für Spielen wird `getUserMedia` per Init-Skript durch einen
+    Oszillator ersetzt. Getestet werden richtig, falsch, dann richtig, Nachklang und Tonwechsel.
+- **Vor dem Fertigmelden** Bildschirmfotos zeigen: 360×740 und 412×915, jeweils hoch und quer, dazu
+  Desktop.
+- **Vor dem Pushen** `git pull`. Zum Schluss ein Pull Request nach `main` und eine Schritt-für-Schritt-
+  Anleitung für Pages und Mergen.
