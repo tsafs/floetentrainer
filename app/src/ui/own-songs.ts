@@ -11,7 +11,7 @@ import type { OctaveShift } from "../store/data";
 import { dayKey } from "../store/dates";
 import type { AbcTune } from "../songs/abc";
 import type { Song } from "../songs/model";
-import { addOwnSongs, kb, LARGE_INPUT, ownSize, readImport, removeOwnSong, type ImportResult, type OwnEntry } from "../songs/own";
+import { addOwnSongs, decodeAbc, kb, LARGE_INPUT, ownSize, readImport, removeOwnSong, type ImportResult, type OwnEntry } from "../songs/own";
 import { FLUTE_HIGH, FLUTE_LOW, type OutsideNote } from "../songs/range";
 import { esc, ICON_BACK, plural, type Ctx, type View } from "./common";
 
@@ -175,7 +175,7 @@ export const songAddView: View = (root, ctx) => {
     file?.addEventListener("change", async () => {
       const f = file.files?.[0];
       if (!f) return;
-      load(f.name, await f.text());
+      load(f.name, decodeAbc(await f.arrayBuffer()));
     });
     ta?.addEventListener("input", () => {
       pasted = ta.value;
@@ -228,6 +228,10 @@ export const songAddView: View = (root, ctx) => {
       render();
       return;
     }
+    // Übernommen: Ein zweiter Klick (Doppelklick, bevor die Liste erscheint) darf nichts noch einmal
+    // speichern – der Seitenwechsel über die Adresse kommt erst danach.
+    src = null;
+    chosen = new Set();
     setListNote(added.length === 1 ? `„${added[0].title}“ ist jetzt in deiner Liederliste.` : `${added.length} Lieder sind jetzt in deiner Liederliste.`);
     ctx.go("#/lieder");
   }

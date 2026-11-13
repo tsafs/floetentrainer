@@ -4,7 +4,7 @@
 // später nicht mehr lesen lässt, bleibt gespeichert und erscheint in der Liste mit Hinweis.
 
 import { uniqueId, type AppData, type OctaveShift, type OwnSong } from "../store/data";
-import { parseAbc, type AbcProblem, type AbcTune } from "./abc";
+import { fileHeadFields, parseAbc, type AbcProblem, type AbcTune } from "./abc";
 import { SONGS } from "./library";
 import type { Song } from "./model";
 import { shiftOctave } from "./range";
@@ -21,7 +21,7 @@ const SLUG_MAX = 60;
 /** Ein lesbares Stück der Eingabe, mit dem Quelltext, der gespeichert würde. */
 export interface ImportTune {
   tune: AbcTune;
-  /** Quelltext nur dieses Stücks (ohne die übrigen Stücke der Datei) */
+  /** Quelltext nur dieses Stücks (ohne die übrigen Stücke der Datei, samt geltenden Feldern des Dateikopfs) */
   abc: string;
   /** Stelle unter den lesbaren Stücken von abc (0, wenn das Herauslösen geklappt hat) */
   index: number;
@@ -45,8 +45,11 @@ export function readImport(text: string): ImportResult {
   }
   const res = parseAbc(text);
   const lines = text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").split("\n");
+  // Felder des Dateikopfs (z. B. L:1/4 vor dem ersten X:) gelten für jedes Stück: mit speichern
+  const head = fileHeadFields(lines);
   const tunes = res.tunes.map((tune, i) => {
-    const own = tuneSource(lines, tune.line);
+    const part = tuneSource(lines, tune.line);
+    const own = part != null && head.length ? `${head.join("\n")}\n${part}` : part;
     // Nur übernehmen, wenn der herausgelöste Text dasselbe Stück ergibt; sonst die ganze Eingabe
     // speichern und das Stück über seine Stelle wiederfinden.
     if (own != null) {
@@ -56,6 +59,19 @@ export function readImport(text: string): ImportResult {
     return { tune, abc: text, index: i };
   });
   return { tunes, errors: res.errors, size: text.length };
+}
+
+/**
+ * Dateiinhalt als Text. ABC-Dateien sind meist UTF-8, ältere Sammlungen aber oft Latin-1 bzw.
+ * Windows-1252 (Standard bis ABC 2.0): Ist der Inhalt kein gültiges UTF-8, wird er so gelesen, statt
+ * Umlaute still durch „�“ zu ersetzen. Eine BOM am Anfang fällt weg.
+ */
+export function decodeAbc(bytes: ArrayBuffer | Uint8Array): string {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    return new TextDecoder("windows-1252").decode(bytes);
+  }
 }
 
 /** „12 kB“ */
@@ -77,7 +93,8 @@ function tuneSource(lines: string[], line: number): string | null {
 }
 
 function sameTune(a: AbcTune, b: AbcTune): boolean {
-  return a.title === b.title && a.song.notes.length === b.song.notes.length && a.song.bars.length === b.song.bars.length;
+  const len = (t: AbcTune) => t.song.notes.map((n) => n.q).join(",");
+  return a.title === b.title && a.song.bars.length === b.song.bars.length && len(a) === len(b);
 }
 
 // ---------------------------------------------------------------- Gespeicherte Lieder lesen

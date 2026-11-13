@@ -14,6 +14,23 @@ describe("ABC: Stücke und Kopffelder", () => {
     ]);
   });
 
+  it("L:, M: und Q: im Dateikopf gelten für alle Stücke; eigene Felder des Stücks gehen vor", () => {
+    const r = parseAbc("%abc-2.1\nL:1/4\nM:3/4\nQ:1/4=80\n\nX:1\nT:Eins\nK:G\nG A B|c2 B|]\n\nX:2\nT:Zwei\nL:1/8\nK:G\nG2 A2 B2|]\n");
+    expect(r.errors).toEqual([]);
+    const [a, b] = r.tunes;
+    expect(a.song.time).toEqual({ num: 3, den: 4 });
+    expect(bars(a.song)).toEqual(["g1:1 a1:1 h1:1", "c2:2 h1:1"]);
+    expect(a.song.tempo).toEqual({ beat: 1, bpm: 80 });
+    expect(a.hints).toEqual([]);
+    expect(bars(b.song)).toEqual(["g1:1 a1:1 h1:1"]);
+  });
+
+  it("freier Text zwischen %%begintext und %%endtext ist keine Musik", () => {
+    const t = abc("C D E F|\n%%begintext\nDies ist ein Text, frei geschrieben.\n%%endtext\nG A B c|]");
+    expect(bars(t.song)).toEqual(["c1:1 d1:1 e1:1 f1:1", "g1:1 a1:1 h1:1 c2:1"]);
+    expect(t.omitted).toEqual([]);
+  });
+
   it("ohne X: ist der ganze Text ein Stück, Leerzeilen darin stören nicht", () => {
     const r = parseAbc("T:Eingefügt\nM:2/4\nL:1/8\nK:D\nDEFG|\n\nABcd|]\n");
     expect(r.tunes.length).toBe(1);

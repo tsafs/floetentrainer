@@ -72,6 +72,21 @@ test("Datei mit mehreren Stücken: auswählen, Weggelassenes sehen, übernehmen;
   await expect(page.locator('a[data-song="abc-bruder-jakob-2"]')).toBeVisible();
 });
 
+test("Doppelklick auf „Lied übernehmen“ speichert das Lied nur einmal; Latin-1-Datei mit Umlauten", async ({ page }) => {
+  await seed(page, sampleData());
+  await toAdd(page);
+  await page.getByTestId("abc-text").fill("X:1\nT:Doppelt\nM:3/4\nL:1/4\nK:G\nG A B|c2 B|A3|]\n");
+  await page.locator('[data-act="read"]').click();
+  await page.locator('[data-act="take"]').dblclick();
+  await expect(page.getByTestId("msg")).toHaveText("„Doppelt“ ist jetzt in deiner Liederliste.");
+  expect((await stored(page)).ownSongs.map((o: { id: string }) => o.id)).toEqual(["abc-doppelt"]);
+  // ältere ABC-Dateien sind oft Latin-1: Umlaute nicht durch „�“ ersetzen
+  await toAdd(page);
+  const latin1 = Buffer.from("X:1\nT:Hänschen klein\nM:4/4\nL:1/4\nK:G\nG E E2|F D D2|]\n", "latin1");
+  await page.getByTestId("abc-file").setInputFiles({ name: "alt.abc", mimeType: "text/plain", buffer: latin1 });
+  await expect(page.getByTestId("tune-0")).toContainText("Hänschen klein");
+});
+
 test("Fehlerhaftes Stück wird mit Titel, Zeile und Grund gezeigt; das lesbare bleibt übernehmbar", async ({ page }) => {
   await seed(page, sampleData());
   await toAdd(page);

@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { DataError, defaultData, normalizeData, type OwnSong } from "../../src/store/data";
 import { backupJson, loadData, parseBackup, saveData } from "../../src/store/storage";
-import { addOwnSongs, ownEntries, ownEntryById, readImport, readOwn, removeOwnSong } from "../../src/songs/own";
+import { addOwnSongs, decodeAbc, ownEntries, ownEntryById, readImport, readOwn, removeOwnSong } from "../../src/songs/own";
 import { SONGS } from "../../src/songs/library";
 import { abcFile } from "./abc-helpers";
 
@@ -47,12 +47,29 @@ describe("Einlesen", () => {
     expect(r.tunes).toHaveLength(1);
     expect(r.tunes[0].abc).toBe(plain); // ohne X: bleibt alles beisammen
   });
+  it("Felder des Dateikopfs (L:, M:) kommen mit in den Quelltext des Stücks", () => {
+    const r = readImport("%abc-2.1\nL:1/4\nM:3/4\n\nX:1\nT:Eins\nK:G\nG A B|c2 B|]\n\nX:2\nT:Zwei\nK:D\nD E F|]\n");
+    const [a] = r.tunes;
+    expect(a.abc).toBe("L:1/4\nM:3/4\nX:1\nT:Eins\nK:G\nG A B|c2 B|]\n");
+    expect(a.abc).not.toContain("Zwei");
+    const again = readOwn(own({ abc: a.abc, number: 1 }));
+    expect(again.song!.notes.map((n) => n.q)).toEqual([1, 1, 1, 2, 1]);
+    expect(again.song!.time).toEqual({ num: 3, den: 4 });
+  });
   it("Fehlerhaftes Stück wird gemeldet, das lesbare bleibt", () => {
     const r = readImport(abcFile("mit-fehler.abc"));
     expect(r.tunes.map((t) => t.tune.title)).toEqual(["Lesbares Stück"]);
     expect(r.errors).toHaveLength(1);
     expect(r.errors[0]).toMatchObject({ number: 2, title: "Kaputtes Stück", line: 12 });
     expect(r.errors[0].message).toMatch(/Zeile 12/);
+  });
+  it("Datei in Latin-1 (ältere Sammlungen): Umlaute bleiben erhalten; UTF-8 samt BOM wie gehabt", () => {
+    const text = "X:1\nT:Hänschen klein\nM:4/4\nL:1/4\nK:G\nG E E2|]\nw:Häns-chen klein\n";
+    const latin1 = Uint8Array.from([...text].map((c) => c.charCodeAt(0)));
+    expect(decodeAbc(latin1)).toBe(text);
+    expect(readImport(decodeAbc(latin1)).tunes[0].tune.title).toBe("Hänschen klein");
+    const utf8 = new TextEncoder().encode("\uFEFF" + text);
+    expect(decodeAbc(utf8)).toBe(text);
   });
   it("zu große Eingaben werden nicht gelesen, große bekommen ihre Größe mit", () => {
     const r = readImport("%".repeat(2_000_001));

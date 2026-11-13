@@ -345,16 +345,31 @@ interface Chunk {
   trailing: number | null;
 }
 
+/** Felder im Dateikopf (vor dem ersten X:), die nach dem Standard für alle Stücke gelten und das Lesen der Noten ändern */
+const FILE_HEAD_RE = /^[LMQU]:/;
+
+/**
+ * Zeilen des Dateikopfs, die für alle Stücke gelten (L: M: Q: U: vor dem ersten X:). Die Stücke
+ * können sie mit eigenen Feldern überschreiben. Ohne X: gibt es keinen Dateikopf (alles ist ein Stück).
+ */
+export function fileHeadFields(lines: string[]): string[] {
+  const first = lines.findIndex((l) => /^X:/.test(l));
+  return first < 0 ? [] : lines.slice(0, first).filter((l) => FILE_HEAD_RE.test(l)).map((l) => stripComment(l).trimEnd());
+}
+
 /** Datei in Stücke teilen: jedes beginnt mit X: und endet an einer Leerzeile; ohne X: ist alles ein Stück. */
 function splitTunes(lines: string[]): Chunk[] {
   if (!lines.some((l) => /^X:/.test(l))) {
     return [{ lines: lines.map((text, i) => ({ text, no: i + 1 })), trailing: null }];
   }
+  // Dateikopf: gilt für jedes Stück, steht dort gleich nach X: (eigene Felder des Stücks folgen danach)
+  const head: SrcLine[] = [];
+  for (let i = 0; i < lines.length && !/^X:/.test(lines[i]); i++) if (FILE_HEAD_RE.test(lines[i])) head.push({ text: lines[i], no: i + 1 });
   const out: Chunk[] = [];
   let cur: (Chunk & { ended: boolean }) | null = null;
   lines.forEach((text, i) => {
     if (/^X:/.test(text)) {
-      cur = { lines: [{ text, no: i + 1 }], trailing: null, ended: false };
+      cur = { lines: [{ text, no: i + 1 }, ...head.map((h) => ({ ...h }))], trailing: null, ended: false };
       out.push(cur);
       return;
     }
@@ -1479,7 +1494,19 @@ function assignAccidentals(bars: Bar[], keys: KeyInfo[]): void {
 
 /** Liest eine ABC-Datei (oder eingefügten ABC-Text) mit einem oder mehreren Stücken. */
 export function parseAbc(text: string): AbcResult {
-  const lines = text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").split("\n");
+  // Freier Text zwischen %%begintext und %%endtext ist keine Musik: wie Kommentarzeilen behandeln
+  // (nicht als Leerzeile, die ein Stück beenden würde; die Zeilennummern bleiben gleich)
+  let inText = false;
+  const lines = text
+    .replace(/^\uFEFF/, "")
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((l) => {
+      if (/^%%begintext\b/.test(l)) inText = true;
+      else if (/^%%endtext\b/.test(l)) inText = false;
+      else if (inText) return "%";
+      return l;
+    });
   const tunes: AbcTune[] = [];
   const errors: AbcProblem[] = [];
   for (const chunk of splitTunes(lines)) {
