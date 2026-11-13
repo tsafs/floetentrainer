@@ -101,3 +101,20 @@ describe("Umwandlung und Prüfung", () => {
     expect(back.days).toEqual([TODAY]);
   });
 });
+
+describe("Einstellungen je Lied", () => {
+  it("ältere Daten ohne Feld: leer, ohne Versionssprung", () => {
+    const d = normalizeData({ version: 1, app: "floetentrainer" });
+    expect(d.version).toBe(DATA_VERSION);
+    expect(d.songs).toEqual({});
+  });
+  it("Tempo wird begrenzt, Fehlerhaftes still übergangen, kommt mit in die Sicherung", () => {
+    const d = normalizeData({
+      version: 1,
+      songs: { "jingle-bells": { tempo: 80 }, "stille-nacht": { tempo: 300 }, kaputt: 5, "Böse Kennung": { tempo: 90 }, x: { tempo: "schnell" } },
+    });
+    expect(d.songs).toEqual({ "jingle-bells": { tempo: 80 }, "stille-nacht": { tempo: 120 } });
+    const back = parseBackup(JSON.stringify({ ...d, savedAt: "x" }));
+    expect(back.songs["jingle-bells"].tempo).toBe(80);
+  });
+});
