@@ -8,12 +8,13 @@ Antworten auf Deutsch, Technik in Worten erklären statt Code zu zitieren. Vor g
 kurz den Plan abstimmen. Design: ruhig, elegant, viel Weißraum, schwarz-weiß druckbar.
 
 ## Stand
-- `heft/pdf/Liederheft-Blockfloete-sw.pdf` – 17 Seiten, aktuell (19 Lieder). Seite 1 = Inhaltsverzeichnis.
+- `heft/pdf/Liederheft-Blockfloete-sw.pdf` – 19 Seiten, aktuell (22 Stücke). Seite 1 = Inhaltsverzeichnis.
 - Bauen mit `heft/bauen.sh`. Das Skript misst die echten Höhen der Liedblöcke im Browser und
   verteilt sie auf Seiten (kein Lied über einen Umbruch); am Ende gibt es je Seite die Unterkante in mm
   aus – Werte über ca. 276 heißen: Seite läuft über.
 - Lieder: `heft/songs.py` (Notation oben in der Datei erklärt). Jede Melodie wird beim Bauen auf
-  Taktlängen und Silbenzahl geprüft. Wiederholungszeichen `|:` und `:|` werden unterstützt
+  Taktlängen und Silbenzahl geprüft. Wiederholungszeichen `|:` und `:|` sowie Klammern `[1` / `[2` (nach einem Taktstrich) werden unterstützt;
+  Vorzeichen gelten bis zum Taktende
   (erklärt auf der Seite „Noten lesen“). Alle Notenzeilen laufen im Blocksatz über die volle Breite
   (Wunsch der Nutzerin) – deshalb pro Zeile genug Takte setzen, sonst wirkt es luftig.
 - Regeln für Inhalte und die Wunschliste: `docs/notizen.md` (nur zweifelsfrei Gemeinfreies!).

@@ -31,6 +31,10 @@ Deshalb entfernt:
 - Kein schöner Land (Wunsch der Nutzerin: komplett raus)
 
 ## Aufgenommen
+- **Van Eyck: Doen Daphne d'over schoone Maeght (Nr. 3), Malle Symen (Nr. 5), Engels Nachtegaeltje (Nr. 27)** –
+  jeweils nur das Thema, aus der Ausgabe von Cayo Gomes 2024 (IMSLP, CC0; liegt in `docs/quellen/`).
+  „Onder de linde groene“ steht dort nicht (die Ausgabe reicht nur bis Nr. 41) – dafür wäre der zweite Teil
+  nötig (IMSLP: Ausgabe Michel/Teske, Datei „van_eyck_amadeus_v2“, oder der Originaldruck).
 - **Kling, Glöckchen**: de.wikibooks.org „Liederbuch/ Kling Glöckchen“ – Melodie aus dem Notenbild
   (Wikimedia Commons, in C, 2/4), Strophen 2–3 wie dort. Text Karl Enslin († 1875).
 - **Jingle Bells**: Melodie der Strophe nach de.wikibooks.org „Liederbuch/ Jingle Bells“, Text aller vier
@@ -44,8 +48,8 @@ Deshalb entfernt:
 ## Wünsche und Ideen für später
 - Van Eycks „Onder de linde groene“ (Fluyten Lust-hof) gilt als Fassung von „All in a Garden Green“ –
   noch nicht geprüft; ggf. als Gegenstück zu Nr. 20.
-- **Jacob van Eyck, Der Fluyten Lust-hof** (1644–49): ganz für Sopranflöte solo. Die Themen allein sind
-  spielbar, z. B. „Doen Daphne d'over schoone Maeght“, „Engels Nachtegaeltje“, „Malle Symen“.
+- **Jacob van Eyck, Der Fluyten Lust-hof** (1644–49): weitere Themen, z. B. „Onder de linde groene“,
+  „Lavignone“, „Rosemont“, „Comagain“, „Amarilli mia bella“ (Nr. 9, 10, 32, 35 stehen in der Gomes-Ausgabe).
 - **Thomas Morley**: „It was a lover and his lass“, „Now is the month of maying“ (Oberstimme).
 - **Anthony Holborne**: Oberstimmen der Consort-Tänze, z. B. „The Honie-suckle“, „The Fairie Round“.
 - **Virgiliano, Bassano**: echte Solo-Ricercare, aber virtuos – für später.
@@ -59,6 +63,7 @@ Zugriff auf weitere Seiten (z. B. imslp.org, thesession.org, abcnotation.com, de
 
 ## Quellen-Hinweise
 - IMSLP: Van Eyck, Fluyten Lust-hof Bd. I in moderner Ausgabe von Cayo Gomes (CC0), Datei
-  „PMLP201599-Der_Fluyten_Lust-Hof_vol._I_-_(Eyck,_Jacob_van).pdf“. IMSLP-Downloads laufen über eine
-  Hinweisseite zu den Nutzungsbedingungen; die darf Claude nur mit ausdrücklicher Erlaubnis der Nutzerin bestätigen.
+  „PMLP201599-Der_Fluyten_Lust-Hof_vol._I_-_(Eyck,_Jacob_van).pdf“. IMSLP-Downloads sind durch ein Captcha
+  geschützt – Claude kann sie nicht laden. Die Nutzerin lädt PDFs selbst und schickt sie (direkter Link:
+  imslp.org/images/…/Dateiname.pdf, Pfad über die API `prop=imageinfo&iiprop=url` ermitteln).
 - Wikimedia-Bilder: nur Vorschaubilder in Standardgrößen laden (z. B. 1920px), Originale geben Fehler 429.

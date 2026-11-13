@@ -200,6 +200,9 @@ def parse_music(src):
             items.append(dict(kind="bar", rep_start=True))
         elif t == ":|":
             items.append(dict(kind="bar", rep_end=True))
+        elif t in ("[1", "[2"):  # Wiederholungsklammer ab dem vorigen Taktstrich
+            assert items and items[-1]["kind"] == "bar", "Klammer muss nach einem Taktstrich stehen"
+            items[-1]["volta"] = int(t[1])
         elif t == "/":
             items.append(dict(kind="break"))
         elif t == ",":
@@ -238,15 +241,25 @@ def check_and_assign(song):
     bar_q = num * 4.0 / den
     # Taktprüfung
     acc, bars, idx = 0.0, [], 0
+    in_v1 = False
     for it in items:
         if it["kind"] in ("note", "rest"):
             acc += it["q"]
         elif it["kind"] == "bar":
+            if in_v1 and acc < bar_q:
+                acc = bar_q  # 1. Klammer ergänzt sich mit dem Auftakt nach der Wiederholung
             if not (it.get("rep_start") and acc == 0.0):  # |: am Anfang/nach :| ist kein eigener Takt
-                bars.append((acc, bar_q))
+                bars.append((acc, bar_q, bool(it.get("rep_end"))))
             acc = 0.0
+            in_v1 = it.get("volta") == 1
         elif it["kind"] == "time":
             bar_q = it["num"] * 4.0 / it["den"]
+    # Takt, der an einer Wiederholung geteilt ist (Rest vor :|, Auftakt nach |:), zählt als ganz
+    for i in range(len(bars) - 1):
+        (a, q, re_), (b2, q2, _) = bars[i], bars[i + 1]
+        if re_ and a < q and abs(a + b2 - q) < 1e-6:
+            bars[i], bars[i + 1] = (q, q, re_), (q2, q2, False)
+    bars = [(b, q) for b, q, _ in bars]
     msgs = []
     for i, (b, bar_q) in enumerate(bars):
         if abs(b - bar_q) > 1e-6:
@@ -417,6 +430,8 @@ def render_staff_system(events, sp, width, key, time_sig=None, base=9.0, show_di
     parts = []
     # vertikale Geometrie
     hi_ext, lo_ext = ext if ext else extents(events, whole_heads)
+    if any(e.get("volta") for e in events):
+        hi_ext = max(hi_ext, 13)
     if show_diagrams:
         top_pad = 0.6 + diag_h + max(1.9 * sp, (hi_ext - 8) * sp / 2 + 1.3 * sp)
     else:
@@ -469,6 +484,26 @@ def render_staff_system(events, sp, width, key, time_sig=None, base=9.0, show_di
             else:
                 parts.append(f'<line x1="{x:.3f}" y1="{Y(8) - 0.065 * sp:.3f}" x2="{x:.3f}" y2="{Y(0) + 0.065 * sp:.3f}" stroke="{INK}" stroke-width="{0.16 * sp:.3f}"/>')
 
+    # Wiederholungsklammern 1. / 2.
+    for i, e in enumerate(events):
+        if e["kind"] == "bar" and e.get("volta"):
+            n = e["volta"]
+            ends = [j for j in range(i + 1, len(events)) if events[j]["kind"] == "bar"]
+            if n == 1:
+                ends = [j for j in ends if events[j].get("rep_end")] or ends
+            j = ends[0] if ends else None
+            xa = sy.xs[i] + 0.3 * sp
+            xb = (sy.xs[j] - (1.6 * sp if n == 1 else 0.3 * sp)) if j is not None else sy.end
+            inner = [events[k]["p"]["pos"] for k in range(i, (j or len(events))) if events[k]["kind"] == "note"]
+            top = max([11] + [q + 4 for q in inner])
+            yv = Y(top)
+            hook = 1.5 * sp
+            d = f'M{xa:.3f},{yv + hook:.3f} L{xa:.3f},{yv:.3f} L{xb:.3f},{yv:.3f}'
+            if n == 1:
+                d += f' L{xb:.3f},{yv + hook:.3f}'
+            parts.append(f'<path d="{d}" fill="none" stroke="{INK}" stroke-width="{0.12 * sp:.3f}"/>')
+            parts.append(f'<text x="{xa + 0.45 * sp:.3f}" y="{yv + 1.15 * sp:.3f}" font-family="EB Garamond" '
+                         f'font-size="{1.5 * sp:.3f}" fill="{INK}">{n}.</text>')
     for i, e in enumerate(events):
         if e["kind"] == "time":
             for txt, pos in ((ts_digit(e["num"]), 6), (ts_digit(e["den"]), 2)):
@@ -578,6 +613,12 @@ def render_staff_system(events, sp, width, key, time_sig=None, base=9.0, show_di
             stem_info[i] = (xsx[k], bl(xsx[k]), up)
 
     note_items = []
+    barno, b = {}, 0
+    for i, e in enumerate(events):
+        if e["kind"] == "bar":
+            b += 1
+        barno[i] = b
+    acc_state = {}  # (Takt, Stammton, Oktave) -> geltende Alteration
     for i, e in nev:
         x = sy.xs[i]
         if e["kind"] == "rest":
@@ -604,7 +645,9 @@ def render_staff_system(events, sp, width, key, time_sig=None, base=9.0, show_di
                 parts.append(f'<line x1="{hl - 0.4 * sp:.3f}" y1="{Y(q):.3f}" x2="{hl + hw + 0.4 * sp:.3f}" y2="{Y(q):.3f}" stroke="{INK}" stroke-width="{0.16 * sp:.3f}"/>')
         # Vorzeichen
         want = p["alt"]
-        have = key_alt.get(p["letter"], 0)
+        ak = (barno[i], p["letter"], p["oct"])
+        have = acc_state.get(ak, key_alt.get(p["letter"], 0))
+        acc_state[ak] = want
         if want != have:
             a = {1: "sharp", -1: "flat", 0: "natural"}[want]
             aw = {"sharp": 0.996, "flat": 0.904, "natural": 0.672}[a]

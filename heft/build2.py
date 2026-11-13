@@ -180,11 +180,12 @@ def grundlagen_page(folio):
         (mini("fis'2 g'2 |", key="G"), "Ein Kreuz (♯)", "Ein Kreuz am Zeilenanfang gilt für das ganze Lied: Jedes f wird zu fis (G-Dur). "
                                                        "Bei zwei Kreuzen wird zusätzlich jedes c zu cis (D-Dur)."),
         (mini("b'2 a'2 |", key="F"), "Ein b (♭)", "Ein b am Zeilenanfang: Jedes h wird zu b (F-Dur, d-Moll)."),
-        (mini("g'4 a'4 h'4 |", time=(3, 4)), "Taktangabe", "3/4: drei Viertel pro Takt, 4/4: vier, 2/4: zwei. "
-                                                          "6/8: sechs Achtel, gezählt in zwei Gruppen zu drei."),
+        (mini("g'4 a'4 h'4 |", time=(3, 4)), "Taktangabe", "3/4: drei Viertel pro Takt, 4/4: vier, 2/4: zwei, "
+                                                          "6/8: sechs Achtel (zweimal drei)."),
         (mini("d'4 | g'4 a'4 h'4 |", time=(4, 4)), "Auftakt", "Manche Lieder beginnen mit einem unvollständigen Takt. "
                                                               "Was dort fehlt, fehlt dafür im letzten Takt."),
-        (mini("|: g'2 a'2 :|"), "Wiederholung", "Alles zwischen den beiden Zeichen wird zweimal gespielt."),
+        (mini("|: g'4 a'4 | [1 h'2 :| [2 c''2 ||"), "Wiederholung",
+         "Alles zwischen den Zeichen zweimal spielen. Mit Klammern: beim zweiten Mal Klammer 2 statt Klammer 1."),
     ]
     rows = "".join(
         f'<div style="display:flex; gap:7mm; align-items:center; margin-top:2.6mm">'

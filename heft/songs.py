@@ -1,6 +1,6 @@
 # Melodien: Ton + Dauer (1/2/4/8/16), Punkt, r = Pause, | Taktstrich, || Schluss,
 # / Zeilenumbruch, ( ) Bindebogen (Melisma), ~ Haltebogen, , Atemzeichen, T4/4 Taktwechsel.
-# |: und :| Wiederholungszeichen (Beginn/Ende des zu wiederholenden Teils).
+# |: und :| Wiederholungszeichen; [1 / [2 nach einem Taktstrich beginnen die Klammer 1. / 2.
 # stanzas: weitere Strophen, Zeilen mit " / " getrennt.
 SONGS = [
     dict(chapter="Kinder- und Weihnachtslieder",
@@ -177,7 +177,31 @@ SONGS = [
                "|: d''4 d''8 d''8 d''4 d''4 | e''4 fis''4 g''2 , | h'4 h'8 h'8 h'4 g'4 | a'4 h'4 c''2 , | "
                "h'4. a'8 g'8 a'8 h'4 | / c''4. h'8 a'8 h'8 c''4 , | d''4. c''8 h'8 c''8 d''4 | "
                "e''4. d''8 c''8 d''8 h'8 c''8 | a'4 g'4 g'4 fis'4 | g'1 :|"),
-
+    dict(title="Doen Daphne d’over schoone Maeght", key="C", keyname="d-Moll (dorisch)", time=(3, 4),
+         credit="Jacob van Eyck, Der Fluyten Lust-hof (1649) · Thema ohne die Variationen",
+         # Quelle: van Eyck, Der Fluyten Lust-hof I, Ausgabe Cayo Gomes 2024 (IMSLP, CC0), nur das Thema
+         music="d'4 | f'2 g'4 | a'2 d''4 | cis''4. d''8 e''4 | d''2 , a'4 | "
+               "c''4 a'4 f'4 | g'4 e'4 c'4 | d'4 f'4 e'4 | [1 d'2 :| [2 d'2. | / "
+               "|: f''2 f''4 | e''2 e''4 | d''2 d''4 | cis''2 , a'4 | a'4. b'8 a'4 | g'4. a'8 f'4 | f'4. g'8 e'4 | f'2. :| / "
+               "|: c''4 c''4 d''4 | c''4 a'4 f'4 | c''4. d''8 e''8 f''8 | g''4 e''4 c''4 , | a'4. g'8 f'4 | e'4 d'4 d''4 | / "
+               "cis''4. d''8 e''4 | d''2 , a'8 h'8 | c''4 a'4 f'4 | g'4 e'4 c'4 | d'8 e'8 f'8 g'8 e'4 | d'2. :|"),
+    dict(title="Malle Symen", key="C", keyname="d-Moll (dorisch)", time=(4, 4),
+         credit="Jacob van Eyck, Der Fluyten Lust-hof (1649) · Thema ohne die Variationen",
+         # Quelle: van Eyck, Der Fluyten Lust-hof I, Ausgabe Cayo Gomes 2024 (IMSLP, CC0), nur das Thema
+         music="|: a'2 f''2 | e''2 a'4 a''4 | g''4 f''4 e''4 d''4 | cis''4 a'4 a'2 , | / "
+               "f''4 d''4 e''4 a'4 | g'4 f'4 e'4 d'4 | a'4 d''4 h'4 cis''4 | d''1 :| / "
+               "|: f''8 g''8 a''4 e''8 f''8 g''4 | d''8 f''8 e''8 d''8 cis''4 a'4 , | f'8 g'8 a'4 e'8 f'8 g'4 | "
+               "d'8 f''8 e''8 d''8 cis''8 h'8 a'4 , | / d''8 e''8 f''8 g''8 a''8 f''8 d''4 | d'8 e'8 f'8 g'8 a'8 f'8 d'4 , | "
+               "f''8 g''8 a''8 b''8 c'''8 a''8 f''4 | f'8 g'8 a'8 b'8 c''8 a'8 f'4 , | / f''4. f''8 e''4. e''8 | "
+               "d''8 f''8 e''8 d''8 cis''4 a'4 | h'8 c''8 d''8 h'8 cis''8 d''8 e''8 cis''8 | d''4 d'4 d''2 :|"),
+    dict(title="Engels Nachtegaeltje", key="C", keyname="C-Dur", time=(4, 4),
+         credit="Jacob van Eyck, Der Fluyten Lust-hof (1649) · Thema ohne die Variationen",
+         # Quelle: van Eyck, Der Fluyten Lust-hof I, Ausgabe Cayo Gomes 2024 (IMSLP, CC0), nur das Thema
+         music="|: e''4. d''16 e''16 c''4 g''8. f''16 | e''2. , c''8 d''8 | e''4 c''4 e''4 fis''4 | g''2. , e''8 f''8 | / "
+               "g''4 g''8 a''8 g''4 e''8 f''8 | g''8 f''8 g''8 a''8 g''4 e''8 f''8 | g''4 e''4 f''4 g''4 | a''4 , a'4 a'4. h'8 | / "
+               "c''8 d''8 e''8 f''8 g''4 c''4 | h'8. c''16 d''4 g'4 g''4 | e''8. f''16 g''8 e''8 d''4. c''8 | c''2. :| / "
+               "|: f''8. g''16 | a''4 f''4 f''4. g''8 | a''8 f''8 a''8 f''8 a''8 f''8 a''8 f''8 | a''8 f''8 a''8 f''8 e''4 fis''4 | g''1 | / "
+               "g''1 , | g''8 g''8 g''8 g''8 g''2 | g''8 g''8 g''8 g''8 g''8 g''8 g''4 | e''8. f''16 g''8 e''8 d''4. c''8 | [1 c''2. :| [2 c''1 ||"),
     # ---------------------------------------------------------------- hübsche Melodien
     dict(chapter="Schöne Melodien",
          title="The Water Is Wide", key="G", keyname="G-Dur", time=(4, 4),
