@@ -18,14 +18,20 @@ nicht die Hilfen.
 Nur zweifelsfrei Gemeinfreies: Urheber seit über 70 Jahren tot, alte Volksweisen, Stücke vor 1700.
 Bei unklarer Herkunft weglassen.
 
+Keine religiösen Lieder (Wunsch der Nutzerin). Traditionelle Weihnachtslieder sind in Ordnung,
+solange sie eher Brauchtum als Gotteslob sind.
+
 Deshalb entfernt:
 - Schneeflöckchen, Weißröckchen (heute gesungene Textfassung und Melodie ohne belegten Urheber)
 - Lasst uns froh und munter sein, Strophen 2–7 (spätere Volksfassungen ohne belegte Herkunft)
 - ABC, die Katze lief im Schnee, Strophe 2 (Herkunft nicht belegt)
 - Alle Jahre wieder, Strophe 4 (nicht sicher von Wilhelm Hey)
 - Scarborough Fair (Melodie erst 1947 aufgezeichnet; aus Vorsicht)
+- Gottes Sohn ist kommen (religiös)
 
 ## Aufgenommen
+- **Jingle Bells**: Strophe „Dashing through the snow“ + Refrain nach de.wikibooks.org „Liederbuch/ Jingle Bells“.
+  Die weiteren Originalstrophen von 1857 fehlen noch (Text aus verlässlicher Quelle nötig).
 - **All in a Garden Green** (Nr. 20): Vorlage thesession.org/tunes/14287, Fassung 2 (von der Nutzerin
   heruntergeladen, `docs/quellen/All_In_A_Garden_Green.abc`). Dort in 2/2, im Heft als 4/4 mit denselben
   Notenwerten. Fassung 1 (als Polka in 2/4) weicht im B-Teil in Takt 1 und 3 leicht ab (punktiert statt

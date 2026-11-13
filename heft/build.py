@@ -153,7 +153,8 @@ def grifftabelle(scale_names=True, as_pages=False, folios=("1", "2")):
         ev = [dict(kind="note", dur=1, dot=False, q=4, tie=False, slur_start=False, slur_end=False,
                    p=parse_pitch(n)) for n in seq]
         svg, h = render_staff_system(ev, 1.75, W, key, base=9.4, show_diagrams=False, whole_heads=True,
-                                     show_lyrics=False, show_names=scale_names, name_size=2.75, stretch_max=3, trailing_open=True)
+                                     show_lyrics=False, show_names=scale_names, name_size=2.75, stretch_max=3, trailing_open=True,
+                                     justify=as_pages)
         blocks.append(f'<div style="margin-top:8.5mm"><div style="display:flex; align-items:baseline; gap:4mm">'
                       f'<h2 style="font-size:14.5pt">{title}</h2>'
                       f'<span class="credit" style="margin:0">{hint}</span></div>'

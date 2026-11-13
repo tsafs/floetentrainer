@@ -290,7 +290,8 @@ class Sys:
 
 
 def layout_system(events, sp, width, base, key, time_sig=None, first=True, lyr_size=3.5,
-                  name_size=2.25, stretch_max=1.4, final_bar=False, ends_with_bar=True, min_note=0.0):
+                  name_size=2.25, stretch_max=1.4, final_bar=False, ends_with_bar=True, min_note=0.0,
+                  justify=False):
     """events: Items dieses Systems (note/rest/bar). Liefert x-Positionen."""
     x = 0.4 * sp
     clef_x = x
@@ -376,6 +377,15 @@ def layout_system(events, sp, width, base, key, time_sig=None, first=True, lyr_s
     for i, e in enumerate(notes):
         if e["kind"] == "bar" and i == 0:
             xs[i] = start - 0.4 * sp
+    if justify:
+        # Blocksatz: alle Zeilen enden am rechten Rand (Abstände gleichmäßig strecken)
+        bars = [xs[i] for i, e in enumerate(notes) if e["kind"] == "bar"]
+        right = bars[-1] if (notes and notes[-1]["kind"] == "bar") else x - 0.2 * sp
+        target = width - 0.1
+        if right > start + 1:
+            f = (target - start) / (right - start)
+            xs = [start + (v - start) * f if v >= start else v for v in xs]
+            x = start + (x - start) * f
     sy = Sys()
     sy.clef_x, sy.ks_x, sy.ts_x, sy.xs, sy.start = clef_x, ks_x, ts_x, xs, start
     sy.end = x
@@ -400,9 +410,9 @@ def extents(events, whole_heads=False):
 def render_staff_system(events, sp, width, key, time_sig=None, base=9.0, show_diagrams=True,
                         diag_h=23.0, lyr_size=3.5, name_size=2.25, stretch_max=1.4,
                         whole_heads=False, show_names=True, show_lyrics=True, lead_bar=False,
-                        trailing_open=False, ext=None, meter=None):
+                        trailing_open=False, ext=None, meter=None, justify=False):
     sy = layout_system(events, sp, width, base, key, time_sig, lyr_size=lyr_size,
-                       name_size=name_size, stretch_max=stretch_max,
+                       name_size=name_size, stretch_max=stretch_max, justify=justify,
                        min_note=(flute_width(diag_h)[0] + 1.3) if show_diagrams else 0.0)
     parts = []
     # vertikale Geometrie
@@ -426,6 +436,8 @@ def render_staff_system(events, sp, width, key, time_sig=None, base=9.0, show_di
     # Linien
     x_last_bar = max([sy.xs[i] for i, e in enumerate(events) if e["kind"] == "bar"] + [sy.start])
     staff_right = x_last_bar if not trailing_open else sy.end - 0.2 * sp
+    if justify and trailing_open:
+        staff_right = width - 0.1
     for i in range(5):
         parts.append(f'<line x1="0" y1="{Y(2 * i):.3f}" x2="{staff_right:.3f}" y2="{Y(2 * i):.3f}" '
                      f'stroke="{INK}" stroke-width="{0.13 * sp:.3f}"/>')

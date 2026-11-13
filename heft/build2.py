@@ -33,7 +33,7 @@ def render_systems(items, key, time, sp=1.75, base=6.4, lyrics=True, gap=4.5, to
         svg, h = render_staff_system(sy, sp, W, key, time_sig=time if k == 0 else None, meter=meter,
                                      base=base, show_diagrams=False, show_names=False,
                                      show_lyrics=lyrics, lyr_size=3.7, stretch_max=1.7,
-                                     trailing_open=open_end, ext=ext)
+                                     trailing_open=open_end, ext=ext, justify=True)
         for e in sy:
             if e["kind"] == "time":
                 meter = (e["num"], e["den"])
@@ -230,11 +230,11 @@ MEASURED = {}
 
 
 def liederheft2():
-    p1, p_scales = grifftabelle(scale_names=False, as_pages=True, folios=("1", "4"))
+    p1, p_scales = grifftabelle(scale_names=False, as_pages=True, folios=("2", "5"))
     p_scales = p_scales.replace("Erst aufwärts, dann abwärts.",
                                 "Erst aufwärts, dann abwärts. Die Namen der Töne stehen in der Grifftabelle.")
-    pages = [p1, grundlagen_page("2"), uebungen_page("3"), p_scales]
-    pageno = 5
+    pages = [p1, grundlagen_page("3"), uebungen_page("4"), p_scales]  # Seite 1 = Inhalt (wird zuletzt erzeugt)
+    pageno = 6
     toc = []
     SONG_GAP = 13.0
     chapters = []
@@ -281,10 +281,10 @@ def liederheft2():
             pageno += 1
             first = False
     # Inhalt
-    rows = ['<tr><td class="n"></td><td>Grifftabelle</td><td class="k"></td><td class="p">1</td></tr>',
-            '<tr><td class="n"></td><td>Noten lesen</td><td class="k"></td><td class="p">2</td></tr>',
-            '<tr><td class="n"></td><td>Erste Übungen</td><td class="k"></td><td class="p">3</td></tr>',
-            '<tr><td class="n"></td><td>Übe-Tonleitern</td><td class="k"></td><td class="p">4</td></tr>']
+    rows = ['<tr><td class="n"></td><td>Grifftabelle</td><td class="k"></td><td class="p">2</td></tr>',
+            '<tr><td class="n"></td><td>Noten lesen</td><td class="k"></td><td class="p">3</td></tr>',
+            '<tr><td class="n"></td><td>Erste Übungen</td><td class="k"></td><td class="p">4</td></tr>',
+            '<tr><td class="n"></td><td>Übe-Tonleitern</td><td class="k"></td><td class="p">5</td></tr>']
     for t in toc:
         if t[0] == "chapter":
             rows.append(f'<tr><td colspan="4" style="border:none; padding-top:3.5mm"><span class="kicker">{html.escape(t[1])}</span></td></tr>')
@@ -292,8 +292,8 @@ def liederheft2():
             _, n, s, lo, hi, pg = t
             rows.append(f'<tr><td class="n">{n:02d}</td><td>{html.escape(s["title"])}</td>'
                         f'<td class="k">{s["keyname"]} · {disp_name(lo)}–{disp_name(hi)}</td><td class="p">{pg}</td></tr>')
-    pages.append(page(KICKER + '<h1>Inhalt</h1><div class="rule"></div>'
-                      f'<table class="toc">{"".join(rows)}</table>', str(pageno)))
+    pages.insert(0, page(KICKER + '<h1>Inhalt</h1><div class="rule"></div>'
+                         f'<table class="toc">{"".join(rows)}</table>', "1"))
     h = doc("Liederheft Blockflöte", pages)
     h = h.replace("</style>", EXTRA_CSS + "</style>")
     return h

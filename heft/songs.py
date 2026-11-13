@@ -31,13 +31,20 @@ SONGS = [
                "c''8 c''8 c''8 c''8 | h'4 h'4 , | a'8 a'8 a'8 a'8 | g'2 ||",
          lyrics="Al-le mei-ne Ent-chen schwim-men auf dem See, schwim-men auf dem See, "
                 "Köpf-chen in das Was-ser, Schwänz-chen in die Höh."),
-    dict(title="Jingle Bells", key="G", keyname="G-Dur", time=(4, 4), subtitle="Refrain",
-         credit="James Lord Pierpont",
-         music="h'4 h'4 h'2 | h'4 h'4 h'2 | h'4 d''4 g'4. a'8 | h'1 , | / "
+    dict(title="Jingle Bells", key="G", keyname="G-Dur", time=(4, 4),
+         credit="Text und Melodie: James Lord Pierpont, 1857",
+         # Strophe nach de.wikibooks.org „Liederbuch/ Jingle Bells“
+         music="d'4 h'4 a'4 g'4 | d'2. d'8 d'8 | d'4 h'4 a'4 g'4 | e'2. r4 | / "
+               "e'4 c''4 h'4 a'4 | fis'2. r4 | d''4 d''4 c''4 a'4 | h'2. r4 | / "
+               "d'4 h'4 a'4 g'4 | d'2. r4 | d'4 h'4 a'4 g'4 | e'2. r8 e'8 | / "
+               "e'4 c''4 h'4 a'4 | d''4 d''4 d''4. d''8 | e''4 d''4 c''4 a'4 | g'2 d''2 , | / "
+               "h'4 h'4 h'2 | h'4 h'4 h'2 | h'4 d''4 g'4. a'8 | h'1 , | / "
                "c''4 c''4 c''4. c''8 | c''4 h'4 h'4 h'8 h'8 | h'4 a'4 a'4 h'4 | a'2 d''2 , | / "
                "h'4 h'4 h'2 | h'4 h'4 h'2 | h'4 d''4 g'4. a'8 | h'1 , | / "
                "c''4 c''4 c''4. c''8 | c''4 h'4 h'4 h'8 h'8 | d''4 d''4 c''4 a'4 | g'1 ||",
-         lyrics="Jin-gle bells, jin-gle bells, jin-gle all the way! Oh, what fun it is to ride "
+         lyrics="Dash-ing through the snow in a one-horse o-pen sleigh, o’er the fields we go, laugh-ing all the way. "
+                "Bells on bob-tails ring, mak-ing spi-rits bright. What fun it is to ride and sing a sleigh-ing song to-night, oh! "
+                "Jin-gle bells, jin-gle bells, jin-gle all the way! Oh, what fun it is to ride "
                 "in a one-horse o-pen sleigh, hey! Jin-gle bells, jin-gle bells, jin-gle all the way! "
                 "Oh, what fun it is to ride in a one-horse o-pen sleigh!"),
     dict(title="Morgen kommt der Weihnachtsmann", key="G", keyname="G-Dur", time=(4, 4),
@@ -136,14 +143,7 @@ SONGS = [
 
     # ---------------------------------------------------------------- alte Melodien
     dict(chapter="Alte Lieder und Tänze",
-         title="Gottes Sohn ist kommen", key="G", keyname="G-Dur", time=(4, 4),
-         credit="Text: Johann Horn, 1544 · Melodie: 16. Jahrhundert · nach G-Dur gesetzt",
-         music="g'4 g'4 h'4 c''4 | d''2 d''2 , | e''4 fis''4 g''4 d''4 | (h'4 cis''4) d''2 , | c''4 a'4 h'4 c''4 | / "
-               "(h'4 a'4) g'2 , | fis'4 g'4 a'4 h'4 | (a'4 g'4 fis'4 e'4) | d'1 , | / "
-               "g'4 g'4 h'4 g'4 | (d''4 e''4) d''2 , | g'4 a'4 h'4 c''4 | (h'2 a'2) | g'1 ||",
-         lyrics="Got-tes Sohn ist kom-men uns al-len zu From-men hier auf die-se Er-den in ar-men Ge-bär-den, "
-                "dass er uns von Sün-de frei-e und ent-bin-de."),
-    dict(title="Es kommt ein Schiff, geladen", key="e", keyname="e-Moll", time=(3, 4),
+         title="Es kommt ein Schiff, geladen", key="e", keyname="e-Moll", time=(3, 4),
          credit="Text: nach Johannes Tauler · Melodie: 1608",
          music="e'4 | e'2 e'4 | fis'2 fis'4 | (g'4 a'4 h'4) | h'2 h'4 , | a'2 a'4 | d'2 fis'4 | / "
                "T4/4 g'2 r4 g'4 | h'4 d''4 e''4 e''4 | (d''8 c''8 h'8 a'8) g'4 , a'4 | h'4 a'4 g'4 fis'4 | e'2. ||",
@@ -174,7 +174,7 @@ SONGS = [
     dict(chapter="Schöne Melodien",
          title="Kein schöner Land", key="G", keyname="G-Dur", time=(3, 4),
          credit="Text und Melodie: Anton Wilhelm von Zuccalmaglio · nach G-Dur gesetzt",
-         music="d'8 d'8 d'8 | g'4 h'4 a'8 g'8 | a'4. , / d'8 d'8 d'8 | g'4 h'4 a'8 g'8 | a'4. , / "
+         music="d'8 d'8 d'8 | g'4 h'4 a'8 g'8 | a'4. , d'8 d'8 d'8 | g'4 h'4 a'8 g'8 | a'4. , / "
                "h'8 g'8 a'8 | (h'8 d''8) c''8 h'8 a'8 g'8 | (a'8 c''8) h'8 a'8 g'8 a'8 | h'4. , / "
                "h'8 g'8 a'8 | (h'8 d''8) c''8 h'8 a'8 g'8 | (a'8 c''8) h'8 a'8 g'8 fis'8 | g'4. ||",
          lyrics="Kein schö-ner Land in die-ser Zeit, als hier das uns-re weit und breit, "

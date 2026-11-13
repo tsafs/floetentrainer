@@ -8,13 +8,14 @@ Antworten auf Deutsch, Technik in Worten erklären statt Code zu zitieren. Vor g
 kurz den Plan abstimmen. Design: ruhig, elegant, viel Weißraum, schwarz-weiß druckbar.
 
 ## Stand
-- `heft/pdf/Liederheft-Blockfloete-sw.pdf` – 19 Seiten, aktuell (22 Lieder).
+- `heft/pdf/Liederheft-Blockfloete-sw.pdf` – 18 Seiten, aktuell (21 Lieder). Seite 1 = Inhaltsverzeichnis.
 - Bauen mit `heft/bauen.sh`. Das Skript misst die echten Höhen der Liedblöcke im Browser und
   verteilt sie auf Seiten (kein Lied über einen Umbruch); am Ende gibt es je Seite die Unterkante in mm
   aus – Werte über ca. 276 heißen: Seite läuft über.
 - Lieder: `heft/songs.py` (Notation oben in der Datei erklärt). Jede Melodie wird beim Bauen auf
   Taktlängen und Silbenzahl geprüft. Wiederholungszeichen `|:` und `:|` werden unterstützt
-  (erklärt auf der Seite „Noten lesen“).
+  (erklärt auf der Seite „Noten lesen“). Alle Notenzeilen laufen im Blocksatz über die volle Breite
+  (Wunsch der Nutzerin) – deshalb pro Zeile genug Takte setzen, sonst wirkt es luftig.
 - Regeln für Inhalte und die Wunschliste: `docs/notizen.md` (nur zweifelsfrei Gemeinfreies!).
 - Vorlagen, die die Nutzerin selbst besorgt hat: `docs/quellen/`.
 - Netz: Die Arbeitsumgebung erreicht nur de.wikibooks.org (plus Websuche mit Zusammenfassungen).
@@ -26,5 +27,4 @@ Silben, Atemzeichen, Seitenumbrüche.
 
 ## Offene Aufgaben
 1. Weitere Stücke aus `docs/notizen.md`, v. a. Themen aus van Eycks „Fluyten Lust-hof“.
-   Seite 16 („All in a Garden Green“) ist erst halb voll – Platz für ein weiteres altes Stück.
 2. Übungs-App: Auftrag in `docs/app-prompt.md`.
