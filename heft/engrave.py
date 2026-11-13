@@ -196,6 +196,13 @@ def parse_music(src):
             items.append(dict(kind="bar"))
         elif t == "||":
             items.append(dict(kind="bar", final=True))
+        elif t == "|:":
+            items.append(dict(kind="bar", rep_start=True))
+        elif t == ":|":
+            items.append(dict(kind="bar", rep_end=True))
+        elif t in ("[1", "[2"):  # Wiederholungsklammer ab dem vorigen Taktstrich
+            assert items and items[-1]["kind"] == "bar", "Klammer muss nach einem Taktstrich stehen"
+            items[-1]["volta"] = int(t[1])
         elif t == "/":
             items.append(dict(kind="break"))
         elif t == ",":
@@ -234,14 +241,35 @@ def check_and_assign(song):
     bar_q = num * 4.0 / den
     # Taktprüfung
     acc, bars, idx = 0.0, [], 0
+    in_v1 = False          # innerhalb der 1. Klammer (bis zum :|)
+    pickup = None          # Länge des Auftakts nach dem letzten |: bzw. am Liedanfang
+    seg_start = True       # nächster Takt ist der erste nach |: bzw. Liedanfang
     for it in items:
         if it["kind"] in ("note", "rest"):
             acc += it["q"]
         elif it["kind"] == "bar":
-            bars.append((acc, bar_q))
+            if seg_start and acc > 0.0:
+                pickup = acc if acc < bar_q else 0.0
+                seg_start = False
+            if in_v1 and it.get("rep_end") and acc < bar_q and pickup and abs(acc + pickup - bar_q) < 1e-6:
+                acc = bar_q  # letzter Takt der 1. Klammer + Auftakt nach der Wiederholung = ganzer Takt
+            if not (it.get("rep_start") and acc == 0.0):  # |: am Anfang/nach :| ist kein eigener Takt
+                bars.append((acc, bar_q, bool(it.get("rep_end"))))
             acc = 0.0
+            if it.get("volta") == 1:
+                in_v1 = True
+            elif it.get("rep_end"):
+                in_v1 = False
+            if it.get("rep_start"):
+                seg_start = True
         elif it["kind"] == "time":
             bar_q = it["num"] * 4.0 / it["den"]
+    # Takt, der an einer Wiederholung geteilt ist (Rest vor :|, Auftakt nach |:), zählt als ganz
+    for i in range(len(bars) - 1):
+        (a, q, re_), (b2, q2, _) = bars[i], bars[i + 1]
+        if re_ and a < q and abs(a + b2 - q) < 1e-6:
+            bars[i], bars[i + 1] = (q, q, re_), (q2, q2, False)
+    bars = [(b, q) for b, q, _ in bars]
     msgs = []
     for i, (b, bar_q) in enumerate(bars):
         if abs(b - bar_q) > 1e-6:
@@ -285,7 +313,8 @@ class Sys:
 
 
 def layout_system(events, sp, width, base, key, time_sig=None, first=True, lyr_size=3.5,
-                  name_size=2.25, stretch_max=1.4, final_bar=False, ends_with_bar=True, min_note=0.0):
+                  name_size=2.25, stretch_max=1.4, final_bar=False, ends_with_bar=True, min_note=0.0,
+                  justify=False):
     """events: Items dieses Systems (note/rest/bar). Liefert x-Positionen."""
     x = 0.4 * sp
     clef_x = x
@@ -325,10 +354,14 @@ def layout_system(events, sp, width, base, key, time_sig=None, first=True, lyr_s
             nd -= 0.35 * base
         need[a] = nd
     nb = sum(1 for e in notes if e["kind"] == "bar")
+    REP_W = 1.25 * sp  # Platz für die Wiederholungspunkte
+    nrep = sum(1 for e in notes if e["kind"] == "bar" and (e.get("rep_start") or e.get("rep_end")))
+    nrep += 0.5 * sum(1 for k, e in enumerate(notes) if k == 0 and e["kind"] == "bar" and e.get("rep_start"))
     avail_w = width - start - 0.5 * sp
 
     def total(s):
-        t = sum(max(w[i] * s, need[i]) for i in note_idx) + nb * max(BAR_GAP * s, 0.35 * base) + nt * 2.6 * sp
+        t = (sum(max(w[i] * s, need[i]) for i in note_idx) + nb * max(BAR_GAP * s, 0.35 * base)
+             + nt * 2.6 * sp + nrep * REP_W)
         return t
 
     lo_s, hi_s = 0.3, stretch_max
@@ -347,10 +380,17 @@ def layout_system(events, sp, width, base, key, time_sig=None, first=True, lyr_s
     xs = []
     x = start
     for i, e in enumerate(notes):
-        if e["kind"] == "bar":
+        if e["kind"] == "bar" and e.get("rep_start") and i == 0:
+            xs.append(start - 0.4 * sp)  # Wiederholungsbeginn am Zeilenanfang
+            x += REP_W + 0.6 * sp
+        elif e["kind"] == "bar":
             bg = max(BAR_GAP * s, 0.35 * base)
+            if e.get("rep_end"):
+                x += REP_W
             xs.append(x + bg * 0.22)
             x += bg
+            if e.get("rep_start"):
+                x += REP_W
         elif e["kind"] == "time":
             xs.append(x - 0.1 * sp)
             x += 2.6 * sp
@@ -360,6 +400,15 @@ def layout_system(events, sp, width, base, key, time_sig=None, first=True, lyr_s
     for i, e in enumerate(notes):
         if e["kind"] == "bar" and i == 0:
             xs[i] = start - 0.4 * sp
+    if justify:
+        # Blocksatz: alle Zeilen enden am rechten Rand (Abstände gleichmäßig strecken)
+        bars = [xs[i] for i, e in enumerate(notes) if e["kind"] == "bar"]
+        right = bars[-1] if (notes and notes[-1]["kind"] == "bar") else x - 0.2 * sp
+        target = width - 0.1
+        if right > start + 1:
+            f = (target - start) / (right - start)
+            xs = [start + (v - start) * f if v >= start else v for v in xs]
+            x = start + (x - start) * f
     sy = Sys()
     sy.clef_x, sy.ks_x, sy.ts_x, sy.xs, sy.start = clef_x, ks_x, ts_x, xs, start
     sy.end = x
@@ -384,13 +433,15 @@ def extents(events, whole_heads=False):
 def render_staff_system(events, sp, width, key, time_sig=None, base=9.0, show_diagrams=True,
                         diag_h=23.0, lyr_size=3.5, name_size=2.25, stretch_max=1.4,
                         whole_heads=False, show_names=True, show_lyrics=True, lead_bar=False,
-                        trailing_open=False, ext=None, meter=None):
+                        trailing_open=False, ext=None, meter=None, justify=False):
     sy = layout_system(events, sp, width, base, key, time_sig, lyr_size=lyr_size,
-                       name_size=name_size, stretch_max=stretch_max,
+                       name_size=name_size, stretch_max=stretch_max, justify=justify,
                        min_note=(flute_width(diag_h)[0] + 1.3) if show_diagrams else 0.0)
     parts = []
     # vertikale Geometrie
     hi_ext, lo_ext = ext if ext else extents(events, whole_heads)
+    if any(e.get("volta") for e in events):
+        hi_ext = max(hi_ext, 13)
     if show_diagrams:
         top_pad = 0.6 + diag_h + max(1.9 * sp, (hi_ext - 8) * sp / 2 + 1.3 * sp)
     else:
@@ -410,6 +461,8 @@ def render_staff_system(events, sp, width, key, time_sig=None, base=9.0, show_di
     # Linien
     x_last_bar = max([sy.xs[i] for i, e in enumerate(events) if e["kind"] == "bar"] + [sy.start])
     staff_right = x_last_bar if not trailing_open else sy.end - 0.2 * sp
+    if justify and trailing_open:
+        staff_right = width - 0.1
     for i in range(5):
         parts.append(f'<line x1="0" y1="{Y(2 * i):.3f}" x2="{staff_right:.3f}" y2="{Y(2 * i):.3f}" '
                      f'stroke="{INK}" stroke-width="{0.13 * sp:.3f}"/>')
@@ -426,12 +479,41 @@ def render_staff_system(events, sp, width, key, time_sig=None, base=9.0, show_di
     for i, e in enumerate(events):
         if e["kind"] == "bar":
             x = sy.xs[i]
-            if e.get("final"):
+            if e.get("rep_start") or e.get("rep_end"):
+                d = 1 if e.get("rep_start") else -1  # Richtung zu den Punkten
+                xk = x if d == 1 else x - 0.5 * sp     # dicker Strich
+                parts.append(f'<rect x="{xk:.3f}" y="{Y(8) - 0.065 * sp:.3f}" width="{0.5 * sp:.3f}" height="{4.13 * sp:.3f}" fill="{INK}"/>')
+                xt = x + 0.75 * sp if d == 1 else x - 0.75 * sp
+                parts.append(f'<line x1="{xt:.3f}" y1="{Y(8):.3f}" x2="{xt:.3f}" y2="{Y(0):.3f}" stroke="{INK}" stroke-width="{0.16 * sp:.3f}"/>')
+                xd = x + 1.2 * sp if d == 1 else x - 1.2 * sp
+                for pos in (3, 5):
+                    parts.append(f'<circle cx="{xd:.3f}" cy="{Y(pos):.3f}" r="{0.25 * sp:.3f}" fill="{INK}"/>')
+            elif e.get("final"):
                 parts.append(f'<line x1="{x - 0.75 * sp:.3f}" y1="{Y(8):.3f}" x2="{x - 0.75 * sp:.3f}" y2="{Y(0):.3f}" stroke="{INK}" stroke-width="{0.16 * sp:.3f}"/>')
                 parts.append(f'<rect x="{x - 0.5 * sp:.3f}" y="{Y(8) - 0.065 * sp:.3f}" width="{0.5 * sp:.3f}" height="{4.13 * sp:.3f}" fill="{INK}"/>')
             else:
                 parts.append(f'<line x1="{x:.3f}" y1="{Y(8) - 0.065 * sp:.3f}" x2="{x:.3f}" y2="{Y(0) + 0.065 * sp:.3f}" stroke="{INK}" stroke-width="{0.16 * sp:.3f}"/>')
 
+    # Wiederholungsklammern 1. / 2.
+    for i, e in enumerate(events):
+        if e["kind"] == "bar" and e.get("volta"):
+            n = e["volta"]
+            ends = [j for j in range(i + 1, len(events)) if events[j]["kind"] == "bar"]
+            if n == 1:
+                ends = [j for j in ends if events[j].get("rep_end")] or ends
+            j = ends[0] if ends else None
+            xa = sy.xs[i] + 0.3 * sp
+            xb = (sy.xs[j] - (1.6 * sp if n == 1 else 0.3 * sp)) if j is not None else sy.end
+            inner = [events[k]["p"]["pos"] for k in range(i, (j or len(events))) if events[k]["kind"] == "note"]
+            top = max([11] + [q + 4 for q in inner])
+            yv = Y(top)
+            hook = 1.5 * sp
+            d = f'M{xa:.3f},{yv + hook:.3f} L{xa:.3f},{yv:.3f} L{xb:.3f},{yv:.3f}'
+            if n == 1:
+                d += f' L{xb:.3f},{yv + hook:.3f}'
+            parts.append(f'<path d="{d}" fill="none" stroke="{INK}" stroke-width="{0.12 * sp:.3f}"/>')
+            parts.append(f'<text x="{xa + 0.45 * sp:.3f}" y="{yv + 1.15 * sp:.3f}" font-family="EB Garamond" '
+                         f'font-size="{1.5 * sp:.3f}" fill="{INK}">{n}.</text>')
     for i, e in enumerate(events):
         if e["kind"] == "time":
             for txt, pos in ((ts_digit(e["num"]), 6), (ts_digit(e["den"]), 2)):
@@ -541,6 +623,12 @@ def render_staff_system(events, sp, width, key, time_sig=None, base=9.0, show_di
             stem_info[i] = (xsx[k], bl(xsx[k]), up)
 
     note_items = []
+    barno, b = {}, 0
+    for i, e in enumerate(events):
+        if e["kind"] == "bar":
+            b += 1
+        barno[i] = b
+    acc_state = {}  # (Takt, Stammton, Oktave) -> geltende Alteration
     for i, e in nev:
         x = sy.xs[i]
         if e["kind"] == "rest":
@@ -567,7 +655,9 @@ def render_staff_system(events, sp, width, key, time_sig=None, base=9.0, show_di
                 parts.append(f'<line x1="{hl - 0.4 * sp:.3f}" y1="{Y(q):.3f}" x2="{hl + hw + 0.4 * sp:.3f}" y2="{Y(q):.3f}" stroke="{INK}" stroke-width="{0.16 * sp:.3f}"/>')
         # Vorzeichen
         want = p["alt"]
-        have = key_alt.get(p["letter"], 0)
+        ak = (barno[i], p["letter"], p["oct"])
+        have = acc_state.get(ak, key_alt.get(p["letter"], 0))
+        acc_state[ak] = want
         if want != have:
             a = {1: "sharp", -1: "flat", 0: "natural"}[want]
             aw = {"sharp": 0.996, "flat": 0.904, "natural": 0.672}[a]
@@ -656,6 +746,12 @@ def render_staff_system(events, sp, width, key, time_sig=None, base=9.0, show_di
                 hl = min(1.1, max(0.5, (xb - xa) * 0.4))
                 parts.append(f'<line x1="{mx - hl / 2:.3f}" y1="{lyr_y - lyr_size * 0.27:.3f}" x2="{mx + hl / 2:.3f}" '
                              f'y2="{lyr_y - lyr_size * 0.27:.3f}" stroke="{INK}" stroke-width="0.17"/>')
+        # Trennstrich am Zeilenende, wenn das Wort in der nächsten Zeile weitergeht
+        if syl_notes and events[syl_notes[-1]].get("hy"):
+            el = events[syl_notes[-1]]
+            xa = sy.xs[syl_notes[-1]] + text_w(el["syl"], lyr_size) / 2 + 0.6
+            parts.append(f'<line x1="{xa:.3f}" y1="{lyr_y - lyr_size * 0.27:.3f}" x2="{xa + 1.0:.3f}" '
+                         f'y2="{lyr_y - lyr_size * 0.27:.3f}" stroke="{INK}" stroke-width="0.17"/>')
         # Melisma-Linie, wenn Wortende über Bogen/Haltebogen
         for k, i in enumerate(note_items):
             e = events[i]

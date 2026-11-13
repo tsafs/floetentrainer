@@ -1,5 +1,7 @@
 # Melodien: Ton + Dauer (1/2/4/8/16), Punkt, r = Pause, | Taktstrich, || Schluss,
 # / Zeilenumbruch, ( ) Bindebogen (Melisma), ~ Haltebogen, , Atemzeichen, T4/4 Taktwechsel.
+# |: und :| Wiederholungszeichen; [1 / [2 nach einem Taktstrich beginnen die Klammer 1. / 2.
+# (Klammer und ihr Takt müssen in derselben Zeile stehen, kein / dazwischen.)
 # stanzas: weitere Strophen, Zeilen mit " / " getrennt.
 SONGS = [
     dict(chapter="Kinder- und Weihnachtslieder",
@@ -30,15 +32,30 @@ SONGS = [
                "c''8 c''8 c''8 c''8 | h'4 h'4 , | a'8 a'8 a'8 a'8 | g'2 ||",
          lyrics="Al-le mei-ne Ent-chen schwim-men auf dem See, schwim-men auf dem See, "
                 "Köpf-chen in das Was-ser, Schwänz-chen in die Höh."),
-    dict(title="Jingle Bells", key="G", keyname="G-Dur", time=(4, 4), subtitle="Refrain",
-         credit="James Lord Pierpont",
-         music="h'4 h'4 h'2 | h'4 h'4 h'2 | h'4 d''4 g'4. a'8 | h'1 , | / "
+    dict(title="Jingle Bells", key="G", keyname="G-Dur", time=(4, 4),
+         credit="Text und Melodie: James Lord Pierpont, 1857 · nach jeder Strophe der Refrain",
+         # Melodie der Strophe nach de.wikibooks.org „Liederbuch/ Jingle Bells“,
+         # Text nach en.wikipedia.org „Jingle Bells“ (Abschnitt Lyrics)
+         music="d'4 h'4 a'4 g'4 | d'2. d'8 d'8 | d'4 h'4 a'4 g'4 | e'2. r4 | / "
+               "e'4 c''4 h'4 a'4 | fis'2. r4 | d''4 d''4 c''4 a'4 | h'2. r4 | / "
+               "d'4 h'4 a'4 g'4 | d'2. r4 | d'4 h'4 a'4 g'4 | e'2. r8 e'8 | / "
+               "e'4 c''4 h'4 a'4 | d''4 d''4 d''4. d''8 | e''4 d''4 c''4 a'4 | g'2 d''2 , | / "
+               "h'4 h'4 h'2 | h'4 h'4 h'2 | h'4 d''4 g'4. a'8 | h'1 , | / "
                "c''4 c''4 c''4. c''8 | c''4 h'4 h'4 h'8 h'8 | h'4 a'4 a'4 h'4 | a'2 d''2 , | / "
                "h'4 h'4 h'2 | h'4 h'4 h'2 | h'4 d''4 g'4. a'8 | h'1 , | / "
                "c''4 c''4 c''4. c''8 | c''4 h'4 h'4 h'8 h'8 | d''4 d''4 c''4 a'4 | g'1 ||",
-         lyrics="Jin-gle bells, jin-gle bells, jin-gle all the way! Oh, what fun it is to ride "
+         lyrics="Dash-ing through the snow in a one-horse o-pen sleigh, o’er the fields we go, laugh-ing all the way. "
+                "Bells on bob tail ring, mak-ing spi-rits bright. What fun it is to ride and sing a sleigh-ing song to-night, oh! "
+                "Jin-gle bells, jin-gle bells, jin-gle all the way! Oh, what fun it is to ride "
                 "in a one-horse o-pen sleigh, hey! Jin-gle bells, jin-gle bells, jin-gle all the way! "
-                "Oh, what fun it is to ride in a one-horse o-pen sleigh!"),
+                "Oh, what fun it is to ride in a one-horse o-pen sleigh!",
+         stanza_cols=3,
+         stanzas=["A day or two ago / I thought I’d take a ride / And soon, Miss Fanny Bright / Was seated by my side, / "
+                  "The horse was lean and lank / Misfortune seemed his lot / He got into a drifted bank / And then we got up sot.",
+                  "A day or two ago, / The story I must tell / I went out on the snow, / And on my back I fell; / "
+                  "A gent was riding by / In a one-horse open sleigh, / He laughed as there I sprawling lie, / But quickly drove away.",
+                  "Now the ground is white / Go it while you’re young, / Take the girls tonight / And sing this sleighing song; / "
+                  "Just get a bobtailed bay / Two forty as his speed / Hitch him to an open sleigh / And snap! You’ll take the lead."]),
     dict(title="Morgen kommt der Weihnachtsmann", key="G", keyname="G-Dur", time=(4, 4),
          credit="Text: Hoffmann von Fallersleben · Melodie: französische Weise",
          music="g'4 g'4 d''4 d''4 | e''4 e''4 d''2 , | c''4 c''4 h'4 h'4 | a'2 g'2 , | / "
@@ -46,6 +63,23 @@ SONGS = [
                "g'4 g'4 d''4 d''4 | e''4 e''4 d''2 , | c''4 c''4 h'4 h'4 | a'2 g'2 ||",
          lyrics="Mor-gen kommt der Weih-nachts-mann, kommt mit sei-nen Ga-ben. Trom-mel, Pfei-fen und Ge-wehr, "
                 "Fahn und Sä-bel und noch mehr, ja ein gan-zes Krie-ges-heer möcht ich ger-ne ha-ben."),
+    dict(title="Kling, Glöckchen", key="C", keyname="C-Dur", time=(2, 4),
+         credit="Text: Karl Enslin · Melodie: 19. Jahrhundert",
+         # Quelle: de.wikibooks.org „Liederbuch/ Kling Glöckchen“ (Notenbild auf Wikimedia Commons, in C)
+         music="g'4 e'8 f'8 | g'16 a'16 g'16 a'16 g'4 | f'4 d'8 g'8 | e'2 , | / "
+               "d'8 d'8 e'8 c'8 | e'4 d'4 | f'8 f'8 g'8 d'8 | f'4 e'4 , | / "
+               "d'8 d'8 e'8 fis'8 | g'4 d'4 | e'8 a'8 g'8 fis'8 | a'4 g'4 , | / "
+               "g'4 e'8 f'8 | g'16 a'16 g'16 a'16 g'4 | f'4 d'8 g'8 | c'2 ||",
+         lyrics="Kling, Glöck-chen, klin-ge-lin-ge-ling, kling, Glöck-chen, kling! "
+                "Lasst mich ein, ihr Kin-der, ist so kalt der Win-ter, "
+                "öff-net mir die Tü-ren, lasst mich nicht er-frie-ren! "
+                "Kling, Glöck-chen, klin-ge-lin-ge-ling, kling, Glöck-chen, kling!",
+         stanzas=["Kling, Glöckchen, klingelingeling, / kling, Glöckchen, kling! / Mädchen, hört, und Bübchen, / "
+                  "macht mir auf das Stübchen, / bring euch viele Gaben, / sollt euch dran erlaben. / "
+                  "Kling, Glöckchen, klingelingeling, / kling, Glöckchen, kling!",
+                  "Kling, Glöckchen, klingelingeling, / kling, Glöckchen, kling! / Hell erglühn die Kerzen, / "
+                  "öffnet mir die Herzen! / Will drin wohnen fröhlich, / frommes Kind, wie selig. / "
+                  "Kling, Glöckchen, klingelingeling, / kling, Glöckchen, kling!"]),
     dict(title="Bruder Jakob", key="G", keyname="G-Dur", time=(4, 4),
          credit="Volksweise (Frère Jacques)",
          music="g'4 a'4 h'4 g'4 | g'4 a'4 h'4 g'4 , | h'4 c''4 d''2 , | h'4 c''4 d''2 , | / "
@@ -112,17 +146,6 @@ SONGS = [
                "g'8. g'16 fis'8 d'8 h'8. h'16 a'8 , d''8 | a'8. g'16 fis'8 e'8 d'4 r4 ||",
          lyrics="A, B, C, die Kat-ze lief im Schnee. Und als sie dann nach Hau-se kam, "
                 "da hatt sie wei-ße Stie-fel an. O je-mi-ne, o je-mi-ne, die Kat-ze lief im Schnee."),
-    dict(title="Ihr Kinderlein, kommet", key="G", keyname="G-Dur", time=(4, 4),
-         credit="Text: Christoph von Schmid · Melodie: Johann Abraham Peter Schulz",
-         music="d''4 | d''4 h'8 d''8 d''4 h'8 d''8 | c''4 a'8 c''8 h'4 r8 / d''8 | "
-               "d''4 h'8 d''8 d''4 h'8 d''8 | c''4 a'8 c''8 h'4 r8 / h'8 | "
-               "a'4 a'8 a'8 c''4 c''8 c''8 | h'4 h'8 h'8 e''4 r8 / e''8 | "
-               "d''4 d''8 d''8 g''4 d''8 h'8 | c''4 a'8 fis'8 g'4 ||",
-         lyrics="Ihr Kin-der-lein, kom-met, o kom-met doch all! Zur Krip-pe her kom-met in Beth-le-hems Stall "
-                "und seht, was in die-ser hoch-hei-li-gen Nacht der Va-ter im Him-mel für Freu-de uns macht!",
-         stanzas=["O seht in der Krippe im nächtlichen Stall, / seht hier bei des Lichtleins hellglänzendem Strahl / den lieblichen Knaben, das himmlische Kind, / viel schöner und holder, als Engelein sind.",
-                  "Da liegt es, ihr Kinder, auf Heu und auf Stroh, / Maria und Josef betrachten es froh; / die redlichen Hirten knien betend davor, / hoch oben schwebt jubelnd der himmlische Chor.",
-                  "O beugt wie die Hirten anbetend die Knie, / erhebet die Händlein und danket wie sie! / Stimmt freudig, ihr Kinder, wer wollt sich nicht freun, / stimmt freudig zum Jubel der Engel mit ein!"]),
     dict(title="Stille Nacht, heilige Nacht", key="C", keyname="C-Dur", time=(6, 8),
          credit="Text: Joseph Mohr · Melodie: Franz Xaver Gruber",
          music="(g'4. a'8) g'4 | e'2. , | g'4. a'8 g'4 | e'2. , | d''2 d''4 | h'2. , | c''2 c''4 | g'2. , | / "
@@ -135,20 +158,7 @@ SONGS = [
 
     # ---------------------------------------------------------------- alte Melodien
     dict(chapter="Alte Lieder und Tänze",
-         title="Gottes Sohn ist kommen", key="G", keyname="G-Dur", time=(4, 4),
-         credit="Text: Johann Horn, 1544 · Melodie: 16. Jahrhundert · nach G-Dur gesetzt",
-         music="g'4 g'4 h'4 c''4 | d''2 d''2 , | e''4 fis''4 g''4 d''4 | (h'4 cis''4) d''2 , | c''4 a'4 h'4 c''4 | / "
-               "(h'4 a'4) g'2 , | fis'4 g'4 a'4 h'4 | (a'4 g'4 fis'4 e'4) | d'1 , | / "
-               "g'4 g'4 h'4 g'4 | (d''4 e''4) d''2 , | g'4 a'4 h'4 c''4 | (h'2 a'2) | g'1 ||",
-         lyrics="Got-tes Sohn ist kom-men uns al-len zu From-men hier auf die-se Er-den in ar-men Ge-bär-den, "
-                "dass er uns von Sün-de frei-e und ent-bin-de."),
-    dict(title="Es kommt ein Schiff, geladen", key="e", keyname="e-Moll", time=(3, 4),
-         credit="Text: nach Johannes Tauler · Melodie: 1608",
-         music="e'4 | e'2 e'4 | fis'2 fis'4 | (g'4 a'4 h'4) | h'2 h'4 , | a'2 a'4 | d'2 fis'4 | / "
-               "T4/4 g'2 r4 g'4 | h'4 d''4 e''4 e''4 | (d''8 c''8 h'8 a'8) g'4 , a'4 | h'4 a'4 g'4 fis'4 | e'2. ||",
-         lyrics="Es kommt ein Schiff, ge-la-den bis an sein höchs-ten Bord, trägt Got-tes Sohn voll Gna-den, des Va-ters e-wigs Wort.",
-         stanzas=["Das Schiff geht still im Triebe, / es trägt ein teure Last; / das Segel ist die Liebe, / der Heilig Geist der Mast."]),
-    dict(title="Noël nouvelet", key="G", keyname="a-Moll (dorisch)", time=(4, 4),
+         title="Noël nouvelet", key="G", keyname="a-Moll (dorisch)", time=(4, 4),
          credit="Französisch, 15. Jahrhundert · Melodie ohne Text",
          music="a'4 e''4 fis''4 d''4 | e''2 c''2 | d''4 d''8 e''8 c''4 h'4 | a'1 , | / "
                "a'4 e''4 fis''4 d''4 | e''2 c''2 | d''4 d''8 e''8 c''4 h'4 | a'1 , | / "
@@ -160,25 +170,162 @@ SONGS = [
                "c''4 d''8 e''8. fis''16 e''8 | d''4 h'8 g'8. a'16 h'8 | c''8. h'16 a'8 gis'8. fis'16 gis'8 | a'4 a'8 a'4 r8 , | / "
                "g''4. g''8. fis''16 e''8 | d''4 h'8 g'8. a'16 h'8 | c''4 a'8 a'8. gis'16 a'8 | h'4 gis'8 e'4. , | / "
                "g''4. g''8. fis''16 e''8 | d''4 h'8 g'8. a'16 h'8 | c''8. h'16 a'8 gis'8. fis'16 gis'8 | a'4. a'4 ||"),
-
+    dict(title="All in a Garden Green", key="G", keyname="G-Dur", time=(4, 4),
+         credit="England, 16. Jahrhundert · Playford, The English Dancing Master (1651) · Melodie ohne Text",
+         # Quelle: thesession.org/tunes/14287, Fassung 2 (in 2/2 notiert, hier als 4/4)
+         music="|: d''2 d''4 d''4 | h'4. c''8 d''4 d''4 | e''4 d''4 c''4 h'4 | a'2. , h'4 | / "
+               "c''4. d''8 e''8 fis''8 g''4 | g'4. a'8 h'8 c''8 d''4 | c''4 h'4 a'8 g'8 a'8 h'8 | g'1 , :| / "
+               "|: d''4 d''8 d''8 d''4 d''4 | e''4 fis''4 g''2 , | h'4 h'8 h'8 h'4 g'4 | a'4 h'4 c''2 , | "
+               "h'4. a'8 g'8 a'8 h'4 | / c''4. h'8 a'8 h'8 c''4 , | d''4. c''8 h'8 c''8 d''4 | "
+               "e''4. d''8 c''8 d''8 h'8 c''8 | a'4 g'4 g'4 fis'4 | g'1 :|"),
+    dict(title="Innsbruck, ich muss dich lassen", key="F", keyname="F-Dur", time=(4, 4),
+         credit="Heinrich Isaac (um 1490), Liedsatz · Oberstimme",
+         # Quelle: Diskantlied-Fassung, Ausgabe Arnold den Teuling (IMSLP), Oberstimme
+         music="f'2 | f'4 g'4 a'2 | c''2 b'2 | a'2 r4 a'4 | c''4. b'8 g'2 | / "
+               "a'2 f'2 | e'2 r4 f'4 | g'4 f'4 e'4 f'4 | g'2 r4 g'4 | / "
+               "f'4 g'4 a'2 | c''2 b'2 | a'2 r4 a'4 | c''4. b'8 g'2 | / "
+               "a'2 f'2 | e'2 r4 g'4 | f'4 g'4 a'2 | / "
+               "b'4. a'8 g'8 f'8 g'4~ | g'8 f'8 f'2 e'4 | f'2 r4 g'4 | / "
+               "f'4 g'4 a'2 | b'4. a'8 g'8 f'8 g'4~ | g'8 f'8 f'2 e'4 | f'1 ||"),
+    dict(title="Tourdion", key="e", keyname="e-Moll (dorisch)", time=(3, 4),
+         credit="Pierre Attaingnant, Paris 1530 · Oberstimme · zum Schluss den ersten Teil noch einmal",
+         # Quelle: Sopranstimme, Ausgabe Pierre Gouin 2007 (IMSLP/WIMA); späterer Text weggelassen
+         music="|: e'8 fis'8 g'8 a'8 g'8 fis'8 | e'4. fis'8 g'8 a'8 | h'8 a'8 g'8 g'8 a'8 fis'8 | (g'4 fis'8 e'8) d'4 , | / "
+               "e'8 fis'8 g'8 a'8 g'8 fis'8 | e'4 g'4 fis'4 | e'2 d'4 | e'2. :| / "
+               "|: h'4. a'8 h'8 cis''8 | h'2 h'4 | d''8 cis''8 h'8 a'8 g'8 fis'8 | (g'4. fis'8) e'4 , | / "
+               "h'4. a'8 h'8 cis''8 | h'4 a'8 g'8 fis'4 | e'2 d'4 | e'2. :|"),
+    dict(title="Ronde „Pour quoy“", key="C", keyname="d-Moll (dorisch)", time=(4, 4),
+         credit="Tielman Susato, Danserye (1551), Ronde I · Oberstimme",
+         # Quelle: Altblockflötenstimme, Ausgabe Martin Grayson (IMSLP, CC BY); verglichen mit Kilpatricks Superius
+         music="|: d''4 a''4 a''4. a''8 | g''4 a''4 f''4 d''4 | g''4. a''8 g''8 f''8 e''8 d''8 | cis''8 h'8 cis''4 d''2 :| / "
+               "|: d''8 e''8 f''8 g''8 a''4 a''4 | c'''4 h''4 a''2 , | d''8 e''8 f''8 g''8 a''4 a''4 | c'''4 h''4 a''2 , | / "
+               "f''8 e''8 f''8 g''8 a''4 a''4 | f''8 e''8 f''8 g''8 a''4 a''4 | g''8 a''8 b''8 a''8 g''8 f''8 e''8 d''8 | cis''8 h'8 d''8 cis''8 d''2 , | / "
+               "f''8 e''8 f''8 g''8 a''4 a''4 | f''8 e''8 f''8 g''8 a''4 a''4 | g''8 a''8 b''8 a''8 g''8 f''8 e''8 d''8 | cis''8 h'8 d''8 cis''8 d''2 :|"),
+    dict(title="Belle qui tiens ma vie", key="F", keyname="g-Moll (dorisch)", time=(2, 4),
+         credit="Thoinot Arbeau, Orchésographie (1589) · Pavane, Oberstimme",
+         # Quelle: Ausgabe Peter Chubb, Mutopia 2002 (gemeinfrei), Sopranstimme und Text
+         music="g'2 | g'4 fis'4 | g'4 a'4 | b'2 | b'4 d''4 | c''4 b'4 | b'4 a'4 | b'2 , | / "
+               "g'2 | g'4 fis'4 | g'4 a'4 | b'2 | b'4 d''4 | c''4 b'4 | b'4 a'4 | b'2 , | / "
+               "b'2 | a'4 a'4 | g'4 g'4 | fis'2 , | d'2 | (e'8 f'8) g'4 | g'4 fis'4 | g'2 , | / "
+               "b'2 | a'4 a'4 | g'4 g'4 | fis'2 , | d'2 | (e'8 f'8) g'4 | g'4 fis'4 | g'2 ||",
+         lyrics="Bel-le qui tiens ma vi-e cap-ti-ve dans tes yeux, qui m’as l’â-me ra-vi-e d’un sou-ris gra-ci-eux. "
+                "Viens tôt me se-cou-rir ou me fau-dra mou-rir. Viens tôt me se-cou-rir ou me fau-dra mou-rir.",
+         stanzas=["Pourquoi fuis-tu, mignarde, / si je suis près de toi? / Quand tes yeux je regarde, / je me perds dedans moi, / "
+                  "car tes perfections / changent mes actions.",
+                  "Tes beautés et ta grâce / et tes divins propos / ont échauffé la glace / qui me gelait les os, / "
+                  "et ont rempli mon cœur / d’une amoureuse ardeur."]),
+    dict(title="Branle de l’Official", key="G", keyname="G-Dur", time=(4, 4),
+         credit="Thoinot Arbeau, Orchésographie (1589) · nach der Flötenstimme von Elaine Fine, eine Oktave tiefer",
+         # Quelle: Elaine Fine 2023 (IMSLP, CC BY-SA), Flöte T. 5–20 ohne die Einleitung
+         music="|: g'4 g'4 a'8 g'8 fis'8 e'8 | d'2. d'4 | e'4 g'4 g'4 fis'4 | g'2 g'2 :| / "
+               "|: d''4. c''8 h'8 c''8 d''8 h'8 | c''4. h'8 a'8 h'8 c''8 a'8 | h'4. a'8 g'8 a'8 h'8 g'8 | a'4. g'8 fis'8 g'8 a'8 fis'8 , | / "
+               "g'4. fis'8 e'8 fis'8 g'8 e'8 | fis'4. e'8 d'4 d'4 | e'4 g'4 g'4 fis'4 | g'2 g'2 :|"),
+    dict(title="The Honie-suckle", key="C", keyname="C-Dur", time=(4, 4),
+         credit="Anthony Holborne, Pavans, Galliards, Almains (1599), Nr. 60 · Oberstimme",
+         # Quelle: Cantus-Stimme, Ausgabe Ulrich Alpers (IMSLP/WIMA)
+         music="|: c''2 d''2 | e''4. f''8 e''4 c''4 | d''4 e''4 f''4 e''4 | d''1 , | d''2 e''2 | f''2 f''4 e''4 | / "
+               "d''4 c''2 h'4 | c''2 c''4 d''8 e''8 | f''2 e''2 | d''2 e''4 g''4 | f''4 e''4 d''4 d''4 | c''1 :| / "
+               "|: d''4 d''4 d''4. c''8 | h'4. c''8 d''4 e''4 | f''4 f''4 e''2 | d''2 d''2 , | a'4. b'8 c''4 d''4 | / "
+               "c''2 c''4 b'4 | c''4 f''4 d''4 e''4 | f''4. e''16 d''16 c''2 , | h'4. c''8 d''4 e''4 | d''2 d''4 c''4 | / "
+               "d''4 g''4 e''4 fis''4 | g''4 g''4. f''8 e''4 | d''4 c''2 h'4 | c''1 :|"),
+    dict(title="The Fairie-round", key="C", keyname="C-Dur", time=(6, 8),
+         credit="Anthony Holborne, Pavans, Galliards, Almains (1599), Nr. 63 · Oberstimme, Notenwerte halbiert",
+         # Quelle: Cantus-Stimme für Sopranflöte, Ausgabe Christian Mondrup 2019 (IMSLP)
+         music="|: g''4 e''8 c''4 a'8 | d''4 h'8 g'4 c''8 | a'4. d''8. c''16 h'8 | c''8. b'16 a'8 g'4 , e''8 | / "
+               "d''4 c''8 h'4 c''8 | f''4 e''8 d''4 c''8 | h'8 g'8 c''4. h'8 | c''4 c''8 c''4 c''8 :| / "
+               "|: g'8 a'8 h'8 c''8. h'16 a'8 | g'4 a'8 g'4 f''8 | e''4 d''8 c''4 h'8 | c''8. h'16 a'8 g'4 , e''8 | / "
+               "d''4 e''4 f''8 e''8 | d''2 c''4 | c''8 e''8 d''4 c''4 | h'4 h'8 h'4 h'8 :| / "
+               "|: g''4 g'8 h'4 c''8 | d''4 g'8 d''4 e''8 | f''4. e''8 d''8 c''8 | h'2. , | / "
+               "e'8 f'16 g'16 a'8 f'8 g'16 a'16 h'16 a'16 | g'8 a'16 h'16 c''8 a'8 h'16 c''16 d''16 c''16 | h'8 g'8 c''4. h'8 | c''4 c''8 c''4 c''8 :|"),
+    dict(title="Now is the month of maying", key="G", keyname="G-Dur", time=(4, 4),
+         credit="Thomas Morley, The First Booke of Balletts (1595) · Oberstimme",
+         # Quelle: Oberstimme nach Messerschmidt 2025 (IMSLP, Trompete in B, hier zurück in G),
+         # Tonhöhen und Text verglichen mit der Canto-Stimme von Bernard Meylan (IMSLP)
+         music="|: g'4 | g'4 g'4 a'4 a'4 | h'2 h'4 g'4 | h'4. a'8 h'4 cis''4 | d''2 d''4 a'8 h'8 , | / "
+               "c''4 c''4 h'4 g'4 | a'4 fis'4 d'4 d''8 c''8 | h'4 c''4 a'4 a'4 | g'2 r4 :| / "
+               "|: h'4 | a'4 d''4 d''4 cis''4 | d''2 r4 a'4 | c''4 c''4 h'4 h'4 | a'2 r4 d''8 c''8 | / "
+               "h'4 g'4 d''2 , | d'8 e'8 fis'8 g'8 a'8 h'8 c''4 | h'4. c''8 h'4 a'4 | g'2 r4 :|",
+         lyrics="Now is the month of May-ing, when mer-ry lads are play-ing, "
+                "Fa la la la la la la la la Fa la la la la la la. "
+                "Each with his bon-ny lass a-dan-cing on the grass. "
+                "Fa la la la la Fa la la la la la la la la la la la.",
+         stanzas=["The spring, clad all in gladness, / doth laugh at Winter’s sadness, Fa la … / "
+                  "And to the bagpipe’s sound / the nymphs tread out their ground. Fa la …",
+                  "Fie then, why sit we musing, / youth’s sweet delight refusing? Fa la … / "
+                  "Say, dainty nymphs, and speak, / shall we play barley-break? Fa la …"]),
+    dict(title="It was a lover and his lass", key="C", keyname="G-Dur (mixolydisch)", time=(4, 4),
+         credit="Text: William Shakespeare · Melodie: Thomas Morley, The First Booke of Ayres (1600)",
+         # Quelle: Cantus-Stimme, Ausgabe Christopher Baum 2018 (IMSLP, Originaltonart);
+         # Takte 24–25 der Vorlage (je 6 Viertel) hier auf 4/4-Takte verteilt
+         music="g'4 | h'4. c''8 d''4 d''4 | c''4 h'4 a'4 , a'8 h'8 | c''4 c''8 d''8 e''4 e''8 f''8 | g''2. f''8 e''8 | / "
+               "d''4 h'8 c''8 d''2~ | d''4 c''8 h'8 c''4 a'4 | g'1 | r2 r4 d''4 | d''4 d''4 e''4 d''4 | / "
+               "c''4 h'4 a'4 , a'4 | e''2 cis''4 a'4 | d''2 h'4 d''4 | g''2 e''4 c''4 | e''4 d''4 c''4 h'4 | / "
+               "d''2 h'4 , g'4 | c''4 h'4 a'4 d''4 | d''8 c''8 h'8 a'8 g'4 g''4 | g''8 f''8 e''8 d''8 c''4 e''4 | / "
+               "e''8 d''8 c''8 h'8 a'4 , c''4 | h'4. h'8 a'4. a'8 | g'4 g'4 d''2 | h'2 r2 | r4 d''4 g''2 | / "
+               "e''4 c''4 e''2 | d''4 c''2 h'4 | d''2 h'4 , g'4 | c''4 h'4 a'4 d''4 | d''8 c''8 h'8 a'8 g'4 g''4 | / "
+               "g''8 f''8 e''8 d''8 c''4 e''4 | e''8 d''8 c''8 h'8 a'4 , c''4 | h'4. h'8 a'4. a'8 | g'1 ||",
+         lyrics="It was a lo-ver and his lass, with a hey, with a ho, and a hey non-ny no, "
+                "and a hey non-ny non-ny no, that o’er the green corn-fields did pass "
+                "in spring-time, in spring-time, in spring-time, the on-ly pret-ty ring-time, "
+                "when birds do sing hey ding a ding a ding, hey ding a ding a ding, hey ding a ding a ding, "
+                "sweet lo-vers love the spring, in spring-time, in spring-time, the on-ly pret-ty ring-time, "
+                "when birds do sing hey ding a ding a ding, hey ding a ding a ding, hey ding a ding a ding, "
+                "sweet lo-vers love the spring.",
+         stanza_cols=3,
+         stanzas=["Between the acres of the rye, / with a hey, with a ho … / "
+                  "these pretty country fools would lie / in springtime …",
+                  "This carol they began that hour, / with a hey, with a ho … / "
+                  "how that a life was but a flower / in springtime …",
+                  "Then pretty lovers take the time, / with a hey, with a ho … / "
+                  "for love is crownèd with the prime / in springtime …"]),
+    dict(title="Doen Daphne d’over schoone Maeght", key="C", keyname="d-Moll (dorisch)", time=(3, 4),
+         credit="Jacob van Eyck, Der Fluyten Lust-hof (1649) · Thema ohne die Variationen",
+         # Quelle: van Eyck, Der Fluyten Lust-hof I, Ausgabe Cayo Gomes 2024 (IMSLP, CC0), nur das Thema
+         music="d'4 | f'2 g'4 | a'2 d''4 | cis''4. d''8 e''4 | d''2 , a'4 | "
+               "c''4 a'4 f'4 | g'4 e'4 c'4 | d'4 f'4 e'4 | [1 d'2 :| [2 d'2. | / "
+               "|: f''2 f''4 | e''2 e''4 | d''2 d''4 | cis''2 , a'4 | a'4. b'8 a'4 | g'4. a'8 f'4 | f'4. g'8 e'4 | f'2. :| / "
+               "|: c''4 c''4 d''4 | c''4 a'4 f'4 | c''4. d''8 e''8 f''8 | g''4 e''4 c''4 , | a'4. g'8 f'4 | e'4 d'4 d''4 | / "
+               "cis''4. d''8 e''4 | d''2 , a'8 h'8 | c''4 a'4 f'4 | g'4 e'4 c'4 | d'8 e'8 f'8 g'8 e'4 | d'2. :|"),
+    dict(title="Malle Symen", key="C", keyname="d-Moll (dorisch)", time=(4, 4),
+         credit="Jacob van Eyck, Der Fluyten Lust-hof (1649) · Thema ohne die Variationen",
+         # Quelle: van Eyck, Der Fluyten Lust-hof I, Ausgabe Cayo Gomes 2024 (IMSLP, CC0), nur das Thema
+         music="|: a'2 f''2 | e''2 a'4 a''4 | g''4 f''4 e''4 d''4 | cis''4 a'4 a'2 , | / "
+               "f''4 d''4 e''4 a'4 | g'4 f'4 e'4 d'4 | a'4 d''4 h'4 cis''4 | d''1 :| / "
+               "|: f''8 g''8 a''4 e''8 f''8 g''4 | d''8 f''8 e''8 d''8 cis''4 a'4 , | f'8 g'8 a'4 e'8 f'8 g'4 | "
+               "d'8 f''8 e''8 d''8 cis''8 h'8 a'4 , | / d''8 e''8 f''8 g''8 a''8 f''8 d''4 | d'8 e'8 f'8 g'8 a'8 f'8 d'4 , | "
+               "f''8 g''8 a''8 b''8 c'''8 a''8 f''4 | f'8 g'8 a'8 b'8 c''8 a'8 f'4 , | / f''4. f''8 e''4. e''8 | "
+               "d''8 f''8 e''8 d''8 cis''4 a'4 | h'8 c''8 d''8 h'8 cis''8 d''8 e''8 cis''8 | d''4 d'4 d''2 :|"),
+    dict(title="Engels Nachtegaeltje", key="C", keyname="C-Dur", time=(4, 4),
+         credit="Jacob van Eyck, Der Fluyten Lust-hof (1649) · Thema ohne die Variationen",
+         # Quelle: van Eyck, Der Fluyten Lust-hof I, Ausgabe Cayo Gomes 2024 (IMSLP, CC0), nur das Thema
+         music="|: e''4. d''16 e''16 c''4 g''8. f''16 | e''2. , c''8 d''8 | e''4 c''4 e''4 fis''4 | g''2. , e''8 f''8 | / "
+               "g''4 g''8 a''8 g''4 e''8 f''8 | g''8 f''8 g''8 a''8 g''4 e''8 f''8 | g''4 e''4 f''4 g''4 | a''4 , a'4 a'4. h'8 | / "
+               "c''8 d''8 e''8 f''8 g''4 c''4 | h'8. c''16 d''4 g'4 g''4 | e''8. f''16 g''8 e''8 d''4. c''8 | c''2. :| / "
+               "|: f''8. g''16 | a''4 f''4 f''4. g''8 | a''8 f''8 a''8 f''8 a''8 f''8 a''8 f''8 | a''8 f''8 a''8 f''8 e''4 fis''4 | g''1 | / "
+               "g''1 , | g''8 g''8 g''8 g''8 g''2 | g''8 g''8 g''8 g''8 g''8 g''8 g''4 | e''8. f''16 g''8 e''8 d''4. c''8 | [1 c''2. :| [2 c''1 ||"),
+    dict(title="Onder de Linde groene", key="C", keyname="C-Dur", time=(4, 4),
+         credit="Jacob van Eyck, Der Fluyten Lust-hof II (1654) · Thema ohne die Variationen",
+         # Quelle: van Eyck, Der Fluyten Lust-hof III, Nr. 100, Ausgabe Michel/Teske, Amadeus 1984 (IMSLP)
+         music="|: g'2 c''2 | e'4. f'8 g'2 | c''4 g'4 a'4 g'4 | e'8 f'8 g'4 e''2 , | / "
+               "g'4. a'8 h'8 c''8 d''4 | f'4. g'8 a'8 h'8 c''4 | e'2 d'2 | c'1 :| / "
+               "|: g'4 g'4 a'8 h'8 c''4 | c''4 h'4 c''2 , | d''8 e''8 f''8 d''8 e''4 e''4 | d''8 e''8 f''8 d''8 e''8. f''16 g''4 , | / "
+               "g'4. a'8 h'8 c''8 d''4 | f'4. g'8 a'8 h'8 c''4 | e'2 d'2 | c'1 :|"),
     # ---------------------------------------------------------------- hübsche Melodien
     dict(chapter="Schöne Melodien",
-         title="Kein schöner Land", key="G", keyname="G-Dur", time=(3, 4),
-         credit="Text und Melodie: Anton Wilhelm von Zuccalmaglio · nach G-Dur gesetzt",
-         music="d'8 d'8 d'8 | g'4 h'4 a'8 g'8 | a'4. , / d'8 d'8 d'8 | g'4 h'4 a'8 g'8 | a'4. , / "
-               "h'8 g'8 a'8 | (h'8 d''8) c''8 h'8 a'8 g'8 | (a'8 c''8) h'8 a'8 g'8 a'8 | h'4. , / "
-               "h'8 g'8 a'8 | (h'8 d''8) c''8 h'8 a'8 g'8 | (a'8 c''8) h'8 a'8 g'8 fis'8 | g'4. ||",
-         lyrics="Kein schö-ner Land in die-ser Zeit, als hier das uns-re weit und breit, "
-                "wo wir uns fin-den wohl un-ter Lin-den zur A-bend-zeit, wo wir uns fin-den wohl un-ter Lin-den zur A-bend-zeit.",
-         stanzas=["Da haben wir so manche Stund / gesessen da in frohem Rund / und taten singen, / die Lieder klingen / im Eichengrund.",
-                  "Dass wir uns hier in diesem Tal / noch treffen so viel hundertmal, / Gott mag es schenken, / Gott mag es lenken, / er hat die Gnad.",
-                  "Jetzt, Brüder, eine gute Nacht, / der Herr im hohen Himmel wacht! / In seiner Güten / uns zu behüten / ist er bedacht."]),
-    dict(title="The Water Is Wide", key="G", keyname="G-Dur", time=(4, 4),
+         title="The Water Is Wide", key="G", keyname="G-Dur", time=(4, 4),
          credit="Schottisch-englisches Volkslied",
          music="d'4 g'8 a'8 a'4 | h'2. a'8 a'8 | g'4 e'4 d'2~ | d'4 , g'4 g'4 fis'4 | g'2. a'4 | h'4 (c''8 h'8) a'2~ | a'4 , / "
                "a'4 h'4 (h'8 c''8) | d''2. c''8 c''8 | h'4 (a'8 g'8) h'2~ | h'4 , a'4 g'4 e'4 | d'2. d'4 | e'4 g'4 g'2~ | g'4 ||",
          lyrics="The wa-ter is wide, I can-not get o’er, and nei-ther have I wings to fly. "
                 "Give me a boat that can car-ry two, and both shall row, my love and I."),
+    dict(title="Musette", key="D", keyname="D-Dur", time=(2, 4),
+         credit="Notenbüchlein für Anna Magdalena Bach (1725), BWV Anh. 126 · rechte Hand, letzter Ton eine Oktave höher",
+         # Quelle: Ausgabe RSB 2012 (IMSLP, CC BY), rechte Hand
+         music="|: a''4 g''16 fis''16 e''16 d''16 | a''4 g''16 fis''16 e''16 d''16 | fis'16 g'16 a'8 g'8 fis'8 | e'8 a'8 fis'8 d'8 | / "
+               "a''4 g''16 fis''16 e''16 d''16 | a''4 g''16 fis''16 e''16 d''16 | fis'16 g'16 a'8 g'8 fis'8 | e'8 a'8 d'4 :| / "
+               "|: cis''16 d''16 e''8 cis''16 d''16 e''8 | a''8 e''8 e''4 | a''8 e''8 a''8 e''8 | d''16 cis''16 h'16 a'16 h'8 e'8 | / "
+               "e''8 dis''8 e'8 d''8~ | d''8 cis''8 a''8 gis''8 | e''8 dis''8 e'8 d''8~ | d''8 cis''8 a''8 gis''8 | / "
+               "e''16 dis''16 cis''16 dis''16 e''16 dis''16 cis''16 dis''16 | e''8 gis'8 a'8 d''8 | cis''16 d''16 e''8 a'8 d'8 | cis'16 d'16 e'8 a'4 :|"),
 ]
 
 EXERCISES = [
@@ -194,7 +341,3 @@ EXERCISES = [
      "g'8 a'8 h'8 a'8 g'2 , | h'8 c''8 d''8 c''8 h'2 , | a'8 h'8 c''8 h'8 a'4 h'4 | g'1 ||"),
 ]
 
-# Für später notiert (ohne erreichbare Quelle): Tourdion (Attaingnant 1530),
-# Pavane „Belle qui tiens ma vie“ (Arbeau), Branle de l'Official (Arbeau),
-# Ronde aus Susatos Danserye, Innsbruck ich muss dich lassen (Isaac),
-# Es ist ein Ros entsprungen, Kling Glöckchen, Fuchs du hast die Gans gestohlen.

@@ -19,7 +19,8 @@ def split_systems(items):
             cur.append(it)
     if cur:
         systems.append(cur)
-    return [[e for k, e in enumerate(sy) if not (k == 0 and e["kind"] == "bar")] for sy in systems]
+    return [[e for k, e in enumerate(sy) if not (k == 0 and e["kind"] == "bar" and not e.get("rep_start"))]
+            for sy in systems]
 
 
 def render_systems(items, key, time, sp=1.75, base=6.4, lyrics=True, gap=4.5, top=5.0):
@@ -32,7 +33,7 @@ def render_systems(items, key, time, sp=1.75, base=6.4, lyrics=True, gap=4.5, to
         svg, h = render_staff_system(sy, sp, W, key, time_sig=time if k == 0 else None, meter=meter,
                                      base=base, show_diagrams=False, show_names=False,
                                      show_lyrics=lyrics, lyr_size=3.7, stretch_max=1.7,
-                                     trailing_open=open_end, ext=ext)
+                                     trailing_open=open_end, ext=ext, justify=True)
         for e in sy:
             if e["kind"] == "time":
                 meter = (e["num"], e["den"])
@@ -53,9 +54,11 @@ def stanza_block(s):
         cols = 1
     if len(st) == 2 and cols == 3:
         cols = 2
+    if s.get("stanza_cols"):
+        cols = s["stanza_cols"]
     LH = 4.75
     rows = [lines[i:i + cols] for i in range(0, len(lines), cols)]
-    h = sum(max(len(x) for x in r) * LH + 3.5 for r in rows) + 6.5
+    h = sum(max(len(x) for x in r) * LH + 3.5 for r in rows) + 5.0
     items = []
     for n, x in enumerate(lines):
         items.append(f'<div class="stz"><span class="stn">{n + 2}.</span>'
@@ -64,7 +67,7 @@ def stanza_block(s):
     if s.get("stanza_note"):
         note = f'<div class="credit" style="margin:0 0 2mm 0">{html.escape(s["stanza_note"])}</div>'
         h += 5.5
-    return (f'<div style="margin-top:6mm; padding-left:9mm">{note}<div class="stanzas" '
+    return (f'<div style="margin-top:4.5mm; padding-left:9mm">{note}<div class="stanzas" '
             f'style="grid-template-columns: repeat({cols}, 1fr)">{"".join(items)}</div></div>'), h
 
 
@@ -177,13 +180,15 @@ def grundlagen_page(folio):
         (mini("fis'2 g'2 |", key="G"), "Ein Kreuz (♯)", "Ein Kreuz am Zeilenanfang gilt für das ganze Lied: Jedes f wird zu fis (G-Dur). "
                                                        "Bei zwei Kreuzen wird zusätzlich jedes c zu cis (D-Dur)."),
         (mini("b'2 a'2 |", key="F"), "Ein b (♭)", "Ein b am Zeilenanfang: Jedes h wird zu b (F-Dur, d-Moll)."),
-        (mini("g'4 a'4 h'4 |", time=(3, 4)), "Taktangabe", "3/4: drei Viertel pro Takt, 4/4: vier, 2/4: zwei. "
-                                                          "6/8: sechs Achtel, gezählt in zwei Gruppen zu drei."),
+        (mini("g'4 a'4 h'4 |", time=(3, 4)), "Taktangabe", "3/4: drei Viertel pro Takt, 4/4: vier, 2/4: zwei, "
+                                                          "6/8: sechs Achtel (zweimal drei)."),
         (mini("d'4 | g'4 a'4 h'4 |", time=(4, 4)), "Auftakt", "Manche Lieder beginnen mit einem unvollständigen Takt. "
-                                                              "Was dort fehlt, fehlt dafür im letzten Takt."),
+                                                              "Was dort fehlt, fehlt meist im letzten Takt."),
+        (mini("|: g'4 a'4 | [1 h'2 :| [2 c''2 ||"), "Wiederholung",
+         "Alles zwischen den Zeichen zweimal spielen. Mit Klammern: beim zweiten Mal Klammer 2 statt Klammer 1."),
     ]
     rows = "".join(
-        f'<div style="display:flex; gap:7mm; align-items:center; margin-top:3.2mm">'
+        f'<div style="display:flex; gap:7mm; align-items:center; margin-top:2.6mm">'
         f'<div style="flex:0 0 40mm">{svg}</div>'
         f'<div style="flex:1"><div style="font-size:12pt">{t}</div><div class="small">{d}</div></div></div>'
         for svg, t, d in signs)
@@ -227,12 +232,18 @@ table.toc td.p { font-family: 'Source Sans 3'; font-size: 8pt; color: #8c8379; t
 MEASURED = {}
 
 
+TOC_ROWS = 32  # Zeilen, die auf eine Inhaltsseite passen
+
+
 def liederheft2():
-    p1, p_scales = grifftabelle(scale_names=False, as_pages=True, folios=("1", "4"))
+    n_chap = sum(1 for s in SONGS if s.get("chapter"))
+    n_toc = 1 if 4 + len(SONGS) + n_chap <= TOC_ROWS else 2  # Inhalt: eine oder zwei Seiten
+    off = n_toc - 1
+    p1, p_scales = grifftabelle(scale_names=False, as_pages=True, folios=(str(2 + off), str(5 + off)))
     p_scales = p_scales.replace("Erst aufwärts, dann abwärts.",
                                 "Erst aufwärts, dann abwärts. Die Namen der Töne stehen in der Grifftabelle.")
-    pages = [p1, grundlagen_page("2"), uebungen_page("3"), p_scales]
-    pageno = 5
+    pages = [p1, grundlagen_page(str(3 + off)), uebungen_page(str(4 + off)), p_scales]  # Inhalt kommt zuletzt nach vorn
+    pageno = 6 + off
     toc = []
     SONG_GAP = 13.0
     chapters = []
@@ -279,19 +290,25 @@ def liederheft2():
             pageno += 1
             first = False
     # Inhalt
-    rows = ['<tr><td class="n"></td><td>Grifftabelle</td><td class="k"></td><td class="p">1</td></tr>',
-            '<tr><td class="n"></td><td>Noten lesen</td><td class="k"></td><td class="p">2</td></tr>',
-            '<tr><td class="n"></td><td>Erste Übungen</td><td class="k"></td><td class="p">3</td></tr>',
-            '<tr><td class="n"></td><td>Übe-Tonleitern</td><td class="k"></td><td class="p">4</td></tr>']
+    rows = [f'<tr><td class="n"></td><td>{t}</td><td class="k"></td><td class="p">{k + 2 + off}</td></tr>'
+            for k, t in enumerate(["Grifftabelle", "Noten lesen", "Erste Übungen", "Übe-Tonleitern"])]
+    chap_rows = []
     for t in toc:
         if t[0] == "chapter":
+            chap_rows.append(len(rows))
             rows.append(f'<tr><td colspan="4" style="border:none; padding-top:3.5mm"><span class="kicker">{html.escape(t[1])}</span></td></tr>')
         else:
             _, n, s, lo, hi, pg = t
             rows.append(f'<tr><td class="n">{n:02d}</td><td>{html.escape(s["title"])}</td>'
                         f'<td class="k">{s["keyname"]} · {disp_name(lo)}–{disp_name(hi)}</td><td class="p">{pg}</td></tr>')
-    pages.append(page(KICKER + '<h1>Inhalt</h1><div class="rule"></div>'
-                      f'<table class="toc">{"".join(rows)}</table>', str(pageno)))
+    if n_toc == 1:
+        parts = [rows]
+    else:  # an einem Kapitelanfang teilen
+        cut = max([c for c in chap_rows if c <= TOC_ROWS] or [TOC_ROWS])
+        parts = [rows[:cut], rows[cut:]]
+    for k, r in reversed(list(enumerate(parts))):
+        pages.insert(0, page(KICKER + '<h1>Inhalt</h1><div class="rule"></div>'
+                             f'<table class="toc">{"".join(r)}</table>', str(k + 1)))
     h = doc("Liederheft Blockflöte", pages)
     h = h.replace("</style>", EXTRA_CSS + "</style>")
     return h
