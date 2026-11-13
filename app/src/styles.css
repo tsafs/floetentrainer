@@ -43,10 +43,13 @@
   --hole: #2b2724;
   --hole-open: #fffdf8;
   --hole-ring: #2b2724;
+  --thumb-bg: none;
+  --thumb-line: none;
 }
 
+/* Dunkelmodus: folgt dem Handy, außer in den Einstellungen ist „Hell“ oder „Dunkel“ gewählt */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     color-scheme: dark;
     --paper: #1e1a16;
     --ink: #ece3d2;
@@ -66,7 +69,32 @@
     --hole: #16120f;
     --hole-open: #efe6d4;
     --hole-ring: #e6dccb;
+    --thumb-bg: var(--wood);
+    --thumb-line: var(--wood-line);
   }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #1e1a16;
+  --ink: #ece3d2;
+  --soft: #a89b8b;
+  --line: #4e4337;
+  --track: #3a3229;
+  --btn: #27221c;
+  --ok: #9cc49f;
+  --ok-tint: #26301f;
+  --err: #e6a08c;
+  --err-tint: #3b2620;
+  --neutral-tint: #2b251f;
+  --on-ink-soft: #5d5246;
+  --wood: #8d7a5f;
+  --wood-line: #b8a07c;
+  --wood-dark: #6c5b45;
+  --hole: #16120f;
+  --hole-open: #efe6d4;
+  --hole-ring: #e6dccb;
+  --thumb-bg: var(--wood);
+  --thumb-line: var(--wood-line);
 }
 
 * {
@@ -167,15 +195,11 @@ svg.acc {
 .flute .hr {
   stroke: var(--hole-ring);
 }
+/* Hintergrund fürs Daumenloch, nur im Dunkelmodus sichtbar */
 .flute .tb {
-  fill: none;
-}
-@media (prefers-color-scheme: dark) {
-  .flute .tb {
-    fill: var(--wood);
-    stroke: var(--wood-line);
-    stroke-width: 0.5;
-  }
+  fill: var(--thumb-bg);
+  stroke: var(--thumb-line);
+  stroke-width: 0.5;
 }
 
 /* ---------------------------------------------------------------- Seitenrahmen */
@@ -963,6 +987,26 @@ svg.acc {
 .stepper output {
   font-size: 1.15rem;
   white-space: nowrap;
+}
+.seg {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--btn);
+}
+.seg button {
+  min-height: 48px;
+  padding: 6px 4px;
+  line-height: 1.15;
+}
+.seg button + button {
+  border-left: 1px solid var(--line);
+}
+.seg button[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--paper);
 }
 .btnrow {
   display: grid;

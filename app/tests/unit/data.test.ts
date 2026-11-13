@@ -75,6 +75,13 @@ describe("Umwandlung und Prüfung", () => {
     expect(d.settings.tuningHz).toBe(442);
     expect(d.settings.sessionCards).toBe(20);
   });
+  it("Darstellung: auto, hell oder dunkel; Unbekanntes fällt auf auto zurück", () => {
+    expect(normalizeData({ version: 1 }).settings.theme).toBe("auto");
+    expect(normalizeData({ version: 1, settings: { theme: "light" } }).settings.theme).toBe("light");
+    expect(normalizeData({ version: 1, settings: { theme: "dark" } }).settings.theme).toBe("dark");
+    expect(normalizeData({ version: 1, settings: { theme: "lila" } }).settings.theme).toBe("auto");
+    expect(normalizeData({ version: 1, settings: { theme: 3 } }).settings.theme).toBe("auto");
+  });
   it("Antworten: höchstens 20 je Ton", () => {
     const list = Array.from({ length: 30 }, (_, i) => [1, TODAY, i]);
     expect(normalizeData({ version: 1, history: { lesen: { h1: list } } }).history.lesen.h1).toHaveLength(20);
