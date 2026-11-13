@@ -88,10 +88,10 @@ class Mic {
     for (let i = 0; i < this.buf.length; i++) sum += this.buf[i] * this.buf[i];
     const rms = Math.sqrt(sum / this.buf.length);
     const t = performance.now();
-    let frame: Frame = { t, freq: null, clarity: 0 };
+    let frame: Frame = { t, freq: null, clarity: 0, rms };
     if (rms >= MIN_RMS) {
       const [pitch, clarity] = this.detector.findPitch(this.buf, this.ctx.sampleRate);
-      if (pitch > 0) frame = { t, freq: pitch, clarity };
+      if (pitch > 0) frame = { t, freq: pitch, clarity, rms };
     }
     for (const l of this.listeners) l(frame);
   }
