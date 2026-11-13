@@ -196,6 +196,10 @@ def parse_music(src):
             items.append(dict(kind="bar"))
         elif t == "||":
             items.append(dict(kind="bar", final=True))
+        elif t == "|:":
+            items.append(dict(kind="bar", rep_start=True))
+        elif t == ":|":
+            items.append(dict(kind="bar", rep_end=True))
         elif t == "/":
             items.append(dict(kind="break"))
         elif t == ",":
@@ -238,7 +242,8 @@ def check_and_assign(song):
         if it["kind"] in ("note", "rest"):
             acc += it["q"]
         elif it["kind"] == "bar":
-            bars.append((acc, bar_q))
+            if not (it.get("rep_start") and acc == 0.0):  # |: am Anfang/nach :| ist kein eigener Takt
+                bars.append((acc, bar_q))
             acc = 0.0
         elif it["kind"] == "time":
             bar_q = it["num"] * 4.0 / it["den"]
@@ -325,10 +330,14 @@ def layout_system(events, sp, width, base, key, time_sig=None, first=True, lyr_s
             nd -= 0.35 * base
         need[a] = nd
     nb = sum(1 for e in notes if e["kind"] == "bar")
+    REP_W = 1.25 * sp  # Platz für die Wiederholungspunkte
+    nrep = sum(1 for e in notes if e["kind"] == "bar" and (e.get("rep_start") or e.get("rep_end")))
+    nrep += 0.5 * sum(1 for k, e in enumerate(notes) if k == 0 and e["kind"] == "bar" and e.get("rep_start"))
     avail_w = width - start - 0.5 * sp
 
     def total(s):
-        t = sum(max(w[i] * s, need[i]) for i in note_idx) + nb * max(BAR_GAP * s, 0.35 * base) + nt * 2.6 * sp
+        t = (sum(max(w[i] * s, need[i]) for i in note_idx) + nb * max(BAR_GAP * s, 0.35 * base)
+             + nt * 2.6 * sp + nrep * REP_W)
         return t
 
     lo_s, hi_s = 0.3, stretch_max
@@ -347,10 +356,17 @@ def layout_system(events, sp, width, base, key, time_sig=None, first=True, lyr_s
     xs = []
     x = start
     for i, e in enumerate(notes):
-        if e["kind"] == "bar":
+        if e["kind"] == "bar" and e.get("rep_start") and i == 0:
+            xs.append(start - 0.4 * sp)  # Wiederholungsbeginn am Zeilenanfang
+            x += REP_W + 0.6 * sp
+        elif e["kind"] == "bar":
             bg = max(BAR_GAP * s, 0.35 * base)
+            if e.get("rep_end"):
+                x += REP_W
             xs.append(x + bg * 0.22)
             x += bg
+            if e.get("rep_start"):
+                x += REP_W
         elif e["kind"] == "time":
             xs.append(x - 0.1 * sp)
             x += 2.6 * sp
@@ -426,7 +442,16 @@ def render_staff_system(events, sp, width, key, time_sig=None, base=9.0, show_di
     for i, e in enumerate(events):
         if e["kind"] == "bar":
             x = sy.xs[i]
-            if e.get("final"):
+            if e.get("rep_start") or e.get("rep_end"):
+                d = 1 if e.get("rep_start") else -1  # Richtung zu den Punkten
+                xk = x if d == 1 else x - 0.5 * sp     # dicker Strich
+                parts.append(f'<rect x="{xk:.3f}" y="{Y(8) - 0.065 * sp:.3f}" width="{0.5 * sp:.3f}" height="{4.13 * sp:.3f}" fill="{INK}"/>')
+                xt = x + 0.75 * sp if d == 1 else x - 0.75 * sp
+                parts.append(f'<line x1="{xt:.3f}" y1="{Y(8):.3f}" x2="{xt:.3f}" y2="{Y(0):.3f}" stroke="{INK}" stroke-width="{0.16 * sp:.3f}"/>')
+                xd = x + 1.2 * sp if d == 1 else x - 1.2 * sp
+                for pos in (3, 5):
+                    parts.append(f'<circle cx="{xd:.3f}" cy="{Y(pos):.3f}" r="{0.25 * sp:.3f}" fill="{INK}"/>')
+            elif e.get("final"):
                 parts.append(f'<line x1="{x - 0.75 * sp:.3f}" y1="{Y(8):.3f}" x2="{x - 0.75 * sp:.3f}" y2="{Y(0):.3f}" stroke="{INK}" stroke-width="{0.16 * sp:.3f}"/>')
                 parts.append(f'<rect x="{x - 0.5 * sp:.3f}" y="{Y(8) - 0.065 * sp:.3f}" width="{0.5 * sp:.3f}" height="{4.13 * sp:.3f}" fill="{INK}"/>')
             else:

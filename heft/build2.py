@@ -19,7 +19,8 @@ def split_systems(items):
             cur.append(it)
     if cur:
         systems.append(cur)
-    return [[e for k, e in enumerate(sy) if not (k == 0 and e["kind"] == "bar")] for sy in systems]
+    return [[e for k, e in enumerate(sy) if not (k == 0 and e["kind"] == "bar" and not e.get("rep_start"))]
+            for sy in systems]
 
 
 def render_systems(items, key, time, sp=1.75, base=6.4, lyrics=True, gap=4.5, top=5.0):
@@ -181,9 +182,10 @@ def grundlagen_page(folio):
                                                           "6/8: sechs Achtel, gezählt in zwei Gruppen zu drei."),
         (mini("d'4 | g'4 a'4 h'4 |", time=(4, 4)), "Auftakt", "Manche Lieder beginnen mit einem unvollständigen Takt. "
                                                               "Was dort fehlt, fehlt dafür im letzten Takt."),
+        (mini("|: g'2 a'2 :|"), "Wiederholung", "Alles zwischen den beiden Zeichen wird zweimal gespielt."),
     ]
     rows = "".join(
-        f'<div style="display:flex; gap:7mm; align-items:center; margin-top:3.2mm">'
+        f'<div style="display:flex; gap:7mm; align-items:center; margin-top:2.6mm">'
         f'<div style="flex:0 0 40mm">{svg}</div>'
         f'<div style="flex:1"><div style="font-size:12pt">{t}</div><div class="small">{d}</div></div></div>'
         for svg, t, d in signs)

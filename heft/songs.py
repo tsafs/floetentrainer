@@ -1,5 +1,6 @@
 # Melodien: Ton + Dauer (1/2/4/8/16), Punkt, r = Pause, | Taktstrich, || Schluss,
 # / Zeilenumbruch, ( ) Bindebogen (Melisma), ~ Haltebogen, , Atemzeichen, T4/4 Taktwechsel.
+# |: und :| Wiederholungszeichen (Beginn/Ende des zu wiederholenden Teils).
 # stanzas: weitere Strophen, Zeilen mit " / " getrennt.
 SONGS = [
     dict(chapter="Kinder- und Weihnachtslieder",
@@ -160,6 +161,14 @@ SONGS = [
                "c''4 d''8 e''8. fis''16 e''8 | d''4 h'8 g'8. a'16 h'8 | c''8. h'16 a'8 gis'8. fis'16 gis'8 | a'4 a'8 a'4 r8 , | / "
                "g''4. g''8. fis''16 e''8 | d''4 h'8 g'8. a'16 h'8 | c''4 a'8 a'8. gis'16 a'8 | h'4 gis'8 e'4. , | / "
                "g''4. g''8. fis''16 e''8 | d''4 h'8 g'8. a'16 h'8 | c''8. h'16 a'8 gis'8. fis'16 gis'8 | a'4. a'4 ||"),
+    dict(title="All in a Garden Green", key="G", keyname="G-Dur", time=(4, 4),
+         credit="England, 16. Jahrhundert · Playford, The English Dancing Master (1651) · Melodie ohne Text",
+         # Quelle: thesession.org/tunes/14287, Fassung 2 (in 2/2 notiert, hier als 4/4)
+         music="|: d''2 d''4 d''4 | h'4. c''8 d''4 d''4 | e''4 d''4 c''4 h'4 | a'2. , h'4 | / "
+               "c''4. d''8 e''8 fis''8 g''4 | g'4. a'8 h'8 c''8 d''4 | c''4 h'4 a'8 g'8 a'8 h'8 | g'1 , :| / "
+               "|: d''4 d''8 d''8 d''4 d''4 | e''4 fis''4 g''2 , | h'4 h'8 h'8 h'4 g'4 | a'4 h'4 c''2 , | "
+               "h'4. a'8 g'8 a'8 h'4 | / c''4. h'8 a'8 h'8 c''4 , | d''4. c''8 h'8 c''8 d''4 | "
+               "e''4. d''8 c''8 d''8 h'8 c''8 | a'4 g'4 g'4 fis'4 | g'1 :|"),
 
     # ---------------------------------------------------------------- hübsche Melodien
     dict(chapter="Schöne Melodien",

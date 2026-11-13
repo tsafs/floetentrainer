@@ -25,9 +25,16 @@ Deshalb entfernt:
 - Alle Jahre wieder, Strophe 4 (nicht sicher von Wilhelm Hey)
 - Scarborough Fair (Melodie erst 1947 aufgezeichnet; aus Vorsicht)
 
+## Aufgenommen
+- **All in a Garden Green** (Nr. 20): Vorlage thesession.org/tunes/14287, Fassung 2 (von der Nutzerin
+  heruntergeladen, `docs/quellen/All_In_A_Garden_Green.abc`). Dort in 2/2, im Heft als 4/4 mit denselben
+  Notenwerten. Fassung 1 (als Polka in 2/4) weicht im B-Teil in Takt 1 und 3 leicht ab (punktiert statt
+  zwei Achtel; Takt 3 endet auf h statt g). Fassung 2 gewählt: ruhiger, näher an der alten Notierung,
+  einfacher zu lesen. Nicht zu verwechseln mit William Byrds gleichnamigem Stück (Fitzwilliam Virginal Book).
+
 ## Wünsche und Ideen für später
-- **All in a Garden Green** (England, 16. Jh.; Playford, English Dancing Master 1651) – ausdrücklicher Wunsch.
-  Vermutlich ist Jacob van Eycks „Onder de linde groene“ dieselbe Melodie – prüfen.
+- Van Eycks „Onder de linde groene“ (Fluyten Lust-hof) gilt als Fassung von „All in a Garden Green“ –
+  noch nicht geprüft; ggf. als Gegenstück zu Nr. 20.
 - **Jacob van Eyck, Der Fluyten Lust-hof** (1644–49): ganz für Sopranflöte solo. Die Themen allein sind
   spielbar, z. B. „Doen Daphne d'over schoone Maeght“, „Engels Nachtegaeltje“, „Malle Symen“.
 - **Thomas Morley**: „It was a lover and his lass“, „Now is the month of maying“ (Oberstimme).
