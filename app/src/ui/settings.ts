@@ -47,6 +47,13 @@ function stepper(name: string, value: string, canDown: boolean, canUp: boolean):
   );
 }
 
+/** Bestätigung vor dem Einlesen; nennt die eigenen Lieder, weil sie mit ersetzt werden */
+function importText(inBackup: number, now: number): string {
+  const has = inBackup ? ` und enthält ${inBackup === 1 ? "ein eigenes Lied" : `${inBackup} eigene Lieder`}` : "";
+  const lost = now ? (now === 1 ? ", auch dein eigenes Lied" : `, auch deine ${now} eigenen Lieder`) : "";
+  return `Die Sicherung ist in Ordnung${has}. Sie ersetzt alle jetzigen Daten${lost}.`;
+}
+
 function levelText(track: Track, lv: number): string {
   return joinNames(stagesOf(track)[lv - 1].notes);
 }
@@ -95,7 +102,7 @@ export const settingsView: View = (root, ctx) => {
     </div>
     ${
       pendingImport
-        ? `<div class="confirm"><p>Die Sicherung ist in Ordnung. Sie ersetzt alle jetzigen Daten.</p><div class="btnrow"><button class="big" data-act="import-yes">Sicherung übernehmen</button><button class="big alt" data-act="import-no">Abbrechen</button></div></div>`
+        ? `<div class="confirm"><p data-testid="import-info">${importText(pendingImport.ownSongs.length, d.ownSongs.length)}</p><div class="btnrow"><button class="big" data-act="import-yes">Sicherung übernehmen</button><button class="big alt" data-act="import-no">Abbrechen</button></div></div>`
         : ""
     }
     ${message ? `<p class="msg ${message.ok ? "ok" : "err"}" data-testid="msg">${esc(message.text)}</p>` : ""}
@@ -103,7 +110,7 @@ export const settingsView: View = (root, ctx) => {
   <section><h2>Zurücksetzen</h2>
     ${
       confirmReset
-        ? `<div class="confirm"><p>Wirklich alles löschen? Fortschritt, Serie und Einstellungen gehen verloren.</p><div class="btnrow"><button class="big danger" data-act="reset-yes">Ja, alles löschen</button><button class="big alt" data-act="reset-no">Abbrechen</button></div></div>`
+        ? `<div class="confirm"><p>Wirklich alles löschen? Fortschritt, Serie${d.ownSongs.length ? ", Einstellungen und eigene Lieder" : " und Einstellungen"} gehen verloren.</p><div class="btnrow"><button class="big danger" data-act="reset-yes">Ja, alles löschen</button><button class="big alt" data-act="reset-no">Abbrechen</button></div></div>`
         : `<button class="big alt" data-act="reset">Alles zurücksetzen</button>`
     }
   </section>

@@ -88,7 +88,11 @@ describe("ABC: Volkslieder wie im Heft", () => {
     expect(tl.total).toBe(48);
     expect(tl.bars[1].beats).toEqual([0, 1.5]);
     expect(tl.bars[0].beats).toEqual([]); // Auftakt: eine Achtel vor der Eins
-    expect(tl.countIn).toEqual([0, 1.5]);
+    expect(tl.bars[0].pickup).toBe(true);
+    // Einzählen wie beim Heft-Lied: ein voller Takt, dann 1 2 bis zur Auftakt-Achtel auf „2 und“
+    expect([tl.countIn, tl.countInDur, tl.countInBeats]).toEqual([[0, 1.5, 3, 4.5], 5.5, 2]);
+    const ref = buildTimeline(heft("Greensleeves"));
+    expect([tl.countIn, tl.countInDur]).toEqual([ref.countIn, ref.countInDur]);
   });
 });
 
@@ -120,7 +124,9 @@ describe("ABC: ganze Stücke", () => {
       [24, 74],
       [24.5, 72],
     ]);
-    expect(tl.countIn).toEqual([0, 1.5]);
+    // Einzählen: ein voller 6/8-Takt, dann 1 2 – der Auftakt d c sind die letzten beiden Achtel
+    expect([tl.countIn, tl.countInDur, tl.countInBeats]).toEqual([[0, 1.5, 3, 4.5], 5, 2]);
+    expect(tl.bars.filter((b) => b.pickup).map((b) => b.index)).toEqual([0, 0, 10, 10]);
   });
 
   it("Drunken Sailor: D-Dorisch, Text in vier Zeilen, Tempo aus Q:", () => {

@@ -11,7 +11,7 @@
 
 import { GLYPHS, type Glyph } from "../music/bravura";
 import { ITALIC_CHARS, ITALIC_WIDTHS, REGULAR_CHARS, REGULAR_WIDTHS } from "../music/garamond";
-import type { Bar, BarEvent, Duration, NoteEvent, Song, TimeSig } from "./model";
+import type { Bar, BarEvent, Duration, KeyInfo, Letter, NoteEvent, Song, TimeSig } from "./model";
 
 /** Notenköpfe auf 82 % verkleinert wie in der Übung (frei im Zwischenraum) */
 export const HEAD_SCALE = 0.82;
@@ -159,6 +159,27 @@ const DUR_F: Record<string, number> = {
 };
 /** Grundbreite einer Achtel bei Dehnung 1 */
 const BASE = 3.9;
+
+/** dieselben Faktoren nach der Dauer in Vierteln (für Triolen) */
+const Q_F: [number, number][] = [
+  [0.25, 0.86], [0.375, 0.9], [0.5, 1.0], [0.75, 1.06], [1, 1.16], [1.5, 1.28], [2, 1.42], [3, 1.58], [4, 1.75], [6, 1.9],
+];
+
+/**
+ * Faktor der dehnbaren Breite eines Ereignisses. Sonst nach dem geschriebenen Notenwert (wie im Heft),
+ * bei Triolen nach der tatsächlichen Dauer q, zwischen den Werten der Tabelle logarithmisch gemittelt.
+ */
+export function durFactor(e: BarEvent): number {
+  if (!e.tuplet) return DUR_F[`${e.dur}${e.dots ? "." : ""}`] ?? 1.2;
+  const q = e.q;
+  if (q <= Q_F[0][0]) return Q_F[0][1];
+  for (let i = 1; i < Q_F.length; i++) {
+    const [qa, fa] = Q_F[i - 1];
+    const [qb, fb] = Q_F[i];
+    if (q <= qb) return fa + ((fb - fa) * Math.log(q / qa)) / Math.log(qb / qa);
+  }
+  return Q_F[Q_F.length - 1][1];
+}
 /** Schlüssel: Lage und Platz */
 export const CLEF_X = 0.4;
 const CLEF_ADV = 3.3;
@@ -191,6 +212,48 @@ const SYL_GAP_HYPHEN = 1.35;
 const S_MIN = 0.55;
 /** Strichstärke eines Taktstrichs */
 export const BAR_W = 0.16;
+/** Abstand der beiden dünnen Striche eines Doppelstrichs (Mitte zu Mitte) */
+export const DOUBLE_GAP = 0.55;
+/** Lücke zwischen Auflösungszeichen und neuer Vorzeichnung beim Tonartwechsel */
+export const CANCEL_GAP = 0.3;
+
+// ---------------------------------------------------------------- Tonarten (Wechsel nur bei ABC)
+
+/** Stammton einer Lage im Violinschlüssel (0 = e¹) */
+export function letterAt(pos: number): Letter {
+  return (["e", "f", "g", "a", "h", "c", "d"] as const)[((pos % 7) + 7) % 7];
+}
+
+/** Tonart, die in jedem Takt gilt (Bar.keyChange gilt ab diesem Takt) */
+export function barKeys(song: Song): KeyInfo[] {
+  let k = song.key;
+  return song.bars.map((b) => (k = b.keyChange ?? k));
+}
+
+/** Was ein Tonartwechsel im Notenbild zeigt */
+export interface KeySwitch {
+  /** Lagen der Auflösungszeichen: Vorzeichen der alten Tonart, die in der neuen nicht mehr gelten */
+  cancel: number[];
+  /** neue Vorzeichnung */
+  sig: KeyInfo["signature"];
+}
+
+/**
+ * Tonartwechsel wie üblich: erst ♮ für jedes Vorzeichen der alten Vorzeichnung, dessen Stammton in der
+ * neuen keins mehr hat, dann die neue Vorzeichnung. null, wenn sich die Vorzeichnung nicht ändert.
+ */
+export function keySwitch(from: KeyInfo, to: KeyInfo): KeySwitch | null {
+  const same =
+    from.signature.length === to.signature.length &&
+    from.signature.every((a, i) => a.accidental === to.signature[i].accidental && a.pos === to.signature[i].pos);
+  if (same) return null;
+  return { cancel: from.signature.filter((a) => !to.alter[letterAt(a.pos)]).map((a) => a.pos), sig: to.signature };
+}
+
+/** Breite der Zeichen eines Tonartwechsels (ohne Rand davor), mit Platz danach */
+export function keySwitchWidth(ks: KeySwitch): number {
+  return (ks.cancel.length + ks.sig.length) * KEY_STEP + (ks.cancel.length && ks.sig.length ? CANCEL_GAP : 0) + KEY_PAD - 0.2;
+}
 
 /** Breite einer Taktangabe (die breitere der beiden Ziffernfolgen) */
 export function timeSigWidth(t: TimeSig): number {
@@ -248,12 +311,18 @@ interface BarMeasure {
   lFix: number;
   /** zusätzliche Breite einer Taktangabe mitten in der Zeile */
   timeW: number;
+  /** Tonartwechsel vor diesem Takt (nur ABC), sonst null */
+  keySw: KeySwitch | null;
+  /** zusätzliche Breite des Tonartwechsels mitten in der Zeile */
+  keyW: number;
 }
 
 function measureBars(song: Song, m: Metrics, stems: Map<number, Stem>): BarMeasure[] {
+  const keys = barKeys(song);
   const ms: BarMeasure[] = song.bars.map((bar) => {
     const ev = bar.events;
-    const e = ev.map((x) => BASE * (DUR_F[`${x.dur}${x.dots ? "." : ""}`] ?? 1.2));
+    const e = ev.map((x) => BASE * durFactor(x));
+    const keySw = bar.keyChange && bar.index > 0 ? keySwitch(keys[bar.index - 1], bar.keyChange) : null;
     const mm = ev.map((x, i) => {
       const nx = ev[i + 1];
       if (!nx) return 0;
@@ -271,6 +340,8 @@ function measureBars(song: Song, m: Metrics, stems: Map<number, Stem>): BarMeasu
       mEnd: 0,
       lFix,
       timeW: bar.timeChange ? timeSigWidth(bar.time) + TIME_PAD + 0.3 : 0,
+      keySw,
+      keyW: keySw ? 0.55 + keySwitchWidth(keySw) : 0,
     };
   });
   // letzte Note eines Takts: bis zum Taktstrich, innerhalb der Zeile und am Zeilenende
@@ -287,6 +358,7 @@ function measureBars(song: Song, m: Metrics, stems: Map<number, Stem>): BarMeasu
     if (last.kind === "note" && last.breath) base += 0.6;
     if (b.bar.barline === "repeatEnd") base += REP_W;
     if (b.bar.barline === "final") base += 0.6;
+    if (b.bar.double && b.bar.barline === "single") base += DOUBLE_GAP;
     const next = ms[i + 1];
     const nextFirst = next?.bar.events[0];
     let inLine = base;
@@ -302,7 +374,7 @@ function measureBars(song: Song, m: Metrics, stems: Map<number, Stem>): BarMeasu
 
 /** Breite eines Takts (linker Taktstrich bzw. Kopfende → rechter Taktstrich) bei Dehnung s */
 function barWidth(b: BarMeasure, s: number, lineStart: boolean, lineEnd: boolean): number {
-  let w = b.lFix + L_EL * s + (lineStart ? 0 : b.timeW);
+  let w = b.lFix + L_EL * s + (lineStart ? 0 : b.timeW + b.keyW);
   const n = b.e.length;
   for (let i = 0; i < n - 1; i++) w += Math.max(b.e[i] * s, b.m[i]);
   w += Math.max(b.e[n - 1] * s * R_F, lineEnd ? b.mEnd : b.m[n - 1]);
@@ -323,10 +395,14 @@ export interface BarLayout {
   xs: number[];
   /** Taktangabe mitten in der Zeile (linker Rand der Ziffern), sonst null */
   timeX: number | null;
+  /** Tonartwechsel mitten in der Zeile (nur ABC): Lage des ersten Zeichens und was zu zeigen ist, sonst null */
+  keyChange: { x: number; sw: KeySwitch } | null;
 }
 
 export interface SystemLayout {
   bars: BarLayout[];
+  /** Tonart im Zeilenkopf (die im ersten Takt der Zeile gilt) */
+  key: KeyInfo;
   /** Lage des ersten Vorzeichens der Tonart */
   keyX: number;
   /** Taktangabe im Zeilenkopf (am Liedanfang und bei Taktwechsel am Zeilenanfang), sonst null */
@@ -343,6 +419,11 @@ export interface SystemLayout {
   right: number;
   /** Verkleinerung, falls ein einzelner Takt nicht in die Breite passt (sonst 1) */
   scale: number;
+  /**
+   * Wechselt die Tonart mit dem ersten Takt der nächsten Zeile (nur ABC), steht wie üblich schon am
+   * Ende dieser Zeile hinter dem Taktstrich die Ankündigung (Auflösungszeichen und neue Vorzeichnung).
+   */
+  courtesy: { x: number; sw: KeySwitch } | null;
 }
 
 export interface ScoreLayout {
@@ -354,10 +435,10 @@ export interface ScoreLayout {
 }
 
 /** Breite des Zeilenkopfs */
-function headerWidth(song: Song, withTime: TimeSig | null): { keyX: number; timeX: number; end: number } {
+function headerWidth(key: KeyInfo, withTime: TimeSig | null): { keyX: number; timeX: number; end: number } {
   let x = CLEF_X + CLEF_ADV;
   const keyX = x;
-  const n = song.key.signature.length;
+  const n = key.signature.length;
   x += n * KEY_STEP + (n ? KEY_PAD : 0);
   const timeX = x;
   if (withTime) x += timeSigWidth(withTime) + TIME_PAD;
@@ -370,11 +451,24 @@ function headerTime(song: Song, first: number): TimeSig | null {
   return song.bars[first].timeChange ? song.bars[first].time : null;
 }
 
+/** Tonart im Kopf einer Zeile, die mit Takt `first` beginnt */
+function headerKey(song: Song, ms: BarMeasure[], first: number): KeyInfo {
+  let k = song.key;
+  for (let i = 0; i <= first && i < ms.length; i++) k = ms[i].bar.keyChange ?? k;
+  return k;
+}
+
+/** Platz für die Ankündigung eines Tonartwechsels am Ende einer Zeile, die vor Takt j endet */
+function courtesyWidth(ms: BarMeasure[], j: number): number {
+  const sw = ms[j]?.keySw;
+  return sw ? 0.6 + keySwitchWidth(sw) - KEY_PAD + 0.25 : 0;
+}
+
 /** Gesamtbreite der Takte i … j−1 als eine Zeile bei Dehnung s */
 function lineWidth(song: Song, ms: BarMeasure[], i: number, j: number, s: number): number {
-  let w = headerWidth(song, headerTime(song, i)).end;
+  let w = headerWidth(headerKey(song, ms, i), headerTime(song, i)).end;
   for (let k = i; k < j; k++) w += barWidth(ms[k], s, k === i, k === j - 1);
-  return w;
+  return w + courtesyWidth(ms, j);
 }
 
 /** Dehnung, bei der die Zeile genau die Breite avail füllt (nach oben begrenzt) */
@@ -464,7 +558,10 @@ function placeSystem(
   avail: number,
 ): SystemLayout {
   const time = headerTime(song, i);
-  const head = headerWidth(song, time);
+  const key = headerKey(song, ms, i);
+  const head = headerWidth(key, time);
+  const cw = courtesyWidth(ms, j);
+  const target = avail - cw;
   let x = head.end;
   const bars: BarLayout[] = [];
   for (let k = i; k < j; k++) {
@@ -473,9 +570,13 @@ function placeSystem(
     const lineEnd = k === j - 1;
     const x0 = x;
     let timeX: number | null = null;
-    if (b.timeW && !lineStart) {
-      timeX = x + 0.55 + (b.bar.repeatStart ? REP_W : 0);
-      x += b.timeW;
+    let keyChange: BarLayout["keyChange"] = null;
+    if ((b.timeW || b.keyW) && !lineStart) {
+      // Reihenfolge nach dem Taktstrich: Wiederholungszeichen, Tonartwechsel, Taktangabe
+      const cx = x + 0.55 + (b.bar.repeatStart ? REP_W : 0);
+      if (b.keySw) keyChange = { x: cx, sw: b.keySw };
+      if (b.timeW) timeX = cx + b.keyW;
+      x += b.timeW + b.keyW;
     }
     x += b.lFix + L_EL * s;
     const xs: number[] = [];
@@ -488,29 +589,33 @@ function placeSystem(
     // ganze Pause allein im Takt: mittig
     const ev = b.bar.events;
     if (ev.length === 1 && ev[0].kind === "rest" && ev[0].dur === 1) xs[0] = (x0 + L_FIX + x) / 2;
-    bars.push({ index: b.bar.index, x0, x1: x, xs, timeX });
+    bars.push({ index: b.bar.index, x0, x1: x, xs, timeX, keyChange });
   }
   // Rundungsfehler der Dehnungssuche: Blocksatz genau bis zum Rand
   const right = x;
-  if (justified && scale === 1 && right > head.end && right !== avail) {
-    const f = (avail - head.end) / (right - head.end);
+  if (justified && scale === 1 && right > head.end && right !== target) {
+    const f = (target - head.end) / (right - head.end);
     const sx = (v: number) => head.end + (v - head.end) * f;
     for (const b of bars) {
       b.x0 = sx(b.x0);
       b.x1 = sx(b.x1);
       b.xs = b.xs.map(sx);
       if (b.timeX != null) b.timeX = sx(b.timeX);
+      if (b.keyChange) b.keyChange.x = sx(b.keyChange.x);
     }
   }
+  const x1 = bars[bars.length - 1].x1;
   return {
     bars,
+    key,
     keyX: head.keyX,
     time,
     timeX: head.timeX,
     headerEnd: head.end,
     stretch: s,
     justified,
-    right: bars[bars.length - 1].x1,
+    right: x1,
     scale,
+    courtesy: ms[j]?.keySw ? { x: x1 + 0.6, sw: ms[j].keySw! } : null,
   };
 }

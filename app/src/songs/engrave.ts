@@ -11,10 +11,12 @@
 // Einheiten wie in layout.ts: 1 = ein Zwischenraum, y = 0 unterste Linie, y nach unten.
 
 import { GLYPHS, type Glyph } from "../music/bravura";
-import type { NoteEvent, Song } from "./model";
+import type { BarEvent, KeyInfo, NoteEvent, Song } from "./model";
 import {
   BAR_W,
+  CANCEL_GAP,
   CLEF_X,
+  DOUBLE_GAP,
   DOT_GAP,
   HEAD_SCALE,
   KEY_STEP,
@@ -28,6 +30,7 @@ import {
   textWidth,
   timeSigWidth,
   type BarLayout,
+  type KeySwitch,
   type ScoreLayout,
   type SystemLayout,
 } from "./layout";
@@ -103,6 +106,10 @@ export function engraveScore(song: Song, opts: { width: number; sp?: number }): 
     bottom[k] = Math.max(bottom[k], y1);
   };
   const placed = new Map<number, Placed>();
+  /** Pausen: Mitte und senkrechte Ausdehnung (für Triolenklammern) */
+  const restAt = new Map<number, { x: number; y0: number; y1: number }>();
+  /** oberster Punkt von Zeichen über den Noten je Takt (Triolen), damit die Klammern 1./2. darüber stehen */
+  const barTop = new Map<number, number>();
   /** Takt → (Zeile, Lage) */
   const barAt = new Map<number, { sys: number; bl: BarLayout }>();
   systems.forEach((sy, k) => sy.bars.forEach((bl) => barAt.set(bl.index, { sys: k, bl })));
@@ -115,7 +122,7 @@ export function engraveScore(song: Song, opts: { width: number; sp?: number }): 
     for (let i = 0; i < 5; i++) o.push(line(0, -i, sy.justified ? W : right + BAR_W / 2, -i, LINE_W, "sl"));
     ext(k, -5.4, 0); // Schlüssel oben (unten reicht er nicht bis unter den Text)
     o.push(glyph(GLYPHS.clef, CLEF_X, -1));
-    song.key.signature.forEach((a, i) => o.push(glyph(GLYPHS[a.accidental], sy.keyX + i * KEY_STEP, Y(a.pos))));
+    o.push(keySig(sy.key.signature, sy.keyX));
     if (sy.time) o.push(timeSig(sy.time.num, sy.time.den, sy.timeX + 0.1));
     if (k > 0) {
       const no = sy.bars[0].index + 1;
@@ -130,13 +137,18 @@ export function engraveScore(song: Song, opts: { width: number; sp?: number }): 
         if (bi === 0) o.push(repeatSign(sy.headerEnd - 0.35, 1));
         else if (prev?.barline !== "repeatEnd") o.push(repeatSign(bl.x0, 1));
       }
+      if (bl.keyChange) o.push(keySwitchSigns(bl.keyChange.sw, bl.keyChange.x));
       if (bl.timeX != null) o.push(timeSig(bar.time.num, bar.time.den, bl.timeX));
       const next = bars[bl.index + 1];
       const lineEnd = bi === sy.bars.length - 1;
-      const bx = lineEnd && sy.justified ? W - BAR_W / 2 : bl.x1;
+      const bx = lineEnd && sy.justified && !sy.courtesy ? W - BAR_W / 2 : bl.x1;
       switch (bar.barline) {
         case "single":
-          if (!(next?.repeatStart && !lineEnd)) o.push(line(bx, -4 - 0.065, bx, 0.065, BAR_W, "bl"));
+          if (!(next?.repeatStart && !lineEnd)) {
+            o.push(line(bx, -4 - 0.065, bx, 0.065, BAR_W, "bl"));
+            // Doppelstrich mitten im Stück (nur ABC): zwei dünne Striche
+            if (bar.double) o.push(line(bx - DOUBLE_GAP, -4 - 0.065, bx - DOUBLE_GAP, 0.065, BAR_W, "bl"));
+          }
           break;
         case "final":
           o.push(line(bx - 0.75 + BAR_W / 2, -4, bx - 0.75 + BAR_W / 2, 0, BAR_W, "bl"));
@@ -150,7 +162,22 @@ export function engraveScore(song: Song, opts: { width: number; sp?: number }): 
       }
       drawBarNotes(k, bl, o);
     });
+    // Ankündigung des Tonartwechsels am Zeilenende
+    if (sy.courtesy) o.push(keySwitchSigns(sy.courtesy.sw, sy.courtesy.x));
   });
+
+  /** Vorzeichnung ab x */
+  function keySig(sig: KeyInfo["signature"], x: number): string {
+    return sig.map((a, i) => glyph(GLYPHS[a.accidental], x + i * KEY_STEP, Y(a.pos))).join("");
+  }
+
+  /** Tonartwechsel: Auflösungszeichen, dann die neue Vorzeichnung */
+  function keySwitchSigns(sw: KeySwitch, x: number): string {
+    let p = sw.cancel.map((pos, i) => glyph(GLYPHS.natural, x + i * KEY_STEP, Y(pos))).join("");
+    const x2 = x + sw.cancel.length * KEY_STEP + (sw.cancel.length ? CANCEL_GAP : 0);
+    p += keySig(sw.sig, x2);
+    return `<g class="key">${p}</g>`;
+  }
 
   function timeSig(num: number, den: number, x: number): string {
     const w = timeSigWidth({ num, den });
@@ -234,6 +261,7 @@ export function engraveScore(song: Song, opts: { width: number; sp?: number }): 
         if (e.dots) p += glyph(GLYPHS.dot, x + w / 2 + DOT_GAP, Y(5));
         o.push(`<g class="r" data-id="${e.id}">${p}</g>`);
         ext(k, y + g.y0, y + g.y1);
+        restAt.set(e.id, { x, y0: y + g.y0, y1: y + g.y1 });
         return;
       }
       const pos = e.pitch.pos;
@@ -280,10 +308,97 @@ export function engraveScore(song: Song, opts: { width: number; sp?: number }): 
     });
   }
 
+  // ---------------------------------------------------------- Triolen (nur ABC)
+  // Zahl p über bzw. unter der Gruppe, auf der Seite der Hälse. Bilden die Noten genau einen Balken,
+  // steht nur die Zahl am Balken, sonst eine Klammer mit Haken und der Zahl in einer Lücke.
+  systems.forEach((sy, k) => {
+    for (const bl of sy.bars) {
+      const evs = bars[bl.index].events;
+      for (let a = 0; a < evs.length; a++) {
+        const t = evs[a].tuplet;
+        if (!t?.start) continue;
+        let b = a;
+        while (b < evs.length - 1 && !evs[b].tuplet?.end) b++;
+        const s = tupletMark(evs.slice(a, b + 1), bl.xs.slice(a, b + 1), t.p, k);
+        out[k].push(s.svg);
+        if (s.top != null) barTop.set(bl.index, Math.min(barTop.get(bl.index) ?? 0, s.top));
+        a = b;
+      }
+    }
+  });
+
+  /** Ziffern der Triolenzahl (Bravura), mittig um x, Grundlinie y */
+  function tupletDigits(n: number, x: number, y: number): { svg: string; w: number; h: number } {
+    const gs = [...String(n)].map((c) => GLYPHS[`tuplet${c}`]);
+    const w = gs.reduce((a, g) => a + g.adv, 0);
+    let xx = x - w / 2;
+    let svg = "";
+    for (const g of gs) {
+      svg += glyph(g, xx, y);
+      xx += g.adv;
+    }
+    return { svg, w, h: -Math.min(...gs.map((g) => g.y0)) };
+  }
+
+  function tupletMark(evs: BarEvent[], xs: number[], p: number, k: number): { svg: string; top: number | null } {
+    const ns = evs.filter((e): e is NoteEvent => e.kind === "note").map((e) => placed.get(e.id)!);
+    const g0 = ns.length ? stems.get(ns[0].ev.id)?.group : null;
+    const beamed = !!g0 && ns.length === evs.length && g0.length === evs.length && ns.every((q) => stems.get(q.ev.id)?.group === g0);
+    const ups = ns.filter((q) => q.up).length;
+    const above = ns.length ? (beamed ? ns[0].up : ups * 2 >= ns.length) : true;
+    const sg = above ? -1 : 1;
+    const DH = 1.5; // Höhe der Ziffern
+    if (beamed) {
+      // Zahl am Balken, mittig zwischen dem ersten und letzten Hals
+      const f = ns[0];
+      const l = ns[ns.length - 1];
+      const hf = headHalf(f.ev.dur);
+      const sx = (q: Placed) => (q.up ? q.x + hf - STEM_W / 2 : q.x - hf + STEM_W / 2);
+      const xm = (sx(f) + sx(l)) / 2;
+      const tm = (f.tip + l.tip) / 2;
+      // über den Hälsen: Balken liegt unter tip, Zahl darüber; sonst unter dem Balken
+      let edge = above ? Math.min(...ns.map((q) => q.tip)) : Math.max(...ns.map((q) => q.tip));
+      edge = above ? Math.min(edge, tm) : Math.max(edge, tm);
+      const base = above ? edge - 0.35 : edge + 0.35 + DH;
+      const d = tupletDigits(p, xm, base);
+      ext(k, base - d.h, base);
+      return { svg: `<g class="tup">${d.svg}</g>`, top: above ? base - d.h : null };
+    }
+    // Klammer: waagerecht, mit Abstand zu Köpfen, Hälsen und Pausen
+    let edge = above ? Infinity : -Infinity;
+    evs.forEach((e) => {
+      if (e.kind === "rest") {
+        const ra = restAt.get(e.id)!;
+        edge = above ? Math.min(edge, ra.y0) : Math.max(edge, ra.y1);
+        return;
+      }
+      const q = placed.get(e.id)!;
+      const stemSide = q.ev.dur >= 2 && q.up === above;
+      const ext0 = above ? Math.min(q.y - 0.5, stemSide ? q.tip : q.y - 0.5) : Math.max(q.y + 0.5, stemSide ? q.tip : q.y + 0.5);
+      edge = above ? Math.min(edge, ext0) : Math.max(edge, ext0);
+    });
+    const yb = edge + sg * 1.0;
+    const halfW = (e: BarEvent) => (e.kind === "note" ? headHalf(e.dur) : (restGlyph(e.dur).x1 - restGlyph(e.dur).x0) / 2);
+    const xa = xs[0] - halfW(evs[0]) - 0.15;
+    const xb = xs[xs.length - 1] + halfW(evs[evs.length - 1]) + 0.15;
+    const xm = (xa + xb) / 2;
+    const d = tupletDigits(p, xm, yb + DH / 2);
+    const gap = d.w / 2 + 0.3;
+    const hook = -sg * 0.6;
+    const path =
+      `M${r(xa)} ${r(yb + hook)}L${r(xa)} ${r(yb)}L${r(xm - gap)} ${r(yb)}` +
+      `M${r(xm + gap)} ${r(yb)}L${r(xb)} ${r(yb)}L${r(xb)} ${r(yb + hook)}`;
+    ext(k, Math.min(yb - DH / 2, yb + hook), Math.max(yb + DH / 2, yb + hook));
+    return {
+      svg: `<g class="tup"><path class="tupb" d="${path}" fill="none" stroke-width="0.12"/>${d.svg}</g>`,
+      top: above ? yb - DH / 2 : null,
+    };
+  }
+
   // ---------------------------------------------------------- Bögen, Atemzeichen, Klammern
   const notes = song.notes;
   /** rechter Rand der Notenlinien einer Zeile */
-  const lineRight = (k: number) => (systems[k].justified ? W - BAR_W / 2 : systems[k].right);
+  const lineRight = (k: number) => (systems[k].justified && !systems[k].courtesy ? W - BAR_W / 2 : systems[k].right);
   /** Bogen von a nach b (Noten in Lesereihenfolge), ggf. über Zeilenumbrüche */
   function bow(a: number, b: number, tie: boolean): void {
     const pa = placed.get(notes[a].id)!;
@@ -355,6 +470,8 @@ export function engraveScore(song: Song, opts: { width: number; sp?: number }): 
   }
 
   // Wiederholungsklammern 1. / 2.: je Zeile ein Stück, Ziffer nur am Anfang, Haken am Anfang und am Ende der 1.
+  // Bei ABC reicht eine Klammer über alle Takte bis zum nächsten Klammeranfang; Beschriftung aus
+  // voltaNumbers („3.“, „1., 2.“), Haken am Ende bei jeder Klammer, die mit :| endet.
   systems.forEach((sy, k) => {
     let q = 0;
     while (q < sy.bars.length) {
@@ -368,7 +485,8 @@ export function engraveScore(song: Song, opts: { width: number; sp?: number }): 
       const b0 = bars[sy.bars[q].index];
       const b1 = bars[sy.bars[e].index];
       const startHere = b0.voltaStart;
-      const endHere = v === 1 ? b1.barline === "repeatEnd" : bars[b1.index + 1]?.volta !== 2;
+      const nb = bars[b1.index + 1];
+      const endHere = v === 1 ? b1.barline === "repeatEnd" : !(nb?.volta === 2 && !nb.voltaStart);
       let topPos = 11;
       for (let t = q; t <= e; t++) {
         for (const ev of bars[sy.bars[t].index].events) {
@@ -376,16 +494,31 @@ export function engraveScore(song: Song, opts: { width: number; sp?: number }): 
           const p = placed.get(ev.id)!;
           topPos = Math.max(topPos, -2 * Math.min(p.y - 0.5, p.up ? p.tip : p.y) + 2.2);
         }
+        const bt = barTop.get(sy.bars[t].index);
+        if (bt != null) topPos = Math.max(topPos, -2 * bt + 1.6);
+      }
+      const xa = (q === 0 ? sy.headerEnd : sy.bars[q].x0) + (startHere ? 0.3 : 0);
+      const label = b0.voltaNumbers?.length ? b0.voltaNumbers.map((n) => `${n}.`).join(", ") : `${v}.`;
+      if (startHere) {
+        // Beschriftung steht unter der Linie: hohe Noten darunter bekommen Abstand zur Schrift
+        const lx1 = xa + 0.4 + textWidth(label, M.small) + 0.3;
+        for (const ev of b0.events) {
+          if (ev.kind !== "note") continue;
+          const p = placed.get(ev.id)!;
+          const hh = headHalf(ev.dur);
+          if (p.x - hh > lx1) break;
+          const top = Math.min(p.y - 0.5, p.up && ev.dur >= 2 ? p.tip : p.y, ev.accidental ? p.y - 1.6 : 0);
+          topPos = Math.max(topPos, -2 * top + 3.2);
+        }
       }
       const yv = Y(topPos);
-      const xa = (q === 0 ? sy.headerEnd : sy.bars[q].x0) + (startHere ? 0.3 : 0);
-      const lastX1 = e === sy.bars.length - 1 && sy.justified ? W - BAR_W / 2 : sy.bars[e].x1;
+      const lastX1 = e === sy.bars.length - 1 && sy.justified && !sy.courtesy ? W - BAR_W / 2 : sy.bars[e].x1;
       const xb = endHere ? lastX1 - (v === 1 ? 1.7 : 0.4) : lastX1;
       const hook = 1.5;
       let d = `M${r(xa)} ${r(startHere ? yv + hook : yv)}L${r(xa)} ${r(yv)}L${r(xb)} ${r(yv)}`;
       if (v === 1 && endHere) d += `L${r(xb)} ${r(yv + hook)}`;
       let s = `<path class="volta" d="${d}" fill="none" stroke-width="0.12"/>`;
-      if (startHere) s += `<text class="vno" x="${r(xa + 0.4)}" y="${r(yv + 1.2)}" font-size="${r(M.small)}">${v}.</text>`;
+      if (startHere) s += `<text class="vno" x="${r(xa + 0.4)}" y="${r(yv + 1.2)}" font-size="${r(M.small)}">${label}</text>`;
       out[k].push(s);
       ext(k, yv - 0.1, yv);
       q = e + 1;

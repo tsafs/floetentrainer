@@ -20,6 +20,7 @@ GLYPHS = {"clef": 0xE050, "whole": 0xE0A2, "sharp": 0xE262, "flat": 0xE260,
           "rest1": 0xE4E3, "rest2": 0xE4E4, "rest4": 0xE4E5, "rest8": 0xE4E6, "rest16": 0xE4E7,
           "breath": 0xE4CE}
 GLYPHS.update({f"time{n}": 0xE080 + n for n in range(10)})  # Ziffern der Taktangabe
+GLYPHS.update({f"tuplet{n}": 0xE880 + n for n in range(10)})  # Ziffern der Triolen (ABC-Lieder)
 
 font = TTFont(FONT)
 upem = font["head"].unitsPerEm

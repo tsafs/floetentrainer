@@ -1,11 +1,11 @@
-// Datenformat der App (Version 1), Standardwerte, Prüfung und Umwandlung älterer Versionen.
+// Datenformat der App (Version 2), Standardwerte, Prüfung und Umwandlung älterer Versionen.
 
 import { levelOf, stagesOf, type Kind, type Track } from "../music/levels";
 import { NOTES } from "../music/notes";
 import { TEMPO_MAX, TEMPO_MIN } from "../songs/tempo";
 import { isValidDayKey } from "./dates";
 
-export const DATA_VERSION = 1;
+export const DATA_VERSION = 2;
 export const HISTORY_LEN = 20;
 
 /** Darstellung: wie das Handy, immer hell oder immer dunkel */
@@ -43,6 +43,29 @@ export interface SongPrefs {
   tempo?: number;
 }
 
+/**
+ * Ein eingelesenes eigenes Lied (ABC). Gespeichert wird der Quelltext, nicht das gelesene Liedmodell:
+ * Beim Start wird er neu gelesen (src/songs/own.ts), so profitieren gespeicherte Lieder von späteren
+ * Verbesserungen des Lesers. Lässt sich ein Stück später nicht mehr lesen, bleibt es trotzdem erhalten.
+ */
+export interface OwnSong {
+  /** Liedkennung, "abc-" + Titel, eindeutig auch gegenüber den Heft-Liedern (z. B. "abc-greensleeves-2") */
+  id: string;
+  /** Titel beim Einlesen (gezeigt, falls sich das Stück nicht mehr lesen lässt) */
+  title: string;
+  /** ABC-Quelltext, normalerweise nur dieses eine Stück (X: bis zur Leerzeile) */
+  abc: string;
+  /** Nummer aus X: (null, wenn das Stück keine hat) – findet das Stück wieder, falls abc mehrere enthält */
+  number: number | null;
+  /** Stelle unter den lesbaren Stücken von abc (meist 0), falls die Nummer nicht weiterhilft */
+  index: number;
+  /** Oktavverschiebung, die sie beim Einlesen gewählt hat (Halbtöne) */
+  shift: OctaveShift;
+  /** Zeitpunkt des Einlesens (ms) */
+  added: number;
+}
+export type OctaveShift = 0 | 12 | -12;
+
 /** Eine gewertete Antwort: [richtig 1/0, Tag, Zeitpunkt in ms] */
 export type Answer = [0 | 1, string, number];
 
@@ -66,6 +89,8 @@ export interface AppData {
   sessions: number;
   /** Einstellungen je Lied (Tempo) */
   songs: Record<string, SongPrefs>;
+  /** eingelesene eigene Lieder (ab Version 2), in der Reihenfolge des Einlesens */
+  ownSongs: OwnSong[];
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -98,6 +123,7 @@ export function defaultData(): AppData {
     days: [],
     sessions: 0,
     songs: {},
+    ownSongs: [],
   };
 }
 
@@ -135,7 +161,24 @@ const MIGRATIONS: Record<number, (d: Record<string, unknown>) => Record<string, 
     if (!out.countFrom) out.countFrom = { lesen: 0, spielen: 0 };
     return out;
   },
+  // Version 2 bringt die eigenen Lieder. Anders als beim Tempo je Lied (optionales Feld ohne Sprung)
+  // ist das Inhalt, den sie selbst eingegeben hat: Eine ältere App ließe das unbekannte Feld beim
+  // Lesen weg und würde es beim nächsten Speichern still löschen. Mit dem Sprung lehnt sie die Daten
+  // stattdessen ab („aus einer neueren Version“) und überschreibt nichts.
+  1: (d) => ({ ...d, version: 2, ownSongs: [] }),
 };
+
+/** Kennungen eigener Lieder: wie Liedkennungen, mit "abc-" davor */
+export const OWN_ID_RE = /^abc-[a-z0-9-]{1,72}$/;
+
+/** Gleiche Kennungen bekommen "-2", "-3" … angehängt (taken: schon vergebene Kennungen). */
+export function uniqueId(id: string, taken: Set<string>): string {
+  if (!taken.has(id)) return id;
+  for (let n = 2; ; n++) {
+    const c = `${id}-${n}`;
+    if (!taken.has(c)) return c;
+  }
+}
 
 /** Prüft und vervollständigt Daten (aus dem Speicher oder einer Sicherung). Wirft DataError. */
 export function normalizeData(raw: unknown): AppData {
@@ -238,6 +281,27 @@ export function normalizeData(raw: unknown): AppData {
       if (isNum(p.tempo)) prefs.tempo = Math.max(TEMPO_MIN, Math.min(TEMPO_MAX, Math.round(p.tempo)));
       if (Object.keys(prefs).length) out.songs[id] = prefs;
     }
+  }
+  // Eigene Lieder: Inhalt der Nutzerin, deshalb nie still übergehen. Fehlt der Quelltext, ist die
+  // ganze Sicherung fehlerhaft; Nebensächliches wird ergänzt, doppelte Kennungen werden aufgelöst.
+  if (d.ownSongs !== undefined) {
+    if (!Array.isArray(d.ownSongs)) throw new DataError("Eigene Lieder fehlerhaft.");
+    const taken = new Set<string>();
+    d.ownSongs.forEach((o, i) => {
+      if (!isObj(o) || typeof o.abc !== "string" || !o.abc.trim()) throw new DataError(`Eigenes Lied Nr. ${i + 1} fehlerhaft.`);
+      const title = typeof o.title === "string" ? o.title : "";
+      const id = uniqueId(typeof o.id === "string" && OWN_ID_RE.test(o.id) ? o.id : `abc-lied-${i + 1}`, taken);
+      taken.add(id);
+      out.ownSongs.push({
+        id,
+        title,
+        abc: o.abc,
+        number: isNum(o.number) && Number.isInteger(o.number) ? o.number : null,
+        index: isNum(o.index) && Number.isInteger(o.index) && o.index >= 0 ? o.index : 0,
+        shift: o.shift === 12 || o.shift === -12 ? o.shift : 0,
+        added: isNum(o.added) ? o.added : 0,
+      });
+    });
   }
   return out;
 }
