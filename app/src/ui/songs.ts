@@ -281,7 +281,7 @@ export const songView: View = (root, ctx) => {
       pname.hidden = false;
       return;
     }
-    const n = (playingTl ?? full).countIn.length;
+    const n = (playingTl ?? full).countInBeats;
     pcount.innerHTML = Array.from({ length: n }, (_, i) => `<i${i + 1 === k ? ' class="on"' : ""}>${i + 1}</i>`).join("");
     pcount.setAttribute("aria-label", `Einzählen ${k}`);
     pcount.hidden = false;
@@ -440,12 +440,12 @@ export const songView: View = (root, ctx) => {
   };
 
   clearBtn.addEventListener("click", () => {
-    const hadSection = !!section;
     section = null;
     selStart = null;
     markBars();
-    // Läuft die Schleife gerade, wird der laufende Durchgang noch zu Ende gespielt.
-    if (hadSection && playingTl) songPlayer.setLoop(false);
+    // Läuft die Schleife gerade, wird der laufende Durchgang noch zu Ende gespielt. Das gilt auch, wenn
+    // schon ein neuer Anfangstakt angetippt war (dann ist section schon null, die alte Schleife läuft aber).
+    if (playingTl && playingTl !== full) songPlayer.setLoop(false);
     updateStatus();
     if (!playingTl) showNote(restingNote());
   });

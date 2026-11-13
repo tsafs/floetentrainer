@@ -57,7 +57,7 @@ export interface PlayerPosition {
   tone: number | null;
   /** Index in timeline.bars (Spielreihenfolge); null beim Einzählen und nach dem Ende */
   bar: number | null;
-  /** beim Einzählen die Zählzeit (1, 2, …), sonst null */
+  /** beim Einzählen die Zählzeit im Takt (1, 2, …; nach einem vollen Takt wieder ab 1), sonst null */
   countIn: number | null;
   /** Durchgang (0 = erster), zählt bei der Schleife hoch */
   pass: number;
@@ -147,14 +147,18 @@ function passEvents(tl: Timeline, wrap: boolean): Ev[] {
     evs.push({ kind: "on", g: t.start, id: j, midi: t.midi });
     evs.push({ kind: "off", g: end, id: j, gap });
   });
-  tl.bars.forEach((b, bi) => {
-    const pickup = bi === 0 && b.dur < tl.countInDur - EPS;
+  tl.bars.forEach((b) => {
     b.beats.forEach((beat, k) => {
       const q = b.start + beat;
-      if (q < L - EPS) evs.push({ kind: "click", g: q, accent: k === 0 && !pickup, metro: true });
+      if (q < L - EPS) evs.push({ kind: "click", g: q, accent: k === 0 && !b.pickup, metro: true });
     });
   });
   return sortEvents(evs);
+}
+
+/** Zählzeiten je Takt beim Einzählen */
+function perBar(tl: Timeline): number {
+  return Math.max(1, tl.countInBeats || tl.countIn.length);
 }
 
 function sortEvents(evs: Ev[]): Ev[] {
@@ -259,7 +263,7 @@ export class SongPlayer {
     bus.gain.value = OUT_GAIN;
     bus.connect(ctx.destination);
     const countEvs: Ev[] = withCount
-      ? tl.countIn.map((g, k) => ({ kind: "click", g, accent: k === 0, metro: false }) as Ev)
+      ? tl.countIn.map((g, k) => ({ kind: "click", g, accent: k % perBar(tl) === 0, metro: false }) as Ev)
       : [];
     const run: Run = {
       tl,
@@ -479,7 +483,7 @@ export class SongPlayer {
     const { tl, C, L } = run;
     if (g < C) {
       const k = lastAtOrBefore(run.countEvs, g, (e) => e.g);
-      return { tone: null, bar: null, countIn: k >= 0 ? k + 1 : null, pass: 0, quarter: g - C };
+      return { tone: null, bar: null, countIn: k >= 0 ? (k % perBar(tl)) + 1 : null, pass: 0, quarter: g - C };
     }
     if (g >= run.endG - EPS || L <= EPS) {
       return { tone: null, bar: null, countIn: null, pass: Math.max(0, run.seg), quarter: L };

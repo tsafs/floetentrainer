@@ -21,14 +21,18 @@ export interface TimelineBar {
   dur: number; // tatsächliche Länge in Vierteln (Auftakt kann kürzer sein)
   beats: number[]; // Zählzeiten (für Metronom-Klicks) in Vierteln relativ zum Taktbeginn,
   // z. B. 3/4 → [0,1,2]; 6/8 → [0,1.5]; 2/2 → [0,2]
+  pickup?: boolean; // Auftakt: die erste Zählzeit darin ist nicht die betonte Eins
 }
 export interface Timeline {
   tones: Tone[];
   bars: TimelineBar[];
   total: number; // Gesamtlänge in Vierteln
-  countIn: number[]; // Zählzeiten eines vollen Einzähltakts in Vierteln (Taktart des ersten Takts),
-  // erster Eintrag ist die betonte Eins; z. B. 6/8 → [0,1.5], Länge = countInDur
-  countInDur: number; // Länge des Einzähltakts in Vierteln
+  countIn: number[]; // Klicks des Einzählens in Vierteln: ein voller Takt in der Taktart des ersten
+  // Takts, z. B. 6/8 → [0,1.5]. Beginnt der Zeitplan mit einem Auftakt, folgen die Zählzeiten des
+  // Auftakt-Takts vor dessen erster Note, damit der Auftakt auf seine Zählzeit fällt (3/4 mit
+  // Viertel-Auftakt: 1 2 3 1 2, Auftakt auf 3). Jeder countInBeats-te Klick ist eine betonte Eins.
+  countInDur: number; // Länge des Einzählens in Vierteln (bis zum Beginn des Zeitplans)
+  countInBeats: number; // Zählzeiten je Takt beim Einzählen (z. B. 3/4 → 3, 6/8 → 2)
 }
 
 const EPS = 1e-6;
@@ -89,7 +93,7 @@ export function timelineOfBars(song: Song, order: number[]): Timeline {
   let openMidi = -1;
   for (const idx of order) {
     const bar = song.bars[idx];
-    bars.push({ index: idx, start: t, dur: bar.length, beats: barBeats(bar) });
+    bars.push({ index: idx, start: t, dur: bar.length, beats: barBeats(bar), pickup: bar.pickup });
     for (const e of bar.events) {
       const start = t + e.offset;
       if (e.kind === "rest") {
@@ -110,12 +114,23 @@ export function timelineOfBars(song: Song, order: number[]): Timeline {
     t += bar.length;
   }
   const first = order.length ? song.bars[order[0]] : song.bars[0];
+  const beats = beatsOf(first.time);
+  const barDur = barQuarters(first.time);
+  let countIn = beats;
+  let countInDur = barDur;
+  if (first.pickup) {
+    // Auftakt: ein voller Takt, dann weiterzählen bis zur ersten Note, sonst stimmt der Takt nicht
+    const shift = first.nominal - first.length;
+    countIn = [...beats, ...beats.filter((b) => b < shift - EPS).map((b) => b + barDur)];
+    countInDur = barDur + shift;
+  }
   return {
     tones,
     bars,
     total: t,
-    countIn: beatsOf(first.time),
-    countInDur: barQuarters(first.time),
+    countIn,
+    countInDur,
+    countInBeats: beats.length,
   };
 }
 

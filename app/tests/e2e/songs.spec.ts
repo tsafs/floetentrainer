@@ -311,3 +311,22 @@ test("Verlassen, Hintergrund und Ende stoppen die Wiedergabe", async ({ page }) 
   await page.clock.runFor(3000);
   expect((await tones(page)).length).toBe(n);
 });
+
+test("Neue Auswahl während der Schleife, dann „Auswahl aufheben“: die alte Schleife endet auch", async ({ page }) => {
+  await open(page, "#/lied/haenschen-klein");
+  await page.locator('rect.takt[data-bar="1"]').click();
+  await page.locator('rect.takt[data-bar="1"]').click();
+  await page.getByRole("button", { name: "Abspielen" }).click();
+  await page.clock.runFor(4 * 625 + 1000);
+  const tl = (await lied(page))!;
+  expect(tl.bars.map((b) => b.index)).toEqual([1]);
+  // neuer Anfangstakt: die alte Schleife läuft weiter, bis der Endtakt feststeht …
+  await page.locator('rect.takt[data-bar="3"]').click();
+  await expect(page.getByTestId("status")).toContainText("Ab Takt 4");
+  expect(await playing(page)).toBe(true);
+  // … oder bis die Auswahl aufgehoben wird: dann wird der laufende Durchgang zu Ende gespielt
+  await page.getByRole("button", { name: "Auswahl aufheben" }).click();
+  await page.clock.runFor(tl.total * 625 + 800);
+  expect(await playing(page)).toBe(false);
+  await expect(page.getByRole("button", { name: "Abspielen" })).toBeVisible();
+});

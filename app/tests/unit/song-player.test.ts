@@ -9,7 +9,8 @@ import {
   type PlayOptions,
   type PlayerPosition,
 } from "../../src/audio/song-player";
-import type { Timeline, TimelineBar } from "../../src/songs/timeline";
+import { songById } from "../../src/songs/library";
+import { buildTimeline, type Timeline, type TimelineBar } from "../../src/songs/timeline";
 import { Harness } from "./audio-fake";
 
 type T = [start: number, dur: number, midi: number, breath?: boolean];
@@ -35,6 +36,7 @@ function timeline(tones: T[], o: { beats?: number[]; barDur?: number; total?: nu
     total,
     countIn: beats,
     countInDur: barDur,
+    countInBeats: beats.length,
   };
 }
 
@@ -179,13 +181,46 @@ describe("Abspieler: Metronom", () => {
 
   it("Auftakt: der erste (kurze) Takt bekommt keine betonte Eins", () => {
     const bars: TimelineBar[] = [
-      { index: 0, start: 0, dur: 1, beats: [0] },
+      { index: 0, start: 0, dur: 1, beats: [0], pickup: true },
       { index: 1, start: 1, dur: 3, beats: [0, 1, 2] },
     ];
     const tl = timeline([[0, 1, 62], [1, 3, 67]], { beats: [0, 1, 2], barDur: 3, total: 4, bars });
     const { h } = setup(tl, { countIn: false, metronome: true });
     h.advance(3);
     expect(h.ctx.clicks().map((c) => c.freq)).toEqual([CLICK, ACCENT, CLICK, CLICK]);
+  });
+
+  it("Heft-Lied mit Auftakt: Einzählen und Metronom bleiben im Takt (Auftakt auf seiner Zählzeit)", () => {
+    // Doen Daphne: 3/4, Viertel-Auftakt. Vorher kam der Auftakt direkt nach „1 2 3“, so dass zwischen
+    // zwei betonten Klicks vier Schläge lagen.
+    const tl = buildTimeline(songById("doen-daphne-dover-schoone-maeght")!);
+    const { h, positions } = setup(tl, { secPerQuarter: 1, metronome: true });
+    h.advance(S + 8.5);
+    const clicks = h.ctx.clicks();
+    const at = clicks.map((c) => Math.round((c.start - S) * 1000) / 1000);
+    const accents = clicks.filter((c) => c.freq === ACCENT).map((c) => Math.round((c.start - S) * 1000) / 1000);
+    expect(at).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(accents).toEqual([0, 3, 6]);
+    // erster Ton (Auftakt) auf der 3, erster voller Takt auf der Eins
+    close(h.ctx.tones()[0].start, S + 5);
+    close(h.ctx.tones()[1].start, S + 6);
+    // Zählanzeige: 1 2 3 1 2
+    expect(positions.filter((p) => p.countIn != null).map((p) => p.countIn)).toEqual([1, 2, 3, 1, 2]);
+  });
+
+  it("Auftakt mitten im Lied (nach :|) bekommt keine betonte Eins", () => {
+    // Now is the month of maying: zweiter Teil beginnt mit |: h'4 (Auftakt, Takt 10)
+    const s = songById("now-is-the-month-of-maying")!;
+    const tl = buildTimeline(s);
+    const bi = tl.bars.findIndex((b) => b.index === 9);
+    expect(tl.bars[bi].pickup).toBe(true);
+    const { h } = setup(tl, { countIn: false, metronome: true, secPerQuarter: 0.25 });
+    h.advance(S + tl.bars[bi].start * 0.25 + 1.2);
+    const startOf = (q: number) => S + q * 0.25;
+    const click = h.ctx.clicks().find((c) => Math.abs(c.start - startOf(tl.bars[bi].start)) < 1e-6)!;
+    expect(click.freq).toBe(CLICK);
+    const next = h.ctx.clicks().find((c) => Math.abs(c.start - startOf(tl.bars[bi + 1].start)) < 1e-6)!;
+    expect(next.freq).toBe(ACCENT);
   });
 
   it("lässt sich während des Spielens an- und ausschalten", () => {

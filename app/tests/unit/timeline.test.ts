@@ -93,15 +93,23 @@ describe("Zeitplan", () => {
     expect(tl.countIn).toEqual([0, 1, 2, 3]);
   });
 
-  it("Auftakt: kürzerer Takt, nur die Zählzeiten, die in ihn fallen; Einzählen als voller Takt", () => {
+  it("Auftakt: kürzerer Takt, nur die Zählzeiten, die in ihn fallen; Einzählen bis zur Zählzeit des Auftakts", () => {
     const tl = buildTimeline(song("g'4 | c''2 h'4 | a'2. ||", { time: [3, 4] }));
-    expect(tl.bars.map((b) => [b.start, b.dur, b.beats])).toEqual([
-      [0, 1, [0]],
-      [1, 3, [0, 1, 2]],
-      [4, 3, [0, 1, 2]],
+    expect(tl.bars.map((b) => [b.start, b.dur, b.beats, b.pickup])).toEqual([
+      [0, 1, [0], true],
+      [1, 3, [0, 1, 2], false],
+      [4, 3, [0, 1, 2], false],
     ]);
-    expect(tl.countIn).toEqual([0, 1, 2]);
-    expect(tl.countInDur).toBe(3);
+    // ein voller Takt, dann 1 2 – der Auftakt fällt auf die 3
+    expect(tl.countIn).toEqual([0, 1, 2, 3, 4]);
+    expect(tl.countInDur).toBe(5);
+    expect(tl.countInBeats).toBe(3);
+    // Achtel-Auftakt im 4/4-Takt: Einzählen 1 2 3 4 1 2 3 4, Auftakt auf „4 und“
+    const e = buildTimeline(song("d'8 | g'1 | g'2. g'4 ||"));
+    expect(e.countIn).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+    expect(e.countInDur).toBe(7.5);
+    // ohne Auftakt: genau ein Takt
+    expect(buildTimeline(song("c'1 | d'1 ||")).countInDur).toBe(4);
     // Achtel-Auftakt im 4/4-Takt: keine Zählzeit darin
     expect(buildTimeline(song("d'8 | g'1 ||")).bars[0].beats).toEqual([]);
     // Schlusstakt, der kürzer ist: Zählzeiten von vorn
