@@ -55,7 +55,7 @@ export function serviceWorker(): Plugin {
     generateBundle(_opts, bundle) {
       const files = Object.keys(bundle).filter((f) => !f.endsWith(".map"));
       const pub = listFiles(publicDir).map((p) => relative(publicDir, p).split("\\").join("/"));
-      const assets = ["./", ...new Set([...files, ...pub])].filter((f) => f !== "sw.js").map((f) => (f === "./" ? f : "./" + f));
+      const assets = ["./", ...new Set(["index.html", ...files, ...pub])].filter((f) => f !== "sw.js").map((f) => (f === "./" ? f : "./" + f));
       const hash = createHash("sha256").update(assets.join("\n")).digest("hex").slice(0, 12);
       this.emitFile({ type: "asset", fileName: "sw.js", source: SW(`floetentrainer-${hash}`, assets) });
     },

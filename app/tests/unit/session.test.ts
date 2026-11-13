@@ -186,6 +186,28 @@ describe("Ablauf", () => {
     const total = Object.values(d.history.lesen).reduce((a, l) => a + l.length, 0);
     expect(total).toBe(20);
   });
+  it("Wiederholung nach 2–3 Karten auch mit nur drei Tönen (erste Sitzung)", () => {
+    for (let seed = 1; seed <= 200; seed++) {
+      const d = defaultData();
+      const s = mkSession(d, "lesen", { seed });
+      let firstWrong: number | null = null;
+      const cards: { uid: number; retry: boolean }[] = [];
+      for (let st = s.next(); st; st = s.next()) {
+        if (st.type === "intro") {
+          s.introDone(st.note);
+          continue;
+        }
+        cards.push({ uid: st.item.uid, retry: st.retry });
+        const wrong = firstWrong === null && cards.length === 3;
+        if (wrong) firstWrong = st.item.uid;
+        s.answer(!wrong);
+      }
+      const i0 = cards.findIndex((c) => c.uid === firstWrong && !c.retry);
+      const i1 = cards.findIndex((c) => c.uid === firstWrong && c.retry);
+      expect(i1 - i0 - 1).toBeGreaterThanOrEqual(2);
+      expect(i1 - i0 - 1).toBeLessThanOrEqual(3);
+    }
+  });
   it("ausstehende Wiederholung am Sitzungsende entfällt", () => {
     const d = defaultData();
     const s = mkSession(d, "lesen", { limitCards: 20 });

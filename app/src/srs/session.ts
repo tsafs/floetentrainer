@@ -200,7 +200,11 @@ export class Session {
       this.retries.splice(this.retries.indexOf(r), 1);
       return take({ type: "card", item: r.item, retry: true });
     }
-    let i = this.remaining.findIndex((p) => p.note !== last);
+    // Möglichst keinen Ton wählen, dessen Wiederholung jetzt oder gleich dran ist –
+    // sonst müsste sie wegen „nie zweimal hintereinander“ warten.
+    const soon = this.retries.filter((r) => r.at <= this.shown + 1).map((r) => r.item.note);
+    let i = this.remaining.findIndex((p) => p.note !== last && !soon.includes(p.note));
+    if (i < 0) i = this.remaining.findIndex((p) => p.note !== last);
     if (i >= 0) {
       const [item] = this.remaining.splice(i, 1);
       return take({ type: "card", item, retry: false });

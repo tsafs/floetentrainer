@@ -29,13 +29,21 @@ class Mic {
    * Muss direkt aus einem Tippen heraus aufgerufen werden: der AudioContext wird sofort angelegt
    * und fortgesetzt, danach wird das Mikrofon angefragt.
    */
+  /** Läuft gerade ein Start (Erlaubnis-Abfrage)? */
+  get pending(): Promise<void> | null {
+    return this.starting;
+  }
+
   start(): Promise<void> {
-    if (this.running) return Promise.resolve();
+    if (this.running) {
+      if (this.ctx?.state === "suspended") this.ctx.resume().catch(() => {});
+      return Promise.resolve();
+    }
     if (this.starting) return this.starting;
     const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!Ctx || !navigator.mediaDevices?.getUserMedia) return Promise.reject<void>("unsupported");
     this.ctx ??= new Ctx();
-    const resume = this.ctx.resume().catch(() => {});
+    this.ctx.resume().catch(() => {});
     this.starting = (async () => {
       try {
         this.stream = await navigator.mediaDevices.getUserMedia({
@@ -45,7 +53,6 @@ class Mic {
         const name = (e as { name?: string })?.name;
         throw name === "NotAllowedError" || name === "SecurityError" ? "denied" : "other";
       }
-      await resume;
       const ctx = this.ctx!;
       const src = ctx.createMediaStreamSource(this.stream);
       this.analyser = ctx.createAnalyser();
