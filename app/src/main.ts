@@ -7,6 +7,7 @@ import { homeView } from "./ui/home";
 import { chartView, micHelpView, progressView, summaryView } from "./ui/pages";
 import { practiceView } from "./ui/practice";
 import { settingsView } from "./ui/settings";
+import { applyTheme } from "./ui/theme";
 import { tunerView } from "./ui/tuner";
 import { defaultData } from "./store/data";
 import { dayKey } from "./store/dates";
@@ -105,6 +106,7 @@ function start() {
     micRetry: null,
     saveFailed: false,
   };
+  applyTheme(ctx.data.settings.theme);
   if (res.fresh) ctx.save();
   requestPersistence();
   window.addEventListener("hashchange", () => render(ctx));

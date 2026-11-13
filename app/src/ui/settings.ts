@@ -3,12 +3,13 @@
 import { maxLevel, stagesOf, type Track } from "../music/levels";
 import { joinNames } from "../music/names";
 import { level, levelCap, setLevel } from "../srs/progress";
-import { defaultData, SETTING_LIMITS, type Settings } from "../store/data";
+import { defaultData, SETTING_LIMITS, type NumSetting, type Theme } from "../store/data";
+import { applyTheme } from "./theme";
 import { backupFileName, backupJson, parseBackup } from "../store/storage";
 import { esc, topbar, type Ctx, type View } from "./common";
 
 interface NumField {
-  key: keyof Settings;
+  key: NumSetting;
   label: string;
   help?: string;
   step: number;
@@ -31,6 +32,12 @@ const FIELDS: { title: string; fields: NumField[] }[] = [
       { key: "tuningHz", label: "Stimmton", help: "Kammerton a", step: 1, fmt: (v) => `${v} Hz` },
     ],
   },
+];
+
+const THEME_OPTIONS: [Theme, string][] = [
+  ["auto", "Wie das Handy"],
+  ["light", "Hell"],
+  ["dark", "Dunkel"],
 ];
 
 function stepper(name: string, value: string, canDown: boolean, canUp: boolean): string {
@@ -71,6 +78,11 @@ export const settingsView: View = (root, ctx) => {
 <main class="screen page settings">
   ${topbar("Einstellungen")}
   ${sections}
+  <section><h2>Darstellung</h2>
+    <div class="seg" role="group" aria-label="Darstellung">${THEME_OPTIONS.map(
+      ([v, label]) => `<button data-theme-opt="${v}" aria-pressed="${s.theme === v}">${label}</button>`,
+    ).join("")}</div>
+  </section>
   <section><h2>Stufen</h2>${lvRow("lesen")}${lvRow("spielen")}
     <p class="help">Spielen ist höchstens so hoch wie Lesen. Nach dem Senken zählen für das Freischalten nur neue Antworten; die bisherigen Daten bleiben erhalten.</p>
   </section>
@@ -120,6 +132,14 @@ export const settingsView: View = (root, ctx) => {
         }),
       );
     });
+    root.querySelectorAll<HTMLButtonElement>("[data-theme-opt]").forEach((b) =>
+      b.addEventListener("click", () => {
+        d.settings.theme = b.dataset.themeOpt as Theme;
+        applyTheme(d.settings.theme);
+        ctx.save();
+        render();
+      }),
+    );
     const on = (act: string, fn: () => void) => root.querySelector(`[data-act="${act}"]`)?.addEventListener("click", fn);
     on("export", () => {
       const blob = new Blob([backupJson(ctx.data)], { type: "application/json" });
@@ -181,6 +201,7 @@ export function replaceData(ctx: Ctx, data: ReturnType<typeof defaultData>): voi
   // Inhalt ersetzen, damit alle Verweise auf ctx.data gültig bleiben
   for (const k of Object.keys(ctx.data) as (keyof typeof data)[]) delete (ctx.data as unknown as Record<string, unknown>)[k];
   Object.assign(ctx.data, data);
+  applyTheme(ctx.data.settings.theme);
   ctx.session = null;
   ctx.save();
 }
