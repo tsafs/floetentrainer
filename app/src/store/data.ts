@@ -7,13 +7,21 @@ import { isValidDayKey } from "./dates";
 export const DATA_VERSION = 1;
 export const HISTORY_LEN = 20;
 
+/** Darstellung: wie das Handy, immer hell oder immer dunkel */
+export type Theme = "auto" | "light" | "dark";
+export const THEMES: Theme[] = ["auto", "light", "dark"];
+
 export interface Settings {
   sessionMinutes: number;
   sessionCards: number;
   toleranceCents: number;
   holdMs: number;
   tuningHz: number;
+  theme: Theme;
 }
+
+/** Einstellungen mit Zahlenwert */
+export type NumSetting = Exclude<keyof Settings, "theme">;
 
 export interface CardState {
   /** Fach 1–6 */
@@ -53,9 +61,10 @@ export const DEFAULT_SETTINGS: Settings = {
   toleranceCents: 40,
   holdMs: 300,
   tuningHz: 440,
+  theme: "auto",
 };
 
-export const SETTING_LIMITS: Record<keyof Settings, [number, number]> = {
+export const SETTING_LIMITS: Record<NumSetting, [number, number]> = {
   sessionMinutes: [1, 30],
   sessionCards: [5, 60],
   toleranceCents: [10, 50],
@@ -134,13 +143,16 @@ export function normalizeData(raw: unknown): AppData {
   // Einstellungen
   if (d.settings !== undefined) {
     if (!isObj(d.settings)) throw new DataError("Einstellungen fehlerhaft.");
-    for (const k of Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[]) {
+    for (const k of Object.keys(SETTING_LIMITS) as NumSetting[]) {
       const val = d.settings[k];
       if (val === undefined) continue;
       if (!isNum(val)) throw new DataError(`Einstellung ${k} fehlerhaft.`);
       const [lo, hi] = SETTING_LIMITS[k];
       out.settings[k] = Math.max(lo, Math.min(hi, val));
     }
+    // unbekannte Werte fallen still auf „wie das Handy“ zurück
+    const th = d.settings.theme;
+    if (typeof th === "string" && (THEMES as string[]).includes(th)) out.settings.theme = th as Theme;
   }
   // Stufen
   if (d.stages !== undefined) {

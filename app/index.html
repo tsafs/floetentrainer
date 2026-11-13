@@ -7,6 +7,13 @@
     <meta name="description" content="Noten lesen und spielen üben auf der Sopranblockflöte" />
     <meta name="theme-color" content="#fbf6ea" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#1e1a16" media="(prefers-color-scheme: dark)" />
+    <script>
+      // Gewählte Darstellung sofort setzen, damit nichts aufblitzt
+      try {
+        var t = JSON.parse(localStorage.getItem("floetentrainer")).settings.theme;
+        if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    </script>
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icons/icon-192.png" type="image/png" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
