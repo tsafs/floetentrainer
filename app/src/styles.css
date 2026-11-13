@@ -47,7 +47,8 @@
   --thumb-line: none;
 }
 
-/* Dunkelmodus: folgt dem Handy, außer in den Einstellungen ist „Hell“ oder „Dunkel“ gewählt */
+/* Dunkelmodus: folgt dem Handy, außer in den Einstellungen ist „Hell“ oder „Dunkel“ gewählt.
+   Die beiden Blöcke unten müssen dieselben Werte haben (ein Test in tests/unit/theme.test.ts prüft das). */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;

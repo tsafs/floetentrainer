@@ -48,5 +48,11 @@ test.describe("Handy im hellen Modus", () => {
     expect(await bg(page)).toBe(DARK);
     await page.reload();
     expect(await bg(page)).toBe(DARK);
+    // Griffbild: Daumenloch bekommt den Holz-Hintergrund, Browserleiste wird dunkel
+    await page.goto("./#/griffe");
+    const tb = await page.locator(".flute .tb").first().evaluate((e) => getComputedStyle(e).fill);
+    expect(tb).toBe("rgb(141, 122, 95)");
+    const metas = await page.evaluate(() => [...document.querySelectorAll('meta[name="theme-color"]')].map((m) => (m as HTMLMetaElement).content));
+    expect(metas).toEqual(["#1e1a16", "#1e1a16"]);
   });
 });
