@@ -65,9 +65,18 @@ export function defaultTempo(t: TimeSig): number {
   return 90 / beatUnit(t); // ganze Noten: wie 90 Viertel
 }
 
-/** Grundtempo eines Lieds: Schläge pro Minute, Länge des Schlags in Vierteln und Viertel pro Minute. */
+/**
+ * Grundtempo eines Lieds: Schläge pro Minute, Länge des Schlags in Vierteln und Viertel pro Minute.
+ * Ein Tempo aus der Datei (Song.tempo, ABC Q:) geht vor; bpm wird dann in die Zählzeit der Taktart
+ * umgerechnet (Q:1/8=120 im 6/8-Takt → 40 punktierte Viertel).
+ */
 export function baseTempo(song: Song): { bpm: number; beat: number; quartersPerMin: number } {
   const beat = beatUnit(song.time);
+  const t = song.tempo;
+  if (t && t.bpm > 0 && t.beat > 0) {
+    const quartersPerMin = t.bpm * t.beat;
+    return { bpm: quartersPerMin / beat, beat, quartersPerMin };
+  }
   const bpm = BASE_TEMPO[song.title] ?? defaultTempo(song.time);
   return { bpm, beat, quartersPerMin: bpm * beat };
 }

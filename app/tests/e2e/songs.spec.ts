@@ -67,7 +67,7 @@ test("Liste: „Kannst du schon spielen“ und „Fehlt noch“ nach dem Lernsta
   const entchen = page.locator('.chap a[data-song="alle-meine-entchen"]');
   await expect(entchen).toContainText("Fehlt noch: e2");
   await expect(entchen).toContainText("2/4");
-  await expect(page.locator(".chap h2").first()).toHaveText("Kinder- und Weihnachtslieder");
+  await expect(page.locator(".chap:not(.own) h2").first()).toHaveText("Kinder- und Weihnachtslieder");
   // anderer Lernstand: e² und f¹ bekannt → Alle meine Entchen spielbar
   await page.evaluate(() => {
     const d = JSON.parse(localStorage.getItem("floetentrainer")!);

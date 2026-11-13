@@ -1,4 +1,4 @@
-// Liedmodell: so sieht ein gelesenes Lied aus (Ergebnis von parseSong in ./parse.ts).
+// Liedmodell: so sieht ein gelesenes Lied aus (Ergebnis von parseSong in ./parse.ts bzw. parseAbc in ./abc.ts).
 // Notensatz, Vorspielen und Liederliste bauen darauf auf. Alle Dauern und Zeiten in Vierteln
 // (1 = eine Viertelnote), Tonhöhen wie in der übrigen App (notiert, c¹ = MIDI 60, Lage 0 = e¹).
 
@@ -86,6 +86,21 @@ interface EventBase {
   q: number;
   /** Beginn im Takt in Vierteln, gezählt ab dem ersten Ereignis des Takts (beim Auftakt also ab 0) */
   offset: number;
+  /**
+   * Nur ABC: Das Ereignis gehört zu einer Triole (allgemein: p Noten in der Zeit von q). dur/dots
+   * geben den geschriebenen Notenwert an, q die tatsächliche (verkürzte) Dauer. Fehlt bei Heft-Liedern.
+   */
+  tuplet?: Tuplet;
+}
+
+/** Triole o. Ä.: p Noten in der Zeit von q (Triole: p = 3, q = 2). Im Notenbild steht die Zahl p. */
+export interface Tuplet {
+  p: number;
+  q: number;
+  /** erstes Ereignis der Gruppe (hier beginnt die Klammer mit der Zahl) */
+  start: boolean;
+  /** letztes Ereignis der Gruppe */
+  end: boolean;
 }
 
 export interface NoteEvent extends EventBase {
@@ -125,7 +140,8 @@ export interface TimeSig {
 }
 
 /**
- * Taktstrich am Ende eines Takts. "single" einfacher Strich, "final" Schlussstrich (||),
+ * Taktstrich am Ende eines Takts. "single" einfacher Strich (bei ABC mit Bar.double auch ||),
+ * "final" Schlussstrich (Heft ||, ABC |] oder || am Ende),
  * "repeatEnd" Wiederholungszeichen :|, "none" Lied endet ohne Strich.
  * Beginnt der folgende Takt mit |: (Bar.repeatStart), zeigt der Notensatz dort das Wiederholungszeichen.
  */
@@ -153,8 +169,21 @@ export interface Bar {
   repeatStart: boolean;
   /** Strich am Taktende */
   barline: Barline;
-  /** Takt gehört zur 1. bzw. 2. Klammer (1. Klammer bis zum :|, 2. Klammer wie im Heft genau ein Takt) */
+  /**
+   * Takt gehört zur 1. bzw. 2. Klammer (1. Klammer bis zum :|, 2. Klammer im Heft genau ein Takt).
+   * Bei ABC kann jede Klammer mehrere Takte umfassen; 1 heißt dort „Klammer endet mit :|“, 2 „letzte
+   * Klammer“. Die gezeigten Nummern stehen dann in voltaNumbers.
+   */
   volta: 1 | 2 | null;
+  /**
+   * Nur ABC: Durchgänge, in denen diese Klammer gespielt wird, z. B. [1], [2], [3] oder [1, 2]
+   * (Anzeige „1.“, „2.“, „3.“, „1., 2.“). Fehlt bei Heft-Liedern (dort gilt volta).
+   */
+  voltaNumbers?: number[];
+  /** Nur ABC: doppelter Taktstrich || mitten im Stück (barline ist dann "single"). */
+  double?: boolean;
+  /** Nur ABC: Vor diesem Takt wechselt die Tonart (neue Vorzeichnung im Notenbild zeigen). */
+  keyChange?: KeyInfo;
   /** Die Klammer beginnt mit diesem Takt (dort steht „1.“ bzw. „2.“). */
   voltaStart: boolean;
   /** Zeile im Heft (0-basiert, nach den "/"), in der der Takt beginnt – nur zur Information */
@@ -164,6 +193,9 @@ export interface Bar {
   /** Im Heft ist der Takt auf zwei Zeilen verteilt: Umbruch nach events[breakInside]; sonst null */
   breakInside: number | null;
 }
+
+/** Tongeschlecht bzw. Kirchentonart (nur ABC; äolisch = minor, ionisch = major). */
+export type KeyMode = "major" | "minor" | "dorian" | "phrygian" | "lydian" | "mixolydian" | "locrian";
 
 /** Tonart eines Lieds samt Vorzeichnung. */
 export interface KeyInfo {
@@ -177,6 +209,13 @@ export interface KeyInfo {
   alter: Partial<Record<Letter, Alter>>;
   /** Zeichen der Vorzeichnung in Reihenfolge, mit Lage im Violinschlüssel (0 = unterste Linie) */
   signature: { accidental: "sharp" | "flat"; pos: number }[];
+  /**
+   * Nur ABC: Tongeschlecht bzw. Kirchentonart. Bei Kirchentonarten ist name wie im Heft die Dur-Tonart
+   * mit derselben Vorzeichnung (A-Dorisch → "G", minor false).
+   */
+  mode?: KeyMode;
+  /** Nur ABC: Grundton, deutsch klein, z. B. "a" bei A-Dorisch, "fis" bei Fis-Moll */
+  tonic?: string;
 }
 
 export interface Song {
@@ -205,4 +244,9 @@ export interface Song {
   notes: NoteEvent[];
   /** tiefster und höchster Ton (nach MIDI) */
   range: { low: SongPitch; high: SongPitch };
+  /**
+   * Nur ABC: Tempo aus Q: – bpm Schläge pro Minute, ein Schlag = beat Viertel (Q:3/8=60 → beat 1,5).
+   * Fehlt es, gilt das Grundtempo aus ./tempo.ts.
+   */
+  tempo?: { beat: number; bpm: number };
 }

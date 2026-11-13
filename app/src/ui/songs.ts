@@ -17,11 +17,13 @@ import { nameHtml, nameText } from "../music/names";
 import { chartNoteByMidi } from "../music/notes";
 import { renderScore, type Score } from "../songs/engrave";
 import { chapters, SONGS, songById } from "../songs/library";
+import { ownEntries, ownEntryById } from "../songs/own";
 import type { NoteEvent, Song, TimeSig } from "../songs/model";
 import { missingHtml, playabilityFor } from "../songs/playable";
 import { baseTempo, clampPercent, secPerQuarter, TEMPO_MAX, TEMPO_MIN } from "../songs/tempo";
 import { buildTimeline, sectionTimeline, type Timeline } from "../songs/timeline";
 import { esc, ICON_BACK, type View } from "./common";
+import { brokenSongPage, mountOwnBox, takeListNote } from "./own-songs";
 
 /** so lange (ms) gilt ein Finger auf dem Takt als langes Tippen */
 const LONG_PRESS_MS = 500;
@@ -91,21 +93,50 @@ export const songListView: View = (root, ctx) => {
     if (p.playable) can.push(s);
     else rest.set(s, missingHtml(p.missing));
   }
+  // Eigene Lieder: spielbare stehen wie Heft-Lieder oben, die übrigen im eigenen Kapitel
+  const own = ownEntries(ctx.data);
+  const ownRows: string[] = [];
+  for (const e of own) {
+    if (!e.song) {
+      ownRows.push(
+        `<li><a class="songrow broken" href="#/lied/${e.stored.id}" data-song="${e.stored.id}"><span class="st">${esc(e.stored.title || "Ohne Titel")}</span>` +
+          `<span class="miss" data-testid="unreadable">Lässt sich zurzeit nicht lesen</span></a></li>`,
+      );
+      continue;
+    }
+    const p = playabilityFor(e.song, ctx.data);
+    if (p.playable) can.push(e.song);
+    else ownRows.push(songRow(e.song, missingHtml(p.missing)));
+  }
+  const ownHelp = !own.length
+    ? "Lieder aus einer ABC-Datei, zum Beispiel von thesession.org oder abcnotation.com."
+    : !ownRows.length
+      ? "Deine eigenen Lieder kannst du alle schon spielen – sie stehen oben."
+      : "";
   const groups = chapters(SONGS.filter((s) => rest.has(s)))
     .map(
       (c) =>
         `<section class="chap"><h2>${esc(c.chapter)}</h2><ul class="songs">${c.songs.map((s) => songRow(s, rest.get(s)!)).join("")}</ul></section>`,
     )
     .join("");
+  const note = takeListNote();
+  // „Eigene Lieder“ steht oben, gleich nach „Kannst du schon spielen“: Die Heft-Liste ist lang, und
+  // was sie selbst hinzugefügt hat, sucht sie am ehesten – samt dem Knopf zum Hinzufügen.
   root.innerHTML = `
 <main class="screen page songlist">
   <header class="topbar"><a class="iconbtn" href="#/" aria-label="Zurück">${ICON_BACK}</a><h1>Lieder</h1><span></span></header>
   <p class="help">Jedes Lied lässt sich anhören: Die App spielt es vor und zeigt die Noten mit.</p>
+  ${note ? `<p class="msg ok" data-testid="msg" role="status">${esc(note)}</p>` : ""}
   <section class="can" data-testid="can-play"><h2>Kannst du schon spielen</h2>${
     can.length
       ? `<ul class="songs">${can.map((s) => songRow(s, null)).join("")}</ul>`
       : `<p class="help">Noch keins – mit den nächsten Stufen kommen die ersten Lieder dazu.</p>`
   }</section>
+  <section class="chap own" data-testid="own-songs"><h2>Eigene Lieder</h2>
+    ${ownRows.length ? `<ul class="songs">${ownRows.join("")}</ul>` : ""}
+    ${ownHelp ? `<p class="help">${ownHelp}</p>` : ""}
+    <a class="big alt addsong" href="#/lied-hinzufuegen">Lied hinzufügen</a>
+  </section>
   ${groups}
 </main>`;
 };
@@ -133,7 +164,12 @@ interface Section {
 
 export const songView: View = (root, ctx) => {
   const id = decodeURIComponent(location.hash.replace(/^#\/?lied\/?/, "").split("?")[0]);
-  const found = songById(id);
+  const ownEntry = songById(id) ? undefined : ownEntryById(ctx.data, id);
+  const found = songById(id) ?? ownEntry?.song;
+  if (ownEntry && !ownEntry.song) {
+    brokenSongPage(root, ctx, ownEntry);
+    return;
+  }
   if (!found) {
     ctx.go("#/lieder");
     return;
@@ -159,6 +195,7 @@ export const songView: View = (root, ctx) => {
   <div class="scorebox" data-testid="score"></div>
   ${stanzasHtml(song)}
   ${song.credit ? `<p class="credit">${esc(song.credit)}</p>` : ""}
+  ${ownEntry ? `<section class="ownbox" data-testid="own-info"></section>` : ""}
   <div class="player" role="region" aria-label="Wiedergabe">
     <div class="pin">
       <div class="pfl" data-testid="flute"></div>
@@ -505,6 +542,7 @@ export const songView: View = (root, ctx) => {
   window.addEventListener("touchmove", userScrolled, { passive: true });
   window.addEventListener("keydown", onKey);
 
+  if (ownEntry) mountOwnBox(main.querySelector(".ownbox") as HTMLElement, ctx, ownEntry, stop);
   draw();
   resetUi();
   // Für automatische Tests

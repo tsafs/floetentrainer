@@ -7,6 +7,7 @@ import { homeView } from "./ui/home";
 import { chartView, micHelpView, progressView, summaryView } from "./ui/pages";
 import { practiceView } from "./ui/practice";
 import { settingsView } from "./ui/settings";
+import { songAddView } from "./ui/own-songs";
 import { songListView, songView } from "./ui/songs";
 import { applyTheme } from "./ui/theme";
 import { tunerView } from "./ui/tuner";
@@ -27,6 +28,7 @@ const ROUTES: Record<string, View> = {
   mikrofon: micHelpView,
   lieder: songListView,
   lied: songView, // #/lied/<Kennung>
+  "lied-hinzufuegen": songAddView,
 };
 
 function routeName(): string {
