@@ -193,6 +193,13 @@ SONGS = [
                "e'8 fis'8 g'8 a'8 g'8 fis'8 | e'4 g'4 fis'4 | e'2 d'4 | e'2. :| / "
                "|: h'4. a'8 h'8 cis''8 | h'2 h'4 | d''8 cis''8 h'8 a'8 g'8 fis'8 | (g'4. fis'8) e'4 , | / "
                "h'4. a'8 h'8 cis''8 | h'4 a'8 g'8 fis'4 | e'2 d'4 | e'2. :|"),
+    dict(title="Ronde „Pour quoy“", key="C", keyname="d-Moll (dorisch)", time=(4, 4),
+         credit="Tielman Susato, Danserye (1551), Ronde I · Oberstimme",
+         # Quelle: Altblockflötenstimme, Ausgabe Martin Grayson (IMSLP, CC BY); verglichen mit Kilpatricks Superius
+         music="|: d''4 a''4 a''4. a''8 | g''4 a''4 f''4 d''4 | g''4. a''8 g''8 f''8 e''8 d''8 | cis''8 h'8 cis''4 d''2 :| / "
+               "|: d''8 e''8 f''8 g''8 a''4 a''4 | c'''4 h''4 a''2 , | d''8 e''8 f''8 g''8 a''4 a''4 | c'''4 h''4 a''2 , | / "
+               "f''8 e''8 f''8 g''8 a''4 a''4 | f''8 e''8 f''8 g''8 a''4 a''4 | g''8 a''8 b''8 a''8 g''8 f''8 e''8 d''8 | cis''8 h'8 d''8 cis''8 d''2 , | / "
+               "f''8 e''8 f''8 g''8 a''4 a''4 | f''8 e''8 f''8 g''8 a''4 a''4 | g''8 a''8 b''8 a''8 g''8 f''8 e''8 d''8 | cis''8 h'8 d''8 cis''8 d''2 :|"),
     dict(title="Belle qui tiens ma vie", key="F", keyname="g-Moll (dorisch)", time=(2, 4),
          credit="Thoinot Arbeau, Orchésographie (1589) · Pavane, Oberstimme",
          # Quelle: Ausgabe Peter Chubb, Mutopia 2002 (gemeinfrei), Sopranstimme und Text
@@ -333,7 +340,3 @@ EXERCISES = [
      "g'8 a'8 h'8 a'8 g'2 , | h'8 c''8 d''8 c''8 h'2 , | a'8 h'8 c''8 h'8 a'4 h'4 | g'1 ||"),
 ]
 
-# Für später notiert (ohne erreichbare Quelle): Tourdion (Attaingnant 1530),
-# Pavane „Belle qui tiens ma vie“ (Arbeau), Branle de l'Official (Arbeau),
-# Ronde aus Susatos Danserye, Innsbruck ich muss dich lassen (Isaac),
-# Es ist ein Ros entsprungen, Kling Glöckchen, Fuchs du hast die Gans gestohlen.

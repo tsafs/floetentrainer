@@ -31,6 +31,8 @@ Deshalb entfernt:
 - Kein schöner Land (Wunsch der Nutzerin: komplett raus)
 
 ## Aufgenommen
+- **Susato: Ronde I „Pour quoy“** – Altblockflötenstimme aus Graysons Satz (IMSLP), Takte 1–4 mit Kilpatricks
+  Superius (Mezzosopranschlüssel, eine Oktave tiefer) verglichen. Geht bis c³ (eine Oktave tiefer ginge unter c¹).
 - **Isaac: Innsbruck, ich muss dich lassen** – Oberstimme aus den Teulings Diskantlied-Fassung. Ohne Text
   (Silbenverteilung in den Melismen der letzten Zeile nicht sicher).
 - **Attaingnant: Tourdion** – Sopran aus Gouins Ausgabe; der französische Trinktext („Quand je bois du vin clairet“)
@@ -66,9 +68,7 @@ Deshalb entfernt:
 - **Jacob van Eyck, Der Fluyten Lust-hof** (1644–49): weitere Themen, z. B.
   „Lavignone“, „Rosemont“, „Comagain“, „Amarilli mia bella“ (Nr. 9, 10, 32, 35 stehen in der Gomes-Ausgabe).
 - **Virgiliano, Bassano**: echte Solo-Ricercare, aber virtuos – für später.
-- Susato, Ronde aus der Danserye (1551): Apkes Datei (in `docs/quellen/`) taugt nicht – Faksimile zu klein,
-  Gitarrensatz. Bessere Ausgabe suchen. („Es ist ein Ros entsprungen“ gestrichen: religiös.)
-- Weitere Lieder: Fuchs du hast die Gans gestohlen.
+- („Es ist ein Ros entsprungen“ gestrichen: religiös. „Fuchs, du hast die Gans gestohlen“: Nutzerin will es nicht.)
 
 Quellen: de.wikibooks.org „Liederbuch/…“ war erreichbar. Für die Liste oben braucht die Arbeitsumgebung
 Zugriff auf weitere Seiten (z. B. imslp.org, thesession.org, abcnotation.com, de.wikipedia.org).
