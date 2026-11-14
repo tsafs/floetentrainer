@@ -267,9 +267,37 @@ svg.acc {
 .iconbtn svg {
   stroke: currentColor;
 }
+/* Menüknopf (ui/menu.ts): ein einziges Element, immer oben rechts in der Bildschirmecke, auf Höhe der
+   Kopfzeile; scrollt mit der Seite weg. Die Seiten halten mit .menuslot Platz frei. Das × der offenen Leiste
+   steht an genau derselben Stelle. */
+:root {
+  --menu-top: max(18px, env(safe-area-inset-top));
+  --menu-right: max(8px, env(safe-area-inset-right));
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  :root {
+    --menu-top: max(12px, env(safe-area-inset-top));
+    --menu-right: max(12px, env(safe-area-inset-right));
+  }
+}
+.iconbtn.menubtn,
+.iconbtn.menuclose {
+  position: absolute;
+  top: var(--menu-top);
+  right: var(--menu-right);
+  margin: 0;
+}
 .iconbtn.menubtn {
-  margin-left: 0;
-  margin-right: -12px;
+  z-index: 40;
+}
+.iconbtn.menubtn[hidden] {
+  display: none;
+}
+.menuslot {
+  display: block;
+  flex: none;
+  width: 36px;
+  height: 48px;
 }
 
 /* ---------------------------------------------------------------- Menü (ui/menu.ts) */
@@ -296,7 +324,7 @@ svg.acc {
   background: var(--paper);
   border-left: 1px solid var(--line);
   box-shadow: -10px 0 30px rgba(20, 16, 12, 0.12);
-  padding: max(10px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) 26px;
+  padding: var(--menu-top) max(18px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) 26px;
   transform: translateX(100%);
   visibility: hidden;
   transition:
@@ -316,14 +344,10 @@ svg.acc {
 .menu-open body {
   overflow: hidden;
 }
+/* eigene Kopfzeile, so hoch wie die Kopfzeile der Seiten; darin das × (absolut, s. o.) */
 .menuhead {
-  display: flex;
-  justify-content: flex-end;
-  min-height: 48px;
+  height: 48px;
   margin-bottom: 6px;
-}
-.menuhead .iconbtn {
-  margin: 0 -12px 0 0;
 }
 .menu ul {
   list-style: none;
@@ -352,21 +376,21 @@ svg.acc {
     transition: none;
   }
 }
+/* Querformat: zwei Spalten (4 + 3, spaltenweise), damit alles ohne Scrollen passt; Leiste dafür breiter */
 @media (orientation: landscape) and (max-height: 520px) {
-  /* × schwebt oben rechts neben „Startseite“, damit alle sieben Einträge ohne Scrollen passen */
-  .menuhead {
-    position: absolute;
-    top: max(4px, env(safe-area-inset-top));
-    right: max(18px, env(safe-area-inset-right));
-    min-height: 0;
-    margin: 0;
+  .menu {
+    width: min(92vw, 440px);
   }
   .menu ul {
-    margin-right: 40px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: repeat(4, auto);
+    grid-auto-flow: column;
+    column-gap: 12px;
   }
   .menu a {
-    min-height: 44px;
-    font-size: 1.2rem;
+    min-height: 48px;
+    font-size: 1.25rem;
   }
 }
 
@@ -404,13 +428,13 @@ svg.acc {
   font-size: 2rem;
   line-height: 1.1;
 }
-/* Titel und Menüknopf in einer Zeile; der Knopf ragt wie in der Kopfzeile in den Rand */
+/* Titel und Platz für den Menüknopf in einer Zeile (der Knopf selbst steht in der Bildschirmecke) */
 .homehead {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin: -6px 0 -6px;
+  margin-bottom: -12px;
 }
 .today {
   display: flex;
@@ -1313,6 +1337,12 @@ svg.acc {
   }
   .homehead {
     grid-area: title;
+    margin-bottom: 0;
+    min-height: 48px; /* Titel auf Höhe des Menüknopfs */
+  }
+  /* quer steht der Titel links; der Knopf sitzt trotzdem in der Bildschirmecke */
+  .homehead .menuslot {
+    display: none;
   }
   .home h1 {
     font-size: 1.7rem;
@@ -2016,16 +2046,20 @@ ul.songs li + li {
     padding-right: calc(272px + max(24px, env(safe-area-inset-right)));
     padding-bottom: 28px;
   }
+  /* Umschalter links neben dem Menüknopf (der steht immer in der Bildschirmecke); dafür ohne Symbole */
   .songpage .modes {
     position: fixed;
     z-index: 6;
     top: max(12px, env(safe-area-inset-top));
-    right: max(18px, env(safe-area-inset-right));
-    width: 236px;
+    right: calc(var(--menu-right) + 52px);
+    width: calc(272px - 18px - 52px - var(--menu-right));
   }
   .modes button {
     font-size: 1rem;
     gap: 6px;
+  }
+  .songpage .modes button svg {
+    display: none;
   }
   .songpage .hint {
     margin-top: 0;

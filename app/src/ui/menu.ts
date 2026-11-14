@@ -1,13 +1,16 @@
-// Menü: Leiste von rechts mit allen Seiten, geöffnet über den Knopf oben rechts (menuButton in common.ts).
+// Menü: Leiste von rechts mit allen Seiten, geöffnet über den Knopf oben rechts in der Bildschirmecke.
 //
-// Die Leiste liegt außerhalb von #app, damit sie das Neuzeichnen einer Seite übersteht. Beim Öffnen
+// Knopf und Leiste liegen außerhalb von #app, damit sie das Neuzeichnen einer Seite überstehen. Der Knopf
+// steht auf allen Seiten an derselben Stelle; sichtbar ist er nur, wenn die Seite mit menuSlot() (common.ts)
+// Platz für ihn freihält – nicht in der Übung, auf dem Sitzungsende, der Willkommensseite usw. Das × der
+// offenen Leiste steht genau an seiner Stelle. Beim Öffnen
 // entsteht ein Verlaufseintrag mit derselben Adresse (kein hashchange, also kein Neuzeichnen), damit die
 // Zurück-Geste von Android das Menü schließt. Schließen auf anderem Weg nimmt diesen Eintrag wieder
 // zurück; wurde ein Eintrag gewählt, geht es erst danach zur neuen Seite – so bleibt der Verlauf sauber
 // und die bisherige Seite räumt wie gewohnt über ihre Aufräumfunktion auf.
 
 import { mic } from "../audio/mic";
-import { ICON_X } from "./common";
+import { ICON_MENU, ICON_X } from "./common";
 
 const ENTRIES: { route: string; label: string }[] = [
   { route: "", label: "Startseite" },
@@ -29,6 +32,20 @@ export function installMenu(app: HTMLElement): void {
   if (installed) return;
   installed = true;
 
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "iconbtn menubtn";
+  button.hidden = true;
+  button.setAttribute("aria-label", "Menü");
+  button.setAttribute("aria-expanded", "false");
+  button.setAttribute("aria-controls", "menu");
+  button.setAttribute("aria-haspopup", "dialog");
+  button.innerHTML = ICON_MENU;
+  // Sichtbar, wenn die gezeichnete Seite Platz für den Knopf freihält
+  const sync = () => (button.hidden = !app.querySelector("[data-menu-slot]"));
+  new MutationObserver(sync).observe(app, { childList: true, subtree: true });
+  sync();
+
   const shade = document.createElement("div");
   shade.className = "menushade";
   shade.dataset.testid = "menu-shade";
@@ -39,22 +56,17 @@ export function installMenu(app: HTMLElement): void {
   panel.setAttribute("aria-modal", "true");
   panel.setAttribute("aria-label", "Menü");
   panel.innerHTML =
-    `<div class="menuhead"><button type="button" class="iconbtn" data-menu-close aria-label="Menü schließen">${ICON_X}</button></div>` +
+    `<div class="menuhead"><button type="button" class="iconbtn menuclose" data-menu-close aria-label="Menü schließen">${ICON_X}</button></div>` +
     `<nav aria-label="Seiten"><ul>${ENTRIES.map((e) => `<li><a href="${hashOf(e.route)}" data-route="${e.route}">${e.label}</a></li>`).join("")}</ul></nav>`;
-  document.body.append(shade, panel);
+  document.body.append(button, shade, panel);
 
   let open = false;
   /** Nach dem Zurücknehmen des Verlaufseintrags dorthin wechseln */
   let pendingHash: string | null = null;
-  let opener: HTMLElement | null = null;
 
-  const setExpanded = (v: boolean) =>
-    document.querySelectorAll<HTMLElement>("[data-menu]").forEach((b) => b.setAttribute("aria-expanded", String(v)));
-
+  const setExpanded = (v: boolean) => button.setAttribute("aria-expanded", String(v));
   const focusOpener = () => {
-    const btn = opener?.isConnected ? opener : document.querySelector<HTMLElement>("[data-menu]");
-    btn?.focus();
-    opener = null;
+    if (!button.hidden) button.focus();
   };
 
   /** Nur das Bild schließen, ohne Verlauf */
@@ -65,10 +77,9 @@ export function installMenu(app: HTMLElement): void {
     setExpanded(false);
   };
 
-  const show = (btn: HTMLElement) => {
+  const show = () => {
     if (open) return;
     open = true;
-    opener = btn;
     const cur = currentRoute();
     panel.querySelectorAll<HTMLAnchorElement>("a[data-route]").forEach((a) => {
       if (a.dataset.route === cur) a.setAttribute("aria-current", "page");
@@ -91,7 +102,6 @@ export function installMenu(app: HTMLElement): void {
       history.back();
     } else if (target) location.hash = target;
     if (!target) focusOpener();
-    else opener = null;
   };
 
   window.addEventListener("popstate", () => {
@@ -115,13 +125,7 @@ export function installMenu(app: HTMLElement): void {
   // Neu geladen, während das Menü offen war: dessen Verlaufseintrag (gleiche Adresse) zurücknehmen
   if (isMenuEntry(history.state)) history.back();
 
-  document.addEventListener("click", (e) => {
-    const btn = (e.target as Element).closest?.("[data-menu]") as HTMLElement | null;
-    if (btn) {
-      e.preventDefault();
-      show(btn);
-    }
-  });
+  button.addEventListener("click", show);
   shade.addEventListener("click", () => close());
   panel.querySelector("[data-menu-close]")!.addEventListener("click", () => close());
   panel.addEventListener("click", (e) => {

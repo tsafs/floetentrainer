@@ -35,14 +35,16 @@ Silben, Atemzeichen, Seitenumbrüche.
    Durchsicht: `SHOTS=1 npx playwright test shots` (optional `SCHEME=dark`), landen in `app/shots/`.
    Veröffentlichung über `.github/workflows/pages.yml` auf https://tsafs.github.io/floetentrainer/.
    - **Menü** (seit 14.11.2026, Plan `docs/app-navigation.md`, Regeln `docs/app-entscheidungen.md` 6): ersetzt
-     die Linkzeile unten auf der Startseite. Knopf `menuButton()` in `app/src/ui/common.ts` (steckt in
-     `topbar()`; Liederliste, Liedseite und „Lied hinzufügen“ rufen ihn selbst auf; `topbar(…, false)` ohne
-     Knopf). Leiste `app/src/ui/menu.ts`, einmal in `main.ts` eingehängt; sie liegt außerhalb von `#app`, damit
-     sie das Neuzeichnen übersteht, und sperrt `#app` (inert), solange sie offen ist. Zurück-Geste: Öffnen legt
+     die Linkzeile unten auf der Startseite. Knopf und Leiste in `app/src/ui/menu.ts`, einmal in `main.ts`
+     eingehängt; beide liegen außerhalb von `#app`, damit sie das Neuzeichnen überstehen. Der Knopf ist **ein**
+     Element, immer in der Bildschirmecke (CSS-Variablen `--menu-top`/`--menu-right`, das × der Leiste nutzt
+     dieselben). Sichtbar ist er nur, wenn die Seite mit `menuSlot()` aus `common.ts` Platz freihält (steckt in
+     `topbar()`; Startseite, Liederliste, Liedseite und „Lied hinzufügen“ rufen es selbst auf; `topbar(…, false)`
+     ohne) – eine neue Seite ohne Menü braucht also nichts zu tun. Offen sperrt die Leiste `#app` (inert). Zurück-Geste: Öffnen legt
      einen Verlaufseintrag mit gleicher Adresse an (kein hashchange), Schließen nimmt ihn zurück; bei Wahl einer
      Seite wird erst danach die Adresse gewechselt, damit Zurück zur vorigen Seite führt und nur einmal
      gezeichnet wird. Tests `app/tests/e2e/menu.spec.ts`, Hilfe `menuTo(page, "Stimmgerät")` in `util.ts`,
-     Bildschirmfotos `*-m1…m5-*.png`. Wird bei offenem Menü neu geladen, nimmt der Start dessen
+     Bildschirmfotos `*-m1…m5-*.png` (m5 = Liedseite, quer mit dem Umschalter neben dem Knopf). Wird bei offenem Menü neu geladen, nimmt der Start dessen
      Verlaufseintrag zurück.
 3. Lieder-Erweiterung (`docs/app-lieder.md`): **Runde 1 umgesetzt** (Liederliste `#/lieder`, Liedseite
    `#/lied/<kennung>` mit Notensatz, Vorspielen, Tempo je Lied, Einzählen, Metronom; Schleife und

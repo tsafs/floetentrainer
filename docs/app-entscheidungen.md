@@ -358,16 +358,18 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   - Unten die großen Knöpfe Üben und Spielen. Die frühere Zeile „Lieder · Stimmgerät · Grifftabelle ·
     Einstellungen“ ist seit 14.11.2026 durch das Menü ersetzt (wurde auf schmalen Handys zweizeilig);
     der Platz kommt der Tonübersicht zugute.
-- **Menü** (seit 14.11.2026, `docs/app-navigation.md`): Knopf mit drei feinen Strichen oben rechts auf
-  jeder Seite mit Kopfzeile und auf der Startseite neben dem Titel – nicht in der Übung, auf dem
-  Sitzungsende und auf der Fehlerseite „Daten nicht lesbar“. Er öffnet von rechts eine Leiste (80 % der
-  Breite, höchstens 320 px, Rest leicht abgedunkelt) mit Startseite · Lieder · Fortschritt · Grifftabelle ·
+- **Menü** (seit 14.11.2026, `docs/app-navigation.md`): Knopf mit drei feinen Strichen **immer oben rechts in
+  der Bildschirmecke**, auf allen Seiten hoch wie quer an derselben Stelle (Nachsteuerung: quer stand er auf der
+  Startseite mitten im Bild) – nicht in der Übung, auf dem Sitzungsende, der Willkommensseite, „Wo steigst du
+  ein?“ und auf der Fehlerseite „Daten nicht lesbar“. Auf der Liedseite quer rückt der Umschalter „Anhören |
+  Mitspielen“ dafür links neben den Knopf und zeigt nur die Wörter. Er öffnet von rechts eine Leiste (80 % der
+  Breite, höchstens 320 px; quer zwei Spalten 4 + 3, spaltenweise, bis 440 px; Rest leicht abgedunkelt) mit Startseite · Lieder · Fortschritt · Grifftabelle ·
   Stimmgerät · Flöte einstellen · Einstellungen; die aktuelle Seite fett mit feinem Strich links (auf
   Liedseite und „Lied hinzufügen“ ist keiner markiert, „Lieder“ führt dort zur Liste). Schließen mit ×,
   Tippen daneben, Escape, Wahl eines Eintrags oder der Zurück-Geste. Das Öffnen hält nichts an (Vorspielen,
   Mitspielen, Stimmgerät); erst eine andere Seite räumt wie bisher auf, die aktuelle Seite wählen schließt
-  nur. „Stimmgerät“ startet das Mikrofon direkt aus dem Tippen. Im Querformat schwebt das × neben
-  „Startseite“, damit alle Einträge ohne Scrollen passen.
+  nur. „Stimmgerät“ startet das Mikrofon direkt aus dem Tippen. Das × der Leiste steht in einer eigenen
+  Kopfzeile genau an der Stelle des Menüknopfs: Öffnen und Schließen an derselben Stelle.
 - **Übung** (Entwurf `?s=ok`, `?s=err`): oben ein ×-Knopf, ein feiner Fortschrittsstrich und
   „7 von 20“, darunter Notenzeile, Frage, Antworten und Rückmeldung.
 - **Sitzungsende:** wie viele richtig, welche Töne schwierig waren und gegebenenfalls „Neu: …“.

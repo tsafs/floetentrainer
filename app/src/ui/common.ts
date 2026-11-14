@@ -30,14 +30,17 @@ export const ICON_CHECK = `<svg width="22" height="22" viewBox="0 0 34 34" aria-
 
 export const ICON_MENU = `<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13" fill="none" stroke-width="1.6" stroke-linecap="round"/></svg>`;
 
-/** Menüknopf oben rechts; öffnet die Leiste aus ui/menu.ts (dort per Klick auf [data-menu] angebunden). */
-export function menuButton(): string {
-  return `<button type="button" class="iconbtn menubtn" data-menu aria-label="Menü" aria-expanded="false" aria-controls="menu" aria-haspopup="dialog">${ICON_MENU}</button>`;
+/**
+ * Platz für den Menüknopf oben rechts. Der Knopf selbst ist ein einziges Element aus ui/menu.ts, das immer
+ * an derselben Stelle in der Bildschirmecke steht; er erscheint nur auf Seiten, die diesen Platz freihalten.
+ */
+export function menuSlot(): string {
+  return `<span class="menuslot" data-menu-slot></span>`;
 }
 
 /** Kopfzeile: Zurück, Titel, rechts der Menüknopf (menu = false: leerer Platz, z. B. auf der Fehlerseite). */
 export function topbar(title: string, back = "#/", menu = true): string {
-  return `<header class="topbar"><a class="iconbtn" href="${back}" aria-label="Zurück">${ICON_BACK}</a><h1>${title}</h1>${menu ? menuButton() : "<span></span>"}</header>`;
+  return `<header class="topbar"><a class="iconbtn" href="${back}" aria-label="Zurück">${ICON_BACK}</a><h1>${title}</h1>${menu ? menuSlot() : "<span></span>"}</header>`;
 }
 
 /** „1 Karte“ / „5 Karten“ */

@@ -6,7 +6,7 @@ import { nameHtml } from "../music/names";
 import { dueCount } from "../srs/leitner";
 import { isWeak, level, noteAccuracy, streak, weekDots } from "../srs/progress";
 import { hasWork, Session } from "../srs/session";
-import { menuButton, plural, type Ctx, type View } from "./common";
+import { menuSlot, plural, type Ctx, type View } from "./common";
 
 function trackRow(ctx: Ctx, track: Track): string {
   const lv = level(ctx.data, track);
@@ -84,7 +84,7 @@ export const homeView: View = (root, ctx) => {
   const spiel = buttonText(ctx, "spielen");
   root.innerHTML = `
 <main class="screen fit home">
-  <header class="homehead"><h1>Flötentrainer</h1>${menuButton()}</header>
+  <header class="homehead"><h1>Flötentrainer</h1>${menuSlot()}</header>
   ${ctx.saveFailed ? `<p class="banner">Speichern ist gerade nicht möglich. Bitte in den Einstellungen eine Sicherung herunterladen.</p>` : ""}
   <section class="today">
     <div class="stat"><span class="num" data-testid="streak">${st}</span><span class="lbl">${st === 1 ? "Tag in Folge" : "Tage in Folge"}</span></div>

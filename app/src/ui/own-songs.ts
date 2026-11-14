@@ -13,7 +13,7 @@ import type { AbcTune } from "../songs/abc";
 import type { Song } from "../songs/model";
 import { addOwnSongs, decodeAbc, kb, LARGE_INPUT, ownSize, readImport, removeOwnSong, type ImportResult, type OwnEntry } from "../songs/own";
 import { FLUTE_HIGH, FLUTE_LOW, type OutsideNote } from "../songs/range";
-import { esc, ICON_BACK, menuButton, plural, type Ctx, type View } from "./common";
+import { esc, ICON_BACK, menuSlot, plural, type Ctx, type View } from "./common";
 
 // ---------------------------------------------------------------- Meldung für die Liederliste
 
@@ -160,7 +160,7 @@ export const songAddView: View = (root, ctx) => {
   function render() {
     root.innerHTML = `
 <main class="screen page songadd">
-  <header class="topbar"><a class="iconbtn" href="#/lieder" aria-label="Zurück">${ICON_BACK}</a><h1>Lied hinzufügen</h1>${menuButton()}</header>
+  <header class="topbar"><a class="iconbtn" href="#/lieder" aria-label="Zurück">${ICON_BACK}</a><h1>Lied hinzufügen</h1>${menuSlot()}</header>
   ${src ? resultHtml() : inputHtml()}
 </main>`;
     bind();
@@ -309,7 +309,7 @@ export function brokenSongPage(root: HTMLElement, ctx: Ctx, entry: OwnEntry): vo
   const title = entry.stored.title || "Eigenes Lied";
   root.innerHTML = `
 <main class="screen page songbroken" data-song="${esc(entry.stored.id)}">
-  <header class="topbar"><a class="iconbtn" href="#/lieder" aria-label="Zurück">${ICON_BACK}</a><h1>${esc(title)}</h1>${menuButton()}</header>
+  <header class="topbar"><a class="iconbtn" href="#/lieder" aria-label="Zurück">${ICON_BACK}</a><h1>${esc(title)}</h1>${menuSlot()}</header>
   <p class="help">Dieses Lied lässt sich zurzeit nicht lesen. Es ist weiter gespeichert und in der Sicherung enthalten – eine spätere Fassung der App kann es vielleicht wieder lesen.</p>
   <p class="note" data-testid="own-error">${esc(entry.error ?? "")}</p>
   <section class="ownbox"></section>

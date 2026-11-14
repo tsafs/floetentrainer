@@ -10,6 +10,7 @@ async function openMenu(page: Page) {
   await menuBtn(page).click();
   await expect(menu(page)).toBeVisible();
   await expect(menuBtn(page)).toHaveAttribute("aria-expanded", "true");
+  await expect(menu(page)).toHaveCSS("transform", "none"); // fertig eingeglitten
 }
 
 test("Einträge in der abgestimmten Reihenfolge, Fokus auf dem ersten, aktuelle Seite markiert", async ({ page }) => {
@@ -154,18 +155,60 @@ test("Stimmgerät aus dem Menü startet das Mikrofon gleich", async ({ page }) =
   await expect(page.getByRole("button", { name: "Mikrofon einschalten" })).toHaveCount(0);
 });
 
-test("Querformat 740 × 360: alle Einträge erreichbar", async ({ page }) => {
+test("Querformat 740 × 360: zwei Spalten (4 + 3, spaltenweise), alles ohne Scrollen sichtbar", async ({ page }) => {
   await page.setViewportSize({ width: 740, height: 360 });
   await seed(page, sampleData());
   await page.goto("./");
   await openMenu(page);
-  const last = menu(page).getByRole("link", { name: "Einstellungen" });
-  await last.scrollIntoViewIfNeeded();
-  await expect(last).toBeInViewport();
   const box = (await menu(page).boundingBox())!;
-  expect(box.width).toBeLessThanOrEqual(320);
-  await last.click();
+  expect(box.width).toBeGreaterThan(400);
+  expect(box.width).toBeLessThanOrEqual(460);
+  expect(box.x + box.width).toBeCloseTo(740, 0); // rechts angedockt
+  const links = menu(page).getByRole("link");
+  const boxes = [];
+  for (let i = 0; i < 7; i++) {
+    await expect(links.nth(i)).toBeInViewport({ ratio: 1 });
+    boxes.push((await links.nth(i).boundingBox())!);
+    expect(boxes[i].height).toBeGreaterThanOrEqual(44);
+  }
+  // linke Spalte Startseite … Grifftabelle, rechte Stimmgerät … Einstellungen
+  for (let i = 1; i < 4; i++) expect(boxes[i].x).toBe(boxes[0].x);
+  for (let i = 5; i < 7; i++) expect(boxes[i].x).toBe(boxes[4].x);
+  expect(boxes[4].x).toBeGreaterThan(boxes[0].x + 100);
+  expect(boxes[4].y).toBe(boxes[0].y);
+  expect(await menu(page).evaluate((el) => el.scrollHeight <= el.clientHeight)).toBe(true);
+  await links.nth(6).click();
   await expect(page.getByRole("heading", { name: "Einstellungen" })).toBeVisible();
+});
+
+for (const vp of [
+  { width: 360, height: 740 },
+  { width: 740, height: 360 },
+]) {
+  test(`Knopf immer an derselben Stelle oben rechts, das × genau darauf (${vp.width} × ${vp.height})`, async ({ page }) => {
+    await page.setViewportSize(vp);
+    await seed(page, sampleData());
+    const spots: { x: number; y: number; width: number; height: number }[] = [];
+    for (const route of ["", "#/einstellungen", "#/lieder", "#/lied/alle-meine-entchen", "#/griffe"]) {
+      await page.goto("./" + route);
+      const b = (await menuBtn(page).boundingBox())!;
+      spots.push(b);
+      expect(b.x + b.width, route).toBeGreaterThan(vp.width - 24); // in der Ecke
+      expect(b.y, route).toBeLessThan(24);
+    }
+    for (const b of spots) expect(b).toEqual(spots[0]);
+    await openMenu(page);
+    expect((await menu(page).getByRole("button", { name: "Menü schließen" }).boundingBox())!).toEqual(spots[0]);
+  });
+}
+
+test("Titel stößt nicht an den Knopf: Kopfzeile hält Platz frei", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await seed(page, sampleData());
+  await page.goto("./#/lied-hinzufuegen");
+  const h = (await page.getByRole("heading", { level: 1 }).boundingBox())!;
+  const b = (await menuBtn(page).boundingBox())!;
+  expect(h.x + h.width).toBeLessThanOrEqual(b.x + 12);
 });
 
 test("Neu geladen bei offenem Menü: kein überzähliger Verlaufseintrag", async ({ page }) => {
@@ -178,4 +221,11 @@ test("Neu geladen bei offenem Menü: kein überzähliger Verlaufseintrag", async
   await expect.poll(() => page.evaluate(() => history.state)).toBeNull();
   await page.goBack();
   await expect(page).toHaveURL(/#\/griffe$/);
+});
+
+test("kein Menüknopf auf der Willkommensseite beim allerersten Start", async ({ page }) => {
+  await seed(page, null);
+  await page.goto("./");
+  await expect(page.getByRole("heading", { name: "Willkommen" })).toBeVisible();
+  await expect(menuBtn(page)).toHaveCount(0);
 });
