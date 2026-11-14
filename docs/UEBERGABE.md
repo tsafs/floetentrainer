@@ -72,4 +72,5 @@ Silben, Atemzeichen, Seitenumbrüche.
      nur Klicks, Warte-Modus still; mit Kopfhörern Melodie leise bzw. im Warte-Modus nach einem falschen
      Ton kurz der richtige. Tests `follow.test.ts`, `app/tests/e2e/follow.spec.ts` (echtes Audio in
      Echtzeit, Mikrofon-Attrappe plant Töne auf der Audio-Uhr), Bildschirmfotos `*-f0…f6-*.png`.
-     Offen: Abgleich-Knopf für die Verzögerung (fest 80 ms, Bluetooth-Kopfhörer brauchen mehr).
+     Verzögerung: fest 50 ms für Mikrofon und Erkennung, dazu die vom Browser gemeldete Ausgabe-Verzögerung
+     (wie bei der Markierung; ohne Meldung 30 ms). Offen: Abgleich-Knopf für Kopfhörer, die zu knapp gemeldet werden.

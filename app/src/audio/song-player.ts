@@ -276,6 +276,16 @@ export class SongPlayer {
   }
 
   /**
+   * Gegenstück zu prepare: Spielt nichts und klingt nichts mehr aus, wird der AudioContext angehalten
+   * (sonst liefe er nach einem prepare ohne play – Mikrofon verweigert, Warte-Modus ohne falschen Ton –
+   * unbemerkt weiter). Während des Spielens oder Ausblendens tut es nichts; dort hält tick ihn an.
+   */
+  idle(): void {
+    if (this.run || this.cancelTick) return;
+    this.ctx?.suspend().catch(() => {});
+  }
+
+  /**
    * Audiozeit (s, Uhr des AudioContext), zu der der Zeitplan beginnt, also nach dem Einzählen; null,
    * wenn nichts spielt. Gilt für das Tempo beim Start; spätere Tempowechsel meldet setTempo. Fürs
    * Mitspielen im Takt (die Umrechnung auf die Uhr des Mikrofons macht der Aufrufer).

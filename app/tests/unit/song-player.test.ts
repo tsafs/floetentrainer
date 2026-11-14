@@ -633,4 +633,18 @@ describe("Abspieler: fürs Mitspielen", () => {
     player.play(four(), { secPerQuarter: 0.5 });
     expect(h.created).toBe(1);
   });
+
+  it("idle hält den AudioContext nach prepare ohne play wieder an, nicht aber während des Spielens", () => {
+    const h = new Harness();
+    const player = new SongPlayer(h.env);
+    player.idle(); // noch kein AudioContext: nichts zu tun
+    expect(h.created).toBe(0);
+    player.prepare();
+    player.idle();
+    expect(h.ctx.state).toBe("suspended");
+    player.play(four(), { secPerQuarter: 0.5 });
+    expect(h.ctx.state).toBe("running");
+    player.idle();
+    expect(h.ctx.state).toBe("running");
+  });
 });

@@ -20,6 +20,12 @@ class Mic {
   private timer: number | null = null;
   private listeners = new Set<Listener>();
   private starting: Promise<void> | null = null;
+  /**
+   * Soll das Mikrofon laufen? stop() während der Erlaubnis-Abfrage setzt es zurück; der Strom, der
+   * danach noch ankommt, wird gleich wieder freigegeben (sonst bliebe das Mikrofon unbemerkt an,
+   * z. B. bei schnellem Doppeltipp auf Start/Stopp).
+   */
+  private wanted = false;
 
   get running(): boolean {
     return this.timer !== null;
@@ -35,24 +41,35 @@ class Mic {
   }
 
   start(): Promise<void> {
+    this.wanted = true;
     if (this.running) {
       if (this.ctx?.state === "suspended") this.ctx.resume().catch(() => {});
       return Promise.resolve();
     }
-    if (this.starting) return this.starting;
+    if (this.starting) {
+      this.ctx?.resume().catch(() => {});
+      return this.starting;
+    }
     const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!Ctx || !navigator.mediaDevices?.getUserMedia) return Promise.reject<void>("unsupported");
     this.ctx ??= new Ctx();
     this.ctx.resume().catch(() => {});
     this.starting = (async () => {
+      let stream: MediaStream;
       try {
-        this.stream = await navigator.mediaDevices.getUserMedia({
+        stream = await navigator.mediaDevices.getUserMedia({
           audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
         });
       } catch (e) {
         const name = (e as { name?: string })?.name;
         throw name === "NotAllowedError" || name === "SecurityError" ? "denied" : "other";
       }
+      if (!this.wanted) {
+        // inzwischen gestoppt
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      this.stream = stream;
       const ctx = this.ctx!;
       const src = ctx.createMediaStreamSource(this.stream);
       this.analyser = ctx.createAnalyser();
@@ -68,6 +85,7 @@ class Mic {
   }
 
   stop(): void {
+    this.wanted = false;
     if (this.timer !== null) window.clearInterval(this.timer);
     this.timer = null;
     this.stream?.getTracks().forEach((t) => t.stop());

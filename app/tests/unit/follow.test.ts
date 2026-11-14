@@ -263,6 +263,7 @@ describe("Mitspielen: Warte-Modus", () => {
 
 const SPQ = 0.5; // 120 Viertel je Minute
 const START = 1000;
+const LAT = DEFAULT_FOLLOW.latencyMs;
 
 /**
  * Spielt einen Zeitplan im Takt: zum Zeitpunkt t erklingt der Ton, dessen Fenster (um `late` ms
@@ -316,7 +317,7 @@ describe("Mitspielen: Takt-Modus", () => {
       b.push(f);
       if (at < 0 && hits.length) at = f.t;
     }
-    // erste Note: Fenster 1000–1500 ms (+ 80 ms Verzögerung), halbe Dauer = 250 ms
+    // erste Note: Fenster 1000–1500 ms (+ Verzögerung von Mikrofon und Erkennung), halbe Dauer = 250 ms
     expect(at).toBeGreaterThan(START + 250);
     expect(at).toBeLessThan(START + 500 + DEFAULT_FOLLOW.latencyMs);
     expect(hits.map(([i]) => i)).toEqual([0, 1, 2, 3, 4, 5]);
@@ -421,26 +422,40 @@ describe("Mitspielen: Takt-Modus", () => {
     const b = new BeatFollower(tl, { secPerQuarter: SPQ, startMs: START, loop: true, onPass: (x) => passes.push(x) });
     // erster Durchgang richtig, im zweiten das a' falsch, der dritte wird nach Takt 1 abgebrochen
     const fs = [
-      ...beatFrames(tl, { passes: 2 }).filter((f) => f.t < START + tl.total * SPQ * 1000 + 80),
-      ...beatFrames(tl, { passes: 3, wrong: { 1: G } }).filter((f) => f.t >= START + tl.total * SPQ * 1000 + 80),
+      ...beatFrames(tl, { passes: 2 }).filter((f) => f.t < START + tl.total * SPQ * 1000 + LAT),
+      ...beatFrames(tl, { passes: 3, wrong: { 1: G } }).filter((f) => f.t >= START + tl.total * SPQ * 1000 + LAT),
     ];
-    feed(b, fs.filter((f) => f.t < START + (2 * tl.total + 4) * SPQ * 1000 + 80));
+    feed(b, fs.filter((f) => f.t < START + (2 * tl.total + 4) * SPQ * 1000 + LAT));
     expect(passes.map((x) => [x.hits, x.total])).toEqual([
       [6, 6],
       [5, 6],
     ]);
     expect(b.pass).toBe(2);
-    const last = b.finish(START + (2 * tl.total + 4) * SPQ * 1000 + 80);
+    const last = b.finish(START + (2 * tl.total + 4) * SPQ * 1000 + LAT);
     expect(last).toMatchObject({ hits: 3, total: 4, complete: false });
     expect(b.done).toBe(true);
+  });
+
+  it("Schleife: eine Frame-Lücke über die Durchgangsgrenze schreibt dem neuen Durchgang nichts Ungehörtes gut", () => {
+    const tl = sectionTimeline(song("g'4 a'4 h'4 c''4 | d''1 ||"), 0, 0);
+    const L = tl.total * SPQ * 1000;
+    const b = new BeatFollower(tl, { secPerQuarter: SPQ, startMs: START, loop: true });
+    // erster Durchgang richtig, kurz vor der Grenze ruckelt es: 450 ms keine Frames, danach ein
+    // einziger g'-Frame im neuen Durchgang, dann Stille
+    feed(b, beatFrames(tl).filter((f) => f.t < START + L - 50 + DEFAULT_FOLLOW.latencyMs));
+    const t1 = START + L + 400 + DEFAULT_FOLLOW.latencyMs;
+    b.push({ t: t1, freq: hz(G), clarity: 0.98 });
+    for (let t = t1 + STEP; t < START + 2 * L + 200; t += STEP) b.push({ t, freq: null, clarity: 0 });
+    expect(b.passes.map((p) => p.hits)).toEqual([4, 0]);
+    expect(b.passResults[1][0]?.coverage).toBeLessThan(0.15);
   });
 
   it("vorzeitig beendet: nur begonnene Noten werden gewertet", () => {
     const tl = melody();
     const b = new BeatFollower(tl, { secPerQuarter: SPQ, startMs: START });
     // abgebrochen bei 1,2 s: die dritte Note hat erst 200 von 500 ms geklungen
-    feed(b, beatFrames(tl).filter((f) => f.t < START + 1200 + 80));
-    const s = b.finish(START + 1200 + 80);
+    feed(b, beatFrames(tl).filter((f) => f.t < START + 1200 + LAT));
+    const s = b.finish(START + 1200 + LAT);
     expect(s).toMatchObject({ hits: 2, total: 3, complete: false });
     expect(b.finish(START + 5000)).toBe(s);
   });

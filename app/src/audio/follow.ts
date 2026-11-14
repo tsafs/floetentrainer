@@ -58,10 +58,13 @@ export interface FollowConfig {
  * Standardwerte. Toleranz, Klarheit, Oktavregel und Frequenzbereich wie beim Üben (DEFAULT_JUDGE).
  * Haltedauer 120 ms statt 300 ms: Achtel bei 100 Schlägen dauern 300 ms, die Note muss deutlich
  * vorher grün werden.
- * Verzögerung 80 ms: Messfenster von pitchy 2048 Samples (≈ 43 ms bei 48 kHz; der Messwert gehört
- * im Mittel zur Fenstermitte, also ≈ 20 ms zurück) + Mikrofon-Eingang auf Android typisch 20–40 ms
- * + Ausgabe der Metronom-Klicks, nach denen sie spielt, typisch 20–40 ms. Bluetooth-Kopfhörer
- * brauchen deutlich mehr – dafür später ein Abgleich-Knopf (latencyMs ist einstellbar).
+ * Verzögerung 50 ms (Mikrofon und Erkennung): Messfenster von pitchy 2048 Samples (≈ 43 ms bei
+ * 48 kHz; der Messwert gehört im Mittel zur Fenstermitte, also ≈ 20 ms zurück) + Mikrofon-Eingang auf
+ * Android typisch 20–40 ms. Die Ausgabe der Klicks, nach denen sie spielt, kommt nicht hierher: Die
+ * Oberfläche legt startMs auf den Zeitpunkt, zu dem sie den Zeitplan-Beginn *hört* (mit der vom
+ * Browser gemeldeten Ausgabe-Verzögerung, wie die Markierung des Abspielers; ohne Meldung üblich
+ * 30 ms, zusammen also wie bisher 80 ms). Bluetooth-Kopfhörer, die der Browser zu knapp meldet,
+ * brauchen mehr – dafür später ein Abgleich-Knopf (latencyMs ist einstellbar).
  */
 export const DEFAULT_FOLLOW: FollowConfig = {
   tuning: DEFAULT_JUDGE.tuning,
@@ -74,7 +77,7 @@ export const DEFAULT_FOLLOW: FollowConfig = {
   reattackGapMs: 40,
   reattackDip: 0.5,
   reattackRise: 1.5,
-  latencyMs: 80,
+  latencyMs: 50,
   minCoverage: 0.5,
   minHitMs: 80,
   frameMs: 25,
@@ -519,11 +522,13 @@ export class BeatFollower {
         this.opts.onHit?.(i, this.pass);
       }
     }
-    // Schleife: Der Teil des Intervalls hinter dem Durchgangsende gehört schon zum nächsten.
+    // Schleife: Der Teil des Intervalls hinter dem Durchgangsende gehört schon zum nächsten – aber nur
+    // dieser Teil: Lag das ganze Intervall schon dahinter (Frame-Lücke über die Grenze, z. B. ein
+    // ruckelnder Hauptthread), beginnt es nicht an der Grenze, sonst würde Ungehörtes gutgeschrieben.
     if (this.opts.loop && local1 > this.L) {
       const pass = this.pass;
       this.settle((pass + 1) * this.L);
-      if (this.pass > pass) this.credit(this.anchorTimeOf(this.pass * this.L), tb, m);
+      if (this.pass > pass) this.credit(Math.max(ta, this.anchorTimeOf(this.pass * this.L)), tb, m);
     }
   }
 

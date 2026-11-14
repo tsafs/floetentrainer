@@ -308,3 +308,100 @@ test("Mikrofon verweigert: dieselbe Erklärung wie beim Spielen", async ({ page 
   await expect(page.getByRole("heading", { name: "Das Mikrofon ist nicht erlaubt" })).toBeVisible();
   await expect(page.getByText("Bei „Mikrofon“ auf „Zulassen“ stellen.")).toBeVisible();
 });
+
+test("Takt-Modus: gemeldete Ausgabe-Verzögerung (z. B. Bluetooth) gilt für Markierung und Wertung gleich", async ({ page }) => {
+  // Der Abspieler meldet 0,3 s Ausgabe-Verzögerung; sie spielt nach dem, was sie hört.
+  // (nach FAKE_AUDIO, dessen Attrappe sonst 0 meldet)
+  await page.addInitScript(FAKE_AUDIO);
+  await page.addInitScript(() => {
+    const w = window as unknown as { AudioContext: typeof AudioContext };
+    const Base = w.AudioContext;
+    w.AudioContext = class extends Base {
+      get outputLatency() {
+        return 0.3;
+      }
+    };
+  });
+  await open(page);
+  expect(await page.evaluate(() => new AudioContext().outputLatency)).toBe(0.3);
+  await start(page, "Takt-Modus");
+  await page.waitForFunction(() => (window as unknown as { __lied: { follow(): FollowDebug } }).__lied.follow().startMs !== null);
+  // Hörbeginn unabhängig von der Seite berechnet: eingeplanter Beginn + 0,3 s
+  const heard = await page.evaluate(() => {
+    const p = (window as unknown as { __lied: { player: { context: AudioContext; timelineStart: number } } }).__lied.player;
+    return performance.now() + (p.timelineStart - p.context.currentTime + 0.3) * 1000;
+  });
+  const d = await dbg(page);
+  const list: [number, number | null][] = [];
+  d.timeline!.tones.forEach((t, i) => {
+    list.push([heard + t.start * SPQ * 1000, hz(MELODY[i])], [heard + (t.start + t.dur) * SPQ * 1000 - 60, null]);
+  });
+  await page.evaluate((l) => (window as unknown as { __osc: { schedule(l: [number, number | null][]): void } }).__osc.schedule(l), list);
+  // die Markierung kommt beim Hören auf die zweite Note
+  const markAt = await page.evaluate(async (h) => {
+    for (;;) {
+      const g = [...document.querySelectorAll<SVGGElement>(".score g.n")].sort((a, b) => Number(a.dataset.id) - Number(b.dataset.id))[1];
+      if (g?.classList.contains("cur")) return performance.now() - h;
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+  }, heard);
+  expect(markAt).toBeGreaterThan(SPQ * 1000 - 60);
+  expect(markAt).toBeLessThan(SPQ * 1000 + 100);
+  await expect(result(page)).toContainText("7 von 7 Noten getroffen", { timeout: 9000 });
+});
+
+test("Schneller Doppeltipp Start/Stopp bzw. Beenden während der Mikrofon-Abfrage: Mikrofon bleibt nicht an", async ({ page }) => {
+  // getUserMedia antwortet erst nach 600 ms (wie bei der Erlaubnis-Abfrage); gezählt werden offene Spuren
+  await page.addInitScript(FAKE_MIC);
+  await page.addInitScript(() => {
+    const w = window as unknown as { __live: number; __gum: number };
+    const orig = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    w.__live = 0;
+    w.__gum = 0;
+    navigator.mediaDevices.getUserMedia = async (c) => {
+      w.__gum++;
+      await new Promise((r) => setTimeout(r, 600));
+      const s = await orig(c);
+      for (const tr of s.getTracks()) {
+        w.__live++;
+        const stop = tr.stop.bind(tr);
+        tr.stop = () => {
+          if (tr.readyState === "live") w.__live--;
+          stop();
+        };
+      }
+      return s;
+    };
+  });
+  await page.addInitScript(FAKE_AUDIO);
+  await seed(page, data());
+  await page.goto(`./#/lied/${SONG}`);
+  const live = () => page.evaluate(() => (window as unknown as { __live: number }).__live);
+  await page.getByRole("button", { name: "Mitspielen" }).click();
+  await page.getByRole("button", { name: "Start" }).click();
+  await page.getByRole("button", { name: "Stopp" }).click();
+  await page.waitForTimeout(1000);
+  expect(await live()).toBe(0);
+  await page.getByRole("button", { name: "Start" }).click();
+  await page.getByRole("button", { name: "Mitspielen beenden" }).click();
+  await page.waitForTimeout(1000);
+  expect(await live()).toBe(0);
+  // Start, Stopp, Start: ein einziger Strom, und der Lauf beginnt
+  await page.getByRole("button", { name: "Mitspielen" }).click();
+  await page.getByRole("button", { name: "Start" }).click();
+  await page.getByRole("button", { name: "Stopp" }).click();
+  await page.getByRole("button", { name: "Start" }).click();
+  await page.waitForFunction(() => (window as unknown as { __lied: { follow(): FollowDebug } }).__lied.follow().started);
+  expect(await live()).toBe(1);
+  await page.getByRole("button", { name: "Stopp" }).click();
+  expect(await live()).toBe(0);
+});
+
+test("Warte-Modus mit Kopfhörern ohne falschen Ton: nach dem Stopp läuft der AudioContext des Abspielers nicht weiter", async ({ page }) => {
+  await open(page, data({ headphones: true }));
+  await start(page, "Warte-Modus");
+  const state = () => page.evaluate(() => (window as unknown as { __lied: { player: { context: AudioContext | null } } }).__lied.player.context?.state);
+  expect(await state()).toBe("running"); // vorbereitet für den Zielton
+  await page.getByRole("button", { name: "Stopp" }).click();
+  await expect.poll(state).toBe("suspended");
+});

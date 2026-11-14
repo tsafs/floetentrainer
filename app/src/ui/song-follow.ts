@@ -42,6 +42,20 @@ const ICON_PLAY = `<svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="
 const ICON_STOP = `<svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><rect x="7" y="7" width="12" height="12" rx="1.6"/></svg>`;
 export const ICON_MIC = `<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><rect x="7" y="2.2" width="6" height="10.2" rx="3" fill="none" stroke-width="1.4"/><path d="M4.3 9.6a5.7 5.7 0 0 0 11.4 0M10 15.3v2.6M7.2 17.9h5.6" fill="none" stroke-width="1.4" stroke-linecap="round"/></svg>`;
 
+/** Ausgabe-Verzögerung (ms), wenn der Browser keine meldet (outputLatency fehlt oder ist 0) */
+export const OUTPUT_FALLBACK_MS = 30;
+
+/**
+ * Audiozeit t des Abspielers (s) → Zeitpunkt auf der Uhr der Mikrofon-Frames (performance.now), zu dem
+ * sie den dort eingeplanten Klick *hört*: wie die Markierung des Abspielers mit der gemeldeten
+ * Ausgabe-Verzögerung (bei Bluetooth-Kopfhörern oft 0,2 s und mehr). Die Verzögerung von Mikrofon und
+ * Erkennung gleicht die Wertung selbst aus (FollowConfig.latencyMs).
+ */
+export function heardAt(ac: Pick<AudioContext, "currentTime" | "outputLatency">, t: number, now = performance.now()): number {
+  const out = ac.outputLatency > 0 ? ac.outputLatency * 1000 : OUTPUT_FALLBACK_MS;
+  return now + (t - ac.currentTime) * 1000 + out;
+}
+
 const MODE_LABEL: Record<FollowMode, string> = { wait: "Warte-Modus", beat: "Takt-Modus" };
 const MODE_EXPL: Record<FollowMode, string> = {
   wait: "Die Markierung wartet auf jede Note und geht weiter, sobald du sie triffst. Spiel in deinem Tempo.",
@@ -104,7 +118,7 @@ export function followBarHtml(): string {
         <span class="fgo" data-testid="follow-go"></span>
       </div>
       <div class="ffoot">
-        <button class="clear" data-act="fexit">Mitspielen beenden</button>
+        <button class="clear" data-act="fexit" aria-label="Mitspielen beenden"><span class="fxl">Mitspielen beenden</span><span class="fxs">Beenden</span></button>
         <button class="clear" data-act="fclear" hidden>Schleife aufheben</button>
       </div>
     </div>`;
@@ -309,6 +323,7 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
     run = null;
     r.unlisten?.();
     if (songPlayer.playing) songPlayer.stop();
+    else songPlayer.idle();
     mic.stop();
     host.setCur([]);
     showCount(null);
@@ -472,8 +487,7 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
         finishRun(b.finish(performance.now()));
       },
     });
-    const ac = songPlayer.context!;
-    const startMs = performance.now() + (songPlayer.timelineStart! - ac.currentTime) * 1000;
+    const startMs = heardAt(songPlayer.context!, songPlayer.timelineStart!);
     const b = new BeatFollower(tl, {
       secPerQuarter: spq,
       startMs,
@@ -580,7 +594,7 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
       const spq = secPerQuarter(song, p);
       const at = songPlayer.setTempo(spq);
       const ac = songPlayer.context;
-      if (at != null && ac) r.beat.setTempo(spq, performance.now() + (at - ac.currentTime) * 1000);
+      if (at != null && ac) r.beat.setTempo(spq, heardAt(ac, at));
     }
   });
   range.addEventListener("change", () => host.setPercent(clampPercent(Number(range.value)), true));

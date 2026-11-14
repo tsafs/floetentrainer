@@ -1862,6 +1862,57 @@ ul.songs li + li {
 .ffoot .clear:first-child {
   padding-left: 0;
 }
+.fxs {
+  display: none;
+}
+/* Während des Mitspielens im Hochformat (und am Desktop) so knapp wie die Leiste fürs Vorspielen:
+   Griffbild links über zwei Zeilen, oben Name und Hinweise, darunter Stopp, Tempo und „Beenden“
+   (an der Stelle des Metronoms). Die Gruppen .frun/.fctl/.ffoot lösen sich dafür ins Raster auf. */
+@media (orientation: portrait), (min-height: 521px) {
+  .fpin.running {
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "fl info info info"
+      "fl play mid exit";
+    column-gap: 14px;
+    row-gap: 4px;
+    align-items: center;
+  }
+  .fpin.running .frun,
+  .fpin.running .fctl,
+  .fpin.running .ffoot {
+    display: contents;
+  }
+  .fpin.running .ffl {
+    grid-area: fl;
+  }
+  .fpin.running .finfo {
+    grid-area: info;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 12px;
+  }
+  .fpin.running .finfo .pstat {
+    flex: 1 1 auto;
+  }
+  .fpin.running .playbtn {
+    grid-area: play;
+  }
+  .fpin.running .ftempo {
+    grid-area: mid;
+  }
+  .fpin.running [data-act="fexit"] {
+    grid-area: exit;
+    padding-left: 4px;
+  }
+  .fpin.running .fxl {
+    display: none;
+  }
+  .fpin.running .fxs {
+    display: inline;
+  }
+}
 
 @media (orientation: landscape) and (max-height: 520px) {
   .songpage.following {
