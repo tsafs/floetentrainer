@@ -215,6 +215,51 @@ describe("Warte-Modus: rot nur bei einem deutlich anderen, neu eingesetzten und 
     expect(w.results.map((r) => r?.ok)).toEqual([true, true]);
   });
 
+  it("„Kuckuck“: der lange gehaltene alte Ton zählt nicht als falsch, auch wenn er scheinbar neu einsetzt", () => {
+    // Befund am Gerät: nach jeder halben Note (d² ≈ 1,2 s) wurde das folgende h¹ rot. Im gehaltenen d²
+    // erkannte die Einsatz-Regel einen „neuen Einsatz“ (Lautstärke schwillt nach dem Anstoß ab und
+    // wieder an, oder zwei Messungen sind kurz unklar).
+    const D2 = 74;
+    const kuckuck = () => buildTimeline(song("d''2 h'4 | d''2 h'4 ||", { key: "G", time: [3, 4] }));
+    const held = (rms: (k: number) => number, clarity: (k: number) => number, t0: number): Frame[] =>
+      Array.from({ length: 48 }, (_, k) => ({ t: t0 + k * STEP, freq: hz(D2), clarity: clarity(k), rms: rms(k) }));
+    const play = (rms: (k: number) => number, clarity: (k: number) => number = () => 0.95) => {
+      const wrongs: [number, number][] = [];
+      const w = new WaitFollower(kuckuck(), { onWrong: (i, m) => wrongs.push([i, m]) });
+      let t = 0;
+      for (let bar = 0; bar < 2; bar++) {
+        feed(w, held(rms, clarity, t));
+        t += 48 * STEP;
+        feed(w, frames([[null, 50], [H, 400], [null, 50]], t));
+        t += 500;
+      }
+      return { wrongs, ok: w.results.map((r) => r?.ok) };
+    };
+    // kräftiger Anstoß, dann leiser, dann wieder lauter
+    const swell = play((k) => (k < 3 ? 0.2 : k < 20 ? 0.09 : 0.14));
+    expect(swell).toEqual({ wrongs: [], ok: [true, true, true, true] });
+    // zwei unklare Messungen mitten im Ton
+    const blip = play(() => 0.1, (k) => (k === 25 || k === 26 ? 0.7 : 0.95));
+    expect(blip).toEqual({ wrongs: [], ok: [true, true, true, true] });
+  });
+
+  it("ein anderer Ton als der alte, neu eingesetzt, färbt nach einer halben Note weiterhin rot", () => {
+    const wrongs: [number, number][] = [];
+    const w = new WaitFollower(buildTimeline(song("d''2 h'4 ||", { key: "G", time: [3, 4] })), { onWrong: (i, m) => wrongs.push([i, m]) });
+    feed(w, frames([[74, 1200], [null, 50], [A, 300], [null, 50], [H, 300]]));
+    expect(wrongs).toEqual([[1, A]]);
+  });
+
+  it("Tonwiederholung nach langem Ton: ohne neuen Einsatz bleibt sie stehen, mit Einsatz grün", () => {
+    const tl = () => buildTimeline(song("h'2 h'4 ||", { key: "G", time: [3, 4] }));
+    const still = new WaitFollower(tl());
+    feed(still, frames([[H, 1500]]));
+    expect(still.index).toBe(1);
+    const tongued = new WaitFollower(tl());
+    feed(tongued, frames([[H, 1200], [null, 50], [H, 300]]));
+    expect(tongued.results.map((r) => r?.ok)).toEqual([true, true]);
+  });
+
   it("Haltedauer für „richtig“ bleibt kurz (120 ms), für „falsch“ 250 ms", () => {
     expect(DEFAULT_FOLLOW.holdMs).toBe(120);
     expect(DEFAULT_FOLLOW.wrongHoldMs).toBe(250);

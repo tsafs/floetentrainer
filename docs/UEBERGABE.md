@@ -79,7 +79,9 @@ Silben, Atemzeichen, Seitenumbrüche.
      **Robuster seit 14.11.2026** (Befund am Gerät: Flöte −30 Cent, „Im Takt“ fast alles rot; Regeln in
      `docs/app-lieder.md`, „Mitspielen robuster“): nächster Halbton, Klarheit 0,85, „falsch“ im Warte-Modus erst
      nach 250 ms und neuem Einsatz, im Takt Wertung nach Anteil im mittleren Teil oder Einsatz am Notenbeginn,
-     Verzögerung 120 ms (mit Kopfhörern 200 ms) bzw. am Gerät abgeglichen („Verzögerung abgleichen“ im
+     Verzögerung 120 ms (mit Kopfhörern 200 ms) bzw. am Gerät abgeglichen; im Warte-Modus zählt der Ton der eben
+     getroffenen Note für die nächste nie als falsch (sonst wurde nach langen Noten die folgende rot, weil im
+     gehaltenen Ton ein scheinbar neuer Einsatz erkannt wurde) („Verzögerung abgleichen“ im
      Mitspiel-Bereich, `app/src/audio/latency.ts`; Wert je Kopfhörer-Zustand in `settings.inputLatencyMs`, nur
      im Browser, nicht in der Sicherung). **Flötenprofile** (`flutes`/`activeFlute` in den Daten, mit Sicherung):
      Einstellungen → Flöte, „Flöte einstellen“ (`#/floete`, `app/src/ui/flute.ts`); angewandt im Mitspielen
