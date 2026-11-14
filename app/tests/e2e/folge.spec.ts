@@ -38,6 +38,8 @@ test.describe("Lesen", () => {
     const t0 = await page.evaluate(() => Date.now());
     const m = folge(page);
     await expect(m.locator(".q")).toHaveText("Wie heißen diese Noten? Der Reihe nach.");
+    // Die Beschriftung für Vorleser verrät die Namen nicht
+    await expect(m.locator(".stage svg").first()).toHaveAttribute("aria-label", "4 Noten");
     await expect(m.locator(".sn")).toHaveCount(4);
     await expect(m.locator(".sn.cur")).toHaveAttribute("data-i", "0");
     await expect(page.getByTestId("count")).toHaveText("2 von 20");

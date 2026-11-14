@@ -229,3 +229,44 @@ test("kein Menüknopf auf der Willkommensseite beim allerersten Start", async ({
   await expect(page.getByRole("heading", { name: "Willkommen" })).toBeVisible();
   await expect(menuBtn(page)).toHaveCount(0);
 });
+
+test("Stimmgerät aus dem Menü übernimmt ein schon laufendes Mikrofon (von „Flöte einstellen“)", async ({ page }) => {
+  await page.addInitScript(FAKE_MIC);
+  await seed(page, sampleData());
+  await page.goto("./#/floete");
+  await page.evaluate(() => (window as never as { __mic: { start(): Promise<void> } }).__mic.start());
+  await page.waitForFunction(() => (window as never as { __mic: { running: boolean } }).__mic.running);
+  await menuTo(page, "Stimmgerät");
+  await expect(page).toHaveURL(/#\/stimmgeraet$/);
+  await expect(page.getByTestId("tuner-name")).toBeVisible();
+  expect(await page.evaluate(() => (window as never as { __mic: { running: boolean } }).__mic.running)).toBe(true);
+  await expect(page.getByRole("button", { name: "Mikrofon einschalten" })).toBeHidden();
+  // Die Übergabe gilt nur einmal: Verlassen des Stimmgeräts schaltet das Mikrofon wie gewohnt aus
+  await menuTo(page, "Grifftabelle");
+  await expect(page).toHaveURL(/#\/griffe$/);
+  expect(await page.evaluate(() => (window as never as { __mic: { running: boolean } }).__mic.running)).toBe(false);
+});
+
+test("Tastatur: der Menüknopf kommt beim Tabben vor dem Seiteninhalt", async ({ page }) => {
+  await seed(page, sampleData());
+  await page.goto("./#/griffe");
+  await page.keyboard.press("Tab");
+  await expect(menuBtn(page)).toBeFocused();
+});
+
+test("Seitenwechsel bei offenem Menü: ein Zurück je sichtbarer Seite", async ({ page }) => {
+  await seed(page, sampleData());
+  await page.goto("./#/fortschritt");
+  await page.evaluate(() => (location.hash = "#/griffe"));
+  await expect(page).toHaveURL(/#\/griffe$/);
+  await openMenu(page);
+  // z. B. verweigertes Mikrofon: Die App wechselt selbst die Seite, während das Menü offen ist
+  await page.evaluate(() => (location.hash = "#/einstellungen"));
+  await expect(page).toHaveURL(/#\/einstellungen$/);
+  await expect(menu(page)).toBeHidden();
+  await page.evaluate(() => history.back());
+  await expect(page).toHaveURL(/#\/griffe$/);
+  await page.evaluate(() => history.back());
+  await expect(page).toHaveURL(/#\/fortschritt$/);
+  await expect(page.getByRole("heading", { name: "Fortschritt" })).toBeVisible();
+});

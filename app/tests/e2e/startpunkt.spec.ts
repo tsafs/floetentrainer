@@ -99,3 +99,19 @@ test("Einstellungen verweisen auf den Startpunkt", async ({ page }) => {
   await page.getByRole("link", { name: "Startpunkt wählen" }).click();
   await expect(page.getByRole("heading", { name: "Startpunkt" })).toBeVisible();
 });
+
+test("nach der ersten Wahl führt Zurück nicht wieder auf „Wo steigst du ein?“", async ({ page }) => {
+  await seed(page, null);
+  await page.goto("./");
+  await page.getByRole("button", { name: /Ich kann schon Noten/ }).click();
+  await page.getByRole("button", { name: /^Linke Hand/ }).click();
+  await page.getByRole("button", { name: "Hier beginnen" }).click();
+  await expect(page.getByRole("heading", { name: "Flötentrainer" })).toBeVisible();
+  await page.evaluate(() => history.back());
+  await page.waitForTimeout(200);
+  await expect(page.getByRole("heading", { name: "Wo steigst du ein?" })).toHaveCount(0);
+  // Wer die Adresse dennoch aufruft, bekommt die normale Seite „Startpunkt“ mit Spurwahl
+  await page.goto("./#/startpunkt/neu");
+  await expect(page.getByRole("heading", { name: "Startpunkt" })).toBeVisible();
+  await expect(page).toHaveURL(/#\/startpunkt$/);
+});

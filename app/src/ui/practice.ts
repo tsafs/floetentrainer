@@ -386,7 +386,8 @@ export const practiceView: View = (root, ctx) => {
     const n = notes.length;
     const label = st.retry ? "nochmal" : `${s.position} von ${s.total}`;
     const question = playing ? "Spiel diese Töne nacheinander." : "Wie heißen diese Noten? Der Reihe nach.";
-    const staff = staffSeqSvg(notes, { range, label: `Noten ${notes.map(nameText).join(" ")}` });
+    // Beim Lesen verrät die Beschriftung für Vorleser die Namen nicht (wie bei der einzelnen Note→Name-Karte)
+    const staff = staffSeqSvg(notes, { range, label: playing ? `Noten ${notes.map(nameText).join(" ")}` : `${n} Noten` });
     let btns = "";
     if (!playing) {
       const choices = folgeChoices(notes, lesenNotes, Math.random);

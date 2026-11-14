@@ -58,7 +58,9 @@ export function installMenu(app: HTMLElement): void {
   panel.innerHTML =
     `<div class="menuhead"><button type="button" class="iconbtn menuclose" data-menu-close aria-label="Menü schließen">${ICON_X}</button></div>` +
     `<nav aria-label="Seiten"><ul>${ENTRIES.map((e) => `<li><a href="${hashOf(e.route)}" data-route="${e.route}">${e.label}</a></li>`).join("")}</ul></nav>`;
-  document.body.append(button, shade, panel);
+  // Knopf vor #app: Er steht oben rechts und soll beim Tabben vor dem Seiteninhalt kommen
+  app.before(button);
+  document.body.append(shade, panel);
 
   let open = false;
   /** Nach dem Zurücknehmen des Verlaufseintrags dorthin wechseln */
@@ -105,6 +107,12 @@ export function installMenu(app: HTMLElement): void {
   };
 
   window.addEventListener("popstate", () => {
+    if (!open && pendingHash === null && isMenuEntry(history.state)) {
+      // Verlaufseintrag eines Menüs, das durch einen Seitenwechsel geschlossen wurde (gleiche Adresse wie
+      // der Eintrag davor): überspringen, sonst täte das nächste Zurück sichtbar nichts
+      history.back();
+      return;
+    }
     if (open) {
       // Zurück-Geste: der Verlaufseintrag des Menüs ist schon weg
       hide();
@@ -117,7 +125,8 @@ export function installMenu(app: HTMLElement): void {
       location.hash = h;
     }
   });
-  // Seitenwechsel auf anderem Weg (sollte bei offenem Menü nicht vorkommen): nur schließen
+  // Seitenwechsel auf anderem Weg (z. B. verweigertes Mikrofon → #/mikrofon): nur schließen; den dann
+  // übrig gebliebenen Verlaufseintrag überspringt popstate beim Zurückgehen
   window.addEventListener("hashchange", () => {
     if (open) hide();
   });
@@ -138,8 +147,14 @@ export function installMenu(app: HTMLElement): void {
       return;
     }
     // Stimmgerät: Mikrofon direkt aus dem Tippen heraus starten, sonst lässt der Browser es nicht zu;
-    // Fehler zeigt das Stimmgerät selbst an.
-    if (route === "stimmgeraet") mic.start().catch(() => {});
+    // Fehler zeigt das Stimmgerät selbst an. Läuft es schon (Flöte einstellen, Mitspielen), übernimmt das
+    // Stimmgerät es – sonst würde die Aufräumfunktion der alten Seite es gleich wieder ausschalten.
+    if (route === "stimmgeraet") {
+      if (mic.running || mic.pending) {
+        mic.handOver();
+        window.addEventListener("hashchange", () => window.setTimeout(() => mic.endHandOver(), 0), { once: true });
+      } else mic.start().catch(() => {});
+    }
     close(hashOf(route));
   });
 

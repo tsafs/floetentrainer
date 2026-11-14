@@ -337,7 +337,9 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
 - **Willkommensseite** (seit 14.11.2026): erscheint anstelle der Startseite, solange noch kein Startpunkt
   gewählt und noch nie geübt wurde (keine Sitzung, keine Karten, keine Übungstage). „Willkommen“, ein Satz,
   die ersten drei Töne als Notenzeile, Knöpfe „Von vorn beginnen“ (setzt den Startpunkt Stufe 1) und „Ich
-  kann schon Noten“ (→ `#/startpunkt/neu`, Meilensteine für beide Spuren gemeinsam). Im Querformat stehen die
+  kann schon Noten“ (→ `#/startpunkt/neu`, Meilensteine für beide Spuren gemeinsam; nach der Wahl ersetzt die
+  Startseite diesen Verlaufseintrag, und ist schon ein Startpunkt gewählt, gilt die Adresse als `#/startpunkt`
+  mit Spurwahl und Hinweisen). Im Querformat stehen die
   Knöpfe nebeneinander. Auch nach „Neu beginnen“ bei unlesbaren Daten kommt sie.
 - **Startpunkt** (`#/startpunkt`): Erreichbar über „Startpunkt ändern“ unten auf der Fortschrittsseite und
   „Startpunkt wählen“ in den Einstellungen unter „Stufen“. Oben der aktuelle Stand beider Spuren, darunter
@@ -368,8 +370,12 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   Liedseite und „Lied hinzufügen“ ist keiner markiert, „Lieder“ führt dort zur Liste). Schließen mit ×,
   Tippen daneben, Escape, Wahl eines Eintrags oder der Zurück-Geste. Das Öffnen hält nichts an (Vorspielen,
   Mitspielen, Stimmgerät); erst eine andere Seite räumt wie bisher auf, die aktuelle Seite wählen schließt
-  nur. „Stimmgerät“ startet das Mikrofon direkt aus dem Tippen. Das × der Leiste steht in einer eigenen
-  Kopfzeile genau an der Stelle des Menüknopfs: Öffnen und Schließen an derselben Stelle.
+  nur. „Stimmgerät“ startet das Mikrofon direkt aus dem Tippen; läuft es schon (Flöte einstellen,
+  Mitspielen), übernimmt das Stimmgerät es, statt dass die alte Seite es beim Aufräumen ausschaltet. Das × der
+  Leiste steht in einer eigenen Kopfzeile genau an der Stelle des Menüknopfs: Öffnen und Schließen an derselben
+  Stelle. Der Knopf steht im DOM vor dem Seiteninhalt (kommt beim Tabben zuerst). Wechselt die App bei offenem
+  Menü selbst die Seite (z. B. verweigertes Mikrofon), wird dessen übrig gebliebener Verlaufseintrag beim
+  Zurückgehen übersprungen.
 - **Übung** (Entwurf `?s=ok`, `?s=err`): oben ein ×-Knopf, ein feiner Fortschrittsstrich und
   „7 von 20“, darunter Notenzeile, Frage, Antworten und Rückmeldung.
 - **Sitzungsende:** wie viele richtig, welche Töne schwierig waren und gegebenenfalls „Neu: …“.

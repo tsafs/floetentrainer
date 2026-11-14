@@ -19,6 +19,7 @@ import {
   nextNotes,
   MILESTONES,
   type Milestone,
+  needsWelcome,
   type StartTracks,
 } from "../srs/startpoint";
 import { esc, topbar, type Ctx, type View } from "./common";
@@ -128,8 +129,11 @@ function currentText(ctx: Ctx): string {
 }
 
 export const startpointView: View = (root, ctx) => {
-  // #/startpunkt/neu: aus der Willkommensseite (noch nichts gewählt, nur gemeinsam)
-  const fresh = location.hash.replace(/^#\/?/, "").split("/")[1] === "neu";
+  // #/startpunkt/neu: aus der Willkommensseite (noch nichts gewählt, nur gemeinsam). Ist schon etwas gewählt
+  // (etwa per Zurück wieder hier), gilt die normale Seite „Startpunkt“ mit Spurwahl und Hinweisen.
+  const neu = location.hash.replace(/^#\/?/, "").split("/")[1] === "neu";
+  const fresh = neu && needsWelcome(ctx.data);
+  if (neu && !fresh) history.replaceState(history.state, "", "#/startpunkt");
   let tracks: StartTracks = "beide";
   let picked: Milestone | null = null;
 
@@ -219,7 +223,9 @@ export const startpointView: View = (root, ctx) => {
       if (!picked) return;
       chooseStart(ctx.data, picked, fresh ? "beide" : tracks, Date.now(), ctx.today());
       ctx.save();
-      ctx.go("#/");
+      // Nach der ersten Wahl führt Zurück nicht wieder auf „Wo steigst du ein?“
+      if (fresh) location.replace("#/");
+      else ctx.go("#/");
     });
   }
 

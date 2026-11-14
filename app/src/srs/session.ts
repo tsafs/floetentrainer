@@ -118,6 +118,9 @@ export interface SessionOptions {
   limitMs: number;
 }
 
+/** Wird dieser Platz im Plan jetzt eine Tonfolge? (leerer Vorrat: zu wenige vorgestellte Töne) */
+const isFolgeSlot = (p: PlanItem, pool: string[]) => !!p.folge && pool.length > 0;
+
 export class Session {
   readonly track: Track;
   readonly sessionNo: number;
@@ -206,16 +209,6 @@ export class Session {
     return step;
   }
 
-  /** Töne für Tonfolgen jetzt (leer: keine Folgen, zu wenige vorgestellte Töne) */
-  private folgePool(): string[] {
-    return folgePool(this.data, this.track);
-  }
-
-  /** Wird dieser Platz im Plan jetzt eine Tonfolge? */
-  private isFolge(p: PlanItem, pool: string[]): boolean {
-    return !!p.folge && pool.length > 0;
-  }
-
   /** Neue Tonfolge für einen Platz im Plan erzeugen. */
   private makeFolge(p: PlanItem, pool: string[], avoidLast: string[]): Folge {
     const rng = this.opt.rng;
@@ -228,9 +221,9 @@ export class Session {
 
   private pick(): Step | null {
     const last = this.lastNote;
-    const pool = this.folgePool();
+    const pool = folgePool(this.data, this.track);
     // Eine Tonfolge kann jeden Ton vermeiden (sie beginnt nie mit dem letzten Ton): zählt als „anderer Ton“.
-    const noteOf = (p: PlanItem) => (this.isFolge(p, pool) ? "" : p.note);
+    const noteOf = (p: PlanItem) => (isFolgeSlot(p, pool) ? "" : p.note);
     // Eine Wiederholung nicht vorziehen, wenn danach nur noch Karten desselben Tons übrig wären.
     const blocks = (n: string) => this.remaining.length > 0 && this.remaining.every((p) => noteOf(p) === n);
     const ready = this.retries.filter((r) => r.at <= this.shown && firstOf(r) !== last && !blocks(firstOf(r)));
@@ -246,7 +239,7 @@ export class Session {
     // sonst müsste sie wegen „nie zweimal hintereinander“ warten.
     const soon = this.retries.filter((r) => r.at <= this.shown + 1).map(firstOf);
     const fromPlan = (item: PlanItem): Step =>
-      this.isFolge(item, pool)
+      isFolgeSlot(item, pool)
         ? { type: "folge", folge: this.makeFolge(item, pool, soon), track: this.track, retry: false }
         : { type: "card", item, retry: false };
     if (ready.length) {
@@ -261,8 +254,8 @@ export class Session {
     const fits = (p: PlanItem) => noteOf(p) !== last && !soon.includes(noteOf(p));
     const inExtras = this.remaining[0]?.type === "extra";
     let i = -1;
-    if (afterFolge) i = this.remaining.findIndex((p) => fits(p) && !this.isFolge(p, pool));
-    else if (inExtras && this.current?.type === "card") i = this.remaining.findIndex((p) => fits(p) && this.isFolge(p, pool));
+    if (afterFolge) i = this.remaining.findIndex((p) => fits(p) && !isFolgeSlot(p, pool));
+    else if (inExtras && this.current?.type === "card") i = this.remaining.findIndex((p) => fits(p) && isFolgeSlot(p, pool));
     if (i < 0) i = this.remaining.findIndex(fits);
     if (i < 0) i = this.remaining.findIndex((p) => noteOf(p) !== last);
     if (i >= 0) {

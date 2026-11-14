@@ -37,6 +37,8 @@ class Mic {
   private timer: number | null = null;
   private listeners = new Set<Listener>();
   private starting: Promise<void> | null = null;
+  /** handOver(): das nächste stop() überspringen */
+  private keepOnce = false;
   /**
    * Soll das Mikrofon laufen? stop() während der Erlaubnis-Abfrage setzt es zurück; der Strom, der
    * danach noch ankommt, wird gleich wieder freigegeben (sonst bliebe das Mikrofon unbemerkt an,
@@ -99,7 +101,24 @@ class Mic {
     return this.starting;
   }
 
+  /**
+   * Seitenwechsel, bei dem die neue Seite das laufende (oder startende) Mikrofon übernimmt (Menü →
+   * Stimmgerät): Das nächste stop() – die Aufräumfunktion der alten Seite – lässt es weiterlaufen.
+   * endHandOver() nimmt das zurück, falls die alte Seite gar nicht stoppt.
+   */
+  handOver(): void {
+    if (this.running || this.starting) this.keepOnce = true;
+  }
+
+  endHandOver(): void {
+    this.keepOnce = false;
+  }
+
   stop(): void {
+    if (this.keepOnce) {
+      this.keepOnce = false;
+      return;
+    }
     this.wanted = false;
     if (this.timer !== null) window.clearInterval(this.timer);
     this.timer = null;

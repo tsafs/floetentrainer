@@ -144,7 +144,6 @@ export function chooseStart(data: AppData, m: Milestone, tracks: StartTracks, no
   } else if (sp > lesen) {
     applyTrack(data, "spielen", Math.min(lesen, maxLevel("spielen")), now, today);
   }
-  if (!data.start) data.start = { lesen: stageId("lesen", 1), spielen: stageId("spielen", 1) };
 }
 
 /** Darf der Meilenstein für diese Wahl genommen werden? (nur Spielen: nicht über der Lesen-Stufe) */
