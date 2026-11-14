@@ -631,7 +631,7 @@ export const songView: View = (root, ctx) => {
     updateStatus();
   } else resetUi();
   // Für automatische Tests
-  (window as unknown as { __lied: unknown }).__lied = { song, player: songPlayer, timeline: () => playingTl, follow: () => follow.debug() };
+  (window as unknown as { __lied: unknown }).__lied = { song, full, player: songPlayer, timeline: () => playingTl, follow: () => follow.debug() };
 
   return () => {
     follow.destroy();

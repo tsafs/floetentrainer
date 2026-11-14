@@ -48,6 +48,7 @@
   /* Notensatz der Lieder: klingende Note (samt Hinterlegung und Balken), gewählter Abschnitt */
   --mark: #1f6fba;
   --mark-glow: rgba(31, 111, 186, 0.26);
+  --playhead: rgba(31, 111, 186, 0.5);
   --mark-tint: #e2e5e0;
   --mark-sel: #d0d9d8;
 }
@@ -79,6 +80,7 @@
     --thumb-line: var(--wood-line);
     --mark: #62aef0;
     --mark-glow: rgba(98, 174, 240, 0.3);
+    --playhead: rgba(98, 174, 240, 0.62);
     --mark-tint: #2f3234;
     --mark-sel: #3b444a;
   }
@@ -107,6 +109,7 @@
   --thumb-line: var(--wood-line);
   --mark: #62aef0;
   --mark-glow: rgba(98, 174, 240, 0.3);
+  --playhead: rgba(98, 174, 240, 0.62);
   --mark-tint: #2f3234;
   --mark-sel: #3b444a;
 }
@@ -1406,13 +1409,13 @@ ul.songs li + li {
   width: 2.5px;
   height: 40px;
   border-radius: 1.25px;
-  background: var(--mark);
+  background: var(--playhead);
   opacity: 0;
   pointer-events: none;
   will-change: transform;
 }
 .playhead.on {
-  opacity: 0.5;
+  opacity: 1;
 }
 .stanzas {
   display: grid;

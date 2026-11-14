@@ -182,6 +182,43 @@ test("Warte-Modus: Tonwiederholung braucht einen neuen Einsatz", async ({ page }
   expect((await stored(page)).songs[SONG]?.best).toBeUndefined();
 });
 
+/** Balken (Mitte x) und Mitte des Notenkopfs der i-ten Note; x null, wenn der Balken nicht zu sehen ist */
+const barAndHead = (page: Page, i: number) =>
+  page.evaluate((k) => {
+    const el = document.querySelector<HTMLElement>(".playhead");
+    const gs = [...document.querySelectorAll<SVGGElement>(".score g.n")].sort((a, b) => Number(a.dataset.id) - Number(b.dataset.id));
+    const h = gs[k].querySelector("path.h")!.getBoundingClientRect();
+    const r = el?.getBoundingClientRect();
+    return { x: el?.classList.contains("on") && r ? r.left + r.width / 2 : null, head: h.left + h.width / 2 };
+  }, i);
+
+test("Balken: im Warte-Modus an der Note, auf die gewartet wird; im Takt-Modus läuft er mit", async ({ page }) => {
+  await open(page);
+  await start(page, "Warte-Modus");
+  let p = await barAndHead(page, 0);
+  expect(p.x).not.toBeNull();
+  expect(Math.abs(p.x! - p.head)).toBeLessThan(1);
+  await playSeq(page, waitPieces().slice(0, 2)); // nur die erste Note
+  await expect.poll(async () => (await dbg(page)).index, { timeout: 4000 }).toBe(1);
+  p = await barAndHead(page, 1);
+  expect(Math.abs(p.x! - p.head)).toBeLessThan(1);
+  await page.getByRole("button", { name: "Stopp" }).click();
+  expect((await barAndHead(page, 0)).x).toBeNull();
+
+  // Takt-Modus: nach dem Einzählen (2 s) stetig nach rechts
+  await page.getByRole("button", { name: "Takt-Modus" }).click();
+  await page.getByRole("button", { name: "Start" }).click();
+  await page.waitForFunction(() => (window as unknown as { __lied: { follow(): FollowDebug } }).__lied.follow().startMs !== null);
+  const startMs = (await dbg(page)).startMs!;
+  await page.waitForFunction((t) => performance.now() > t + 300, startMs);
+  const a = (await barAndHead(page, 0)).x!;
+  await page.waitForTimeout(400);
+  const b = (await barAndHead(page, 0)).x!;
+  expect(b).toBeGreaterThan(a + 5);
+  await page.getByRole("button", { name: "Stopp" }).click();
+  expect((await barAndHead(page, 0)).x).toBeNull();
+});
+
 test("Takt-Modus richtig gespielt: Einzählen und leise Klicks ohne Melodie, alles grün, Bestwert", async ({ page }) => {
   await open(page);
   const before = await learning(page);

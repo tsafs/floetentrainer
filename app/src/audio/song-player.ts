@@ -53,14 +53,14 @@ const MAX_GAP = BREATH_GAP;
 /** Ausblenden beim Stopp (s) */
 export const FADE = 0.04;
 /** Lautstärke am Ausgang (vor dem Begrenzer) */
-export const OUT_GAIN = 1.0;
+export const OUT_GAIN = 0.87;
 /**
  * Begrenzer am Ausgang: setzt erst kurz unter Vollaussteuerung ein (einzelne Töne bleiben unberührt),
  * schnell im Ansprechen, sanft im Loslassen. Chromium/WebKit/Gecko verstärken mit einem Compressor
  * zusätzlich automatisch (Ausgleich nach Schwelle und Verhältnis); die Pegel sind darum offline
  * nachgemessen (Spitze unter 0,95).
  */
-export const LIMITER = { threshold: -9, knee: 6, ratio: 12, attack: 0.002, release: 0.15 };
+export const LIMITER = { threshold: -4, knee: 3, ratio: 12, attack: 0.002, release: 0.15 };
 /** Vorlauf des Compressors (in allen Browsern fest 6 ms): um so viel später ist alles zu hören */
 export const LIMITER_DELAY = 0.006;
 /** Ein in requestAnimationFrame gezeichnetes Bild steht etwa so viel später auf dem Schirm (s) */
@@ -172,7 +172,8 @@ export function outputClock(ctx: ClockCtx, perf = performance.now()): { audio: n
   const ts = typeof ctx.getOutputTimestamp === "function" ? ctx.getOutputTimestamp() : null;
   const ct = ts?.contextTime;
   const pt = ts?.performanceTime;
-  if (ct != null && pt != null && pt > 0 && ct >= 0) {
+  // (vor dem ersten hörbaren Block melden Browser contextTime 0: dann der Rückfall)
+  if (ct != null && pt != null && pt > 0 && ct > 0) {
     const audio = ct + (perf - pt) / 1000;
     // Plausibel? (zu hören ist nie, was noch nicht berechnet ist, und nicht mehr als 1 s zurück)
     if (audio <= ctx.currentTime + 0.005 && audio > ctx.currentTime - 1) return { audio: audio - LIMITER_DELAY, perf };
