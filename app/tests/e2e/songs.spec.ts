@@ -5,7 +5,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { chartNoteByMidi } from "../../src/music/notes";
 import { audioLog, FAKE_AUDIO } from "./fake-audio";
 import { sampleData } from "./seed";
-import { seed } from "./util";
+import { menuTo, seed } from "./util";
 
 interface Tl {
   tones: { start: number; dur: number; midi: number; ids: number[]; bar: number }[];
@@ -59,12 +59,11 @@ const noteName = (page: Page) => page.getByTestId("note-name");
 /** Lesen-Stufe setzen (Beispieldaten) */
 const withStage = (lesen: string) => ({ ...sampleData(), stages: { lesen, spielen: "erste-toene" } });
 
-test("Startseite zeigt „Lieder“ und führt zur Liste", async ({ page }) => {
+test("Menü der Startseite führt zu den Liedern", async ({ page }) => {
   await seed(page, sampleData());
   await page.goto("./");
-  const links = page.locator("nav.links a");
-  await expect(links).toHaveText(["Lieder", "Stimmgerät", "Grifftabelle", "Einstellungen"]);
-  await page.getByRole("link", { name: "Lieder" }).click();
+  await expect(page.locator("nav.links")).toHaveCount(0);
+  await menuTo(page, "Lieder");
   await expect(page.getByRole("heading", { name: "Kannst du schon spielen" })).toBeVisible();
 });
 
@@ -547,4 +546,21 @@ test("Verlassen, Hintergrund und Ende stoppen die Wiedergabe", async ({ page }) 
   const n = (await tones(page)).length;
   await page.clock.runFor(3000);
   expect((await tones(page)).length).toBe(n);
+});
+
+test("Menü öffnen hält das Vorspielen nicht an; erst eine andere Seite stoppt es", async ({ page }) => {
+  await open(page, "#/lied/alle-meine-entchen");
+  await page.getByRole("button", { name: "Abspielen" }).click();
+  await page.clock.runFor(3000);
+  expect(await playing(page)).toBe(true);
+  await page.getByRole("button", { name: "Menü", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Menü" })).toBeVisible();
+  await page.clock.runFor(1000);
+  expect(await playing(page)).toBe(true);
+  await page.keyboard.press("Escape");
+  await page.clock.runFor(500);
+  expect(await playing(page)).toBe(true);
+  await menuTo(page, "Grifftabelle");
+  await expect(page.getByRole("heading", { name: "Grifftabelle" })).toBeVisible();
+  expect(await playing(page)).toBe(false);
 });

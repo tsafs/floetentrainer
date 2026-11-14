@@ -1,7 +1,7 @@
 // Bildschirmfotos für die Durchsicht (nur mit SHOTS=1): npx playwright test shots
 import { expect, test, type Page } from "@playwright/test";
 import { sampleData } from "./seed";
-import { answer, FAKE_MIC, info, next, skipIntros } from "./util";
+import { answer, FAKE_MIC, info, next, menuTo, skipIntros } from "./util";
 import { FAKE_AUDIO } from "./fake-audio";
 import { note, soundingFreq } from "../../src/music/notes";
 import { readFileSync } from "node:fs";
@@ -102,6 +102,30 @@ for (const s of SIZES) {
       await page.getByRole("button", { name: "Sitzung beenden" }).click();
       await page.screenshot({ path: p("9-ende") });
     });
+    test("Menü", async ({ page }) => {
+      await seed(page);
+      const p = (x: string) => `${OUT}/${scheme}-${s.name}-${x}.png`;
+      const open = async () => {
+        await page.getByRole("button", { name: "Menü", exact: true }).click();
+        await expect(page.getByRole("dialog", { name: "Menü" })).toBeVisible();
+        await page.waitForTimeout(400); // Gleiten abwarten
+      };
+      await page.goto("./");
+      await page.evaluate(() => document.fonts.ready);
+      await page.screenshot({ path: p("m1-start") });
+      await open();
+      await page.screenshot({ path: p("m2-start-menue") });
+      await page.goto("./#/einstellungen");
+      await page.evaluate(() => document.fonts.ready);
+      await expect(page.getByRole("dialog", { name: "Menü" })).toBeHidden();
+      await page.screenshot({ path: p("m3-einstellungen") });
+      await open();
+      await page.screenshot({ path: p("m4-einstellungen-menue") });
+      await page.goto("./#/lied/alle-meine-entchen");
+      await page.evaluate(() => document.fonts.ready);
+      await expect(page.getByRole("dialog", { name: "Menü" })).toBeHidden();
+      await page.screenshot({ path: p("m5-lied") });
+    });
     test("Spielen und Stimmgerät", async ({ page }) => {
       await page.addInitScript(FAKE_MIC);
       await seed(page);
@@ -118,7 +142,7 @@ for (const s of SIZES) {
       await expect(page.getByTestId("panel")).toBeVisible();
       await page.screenshot({ path: p("b-spielen-falsch") });
       await page.goto("./");
-      await page.getByRole("link", { name: "Stimmgerät" }).click();
+      await menuTo(page, "Stimmgerät");
       await page.waitForFunction(() => (window as never as { __osc: unknown }).__osc !== null);
       await osc("b1");
       await expect(page.getByTestId("tuner-name")).toHaveText("b1");
@@ -133,7 +157,7 @@ for (const s of SIZES) {
       await page.goto("./");
       await page.evaluate(() => document.fonts.ready);
       await page.screenshot({ path: p("l1-start") });
-      await page.getByRole("link", { name: "Lieder" }).click();
+      await menuTo(page, "Lieder");
       await expect(page.getByTestId("can-play")).toBeVisible();
       await page.screenshot({ path: p("l2-liste") });
       await page.screenshot({ path: p("l2-liste-ganz"), fullPage: true });
@@ -342,7 +366,7 @@ for (const s of SIZES.filter((x) => x.name === "360x740" || x.name === "740x360"
       await page.screenshot({ path: p("r5-mitspielen-floete-diagnose") });
       // Stimmgerät mit Wert der Flöte
       await page.goto("./#/");
-      await page.getByRole("link", { name: "Stimmgerät" }).click();
+      await menuTo(page, "Stimmgerät");
       await page.waitForFunction(() => (window as unknown as { __osc: unknown }).__osc !== null);
       await page.evaluate((f) => (window as unknown as { __osc: { play(f: number): void } }).__osc.play(f), hz(69, -32));
       await expect(page.getByTestId("tuner-flute")).not.toHaveText("");

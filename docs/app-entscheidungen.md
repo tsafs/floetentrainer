@@ -280,12 +280,24 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
 ## 6. Seiten
 
 - **Startseite** (Entwurf `?s=home`):
-  - Titel; die fälligen Karten für Lesen und Spielen jeweils auf ihrem Knopf.
+  - Titel, rechts daneben der Menüknopf; die fälligen Karten für Lesen und Spielen jeweils auf ihrem Knopf.
   - „Tage in Folge“ mit den Wochenpunkten Mo–So.
   - Die beiden Spuren als Stufenleisten (12 bzw. 11 Abschnitte).
   - „Deine Töne beim Lesen“: Namen mit Trefferquote-Balken. Rot ist ein Ton mit mindestens 5 Antworten
     und unter 80 %.
-  - Unten die großen Knöpfe Üben und Spielen, darunter Stimmgerät · Grifftabelle · Einstellungen.
+  - Unten die großen Knöpfe Üben und Spielen. Die frühere Zeile „Lieder · Stimmgerät · Grifftabelle ·
+    Einstellungen“ ist seit 14.11.2026 durch das Menü ersetzt (wurde auf schmalen Handys zweizeilig);
+    der Platz kommt der Tonübersicht zugute.
+- **Menü** (seit 14.11.2026, `docs/app-navigation.md`): Knopf mit drei feinen Strichen oben rechts auf
+  jeder Seite mit Kopfzeile und auf der Startseite neben dem Titel – nicht in der Übung, auf dem
+  Sitzungsende und auf der Fehlerseite „Daten nicht lesbar“. Er öffnet von rechts eine Leiste (80 % der
+  Breite, höchstens 320 px, Rest leicht abgedunkelt) mit Startseite · Lieder · Fortschritt · Grifftabelle ·
+  Stimmgerät · Flöte einstellen · Einstellungen; die aktuelle Seite fett mit feinem Strich links (auf
+  Liedseite und „Lied hinzufügen“ ist keiner markiert, „Lieder“ führt dort zur Liste). Schließen mit ×,
+  Tippen daneben, Escape, Wahl eines Eintrags oder der Zurück-Geste. Das Öffnen hält nichts an (Vorspielen,
+  Mitspielen, Stimmgerät); erst eine andere Seite räumt wie bisher auf, die aktuelle Seite wählen schließt
+  nur. „Stimmgerät“ startet das Mikrofon direkt aus dem Tippen. Im Querformat schwebt das × neben
+  „Startseite“, damit alle Einträge ohne Scrollen passen.
 - **Übung** (Entwurf `?s=ok`, `?s=err`): oben ein ×-Knopf, ein feiner Fortschrittsstrich und
   „7 von 20“, darunter Notenzeile, Frage, Antworten und Rückmeldung.
 - **Sitzungsende:** wie viele richtig, welche Töne schwierig waren und gegebenenfalls „Neu: …“.

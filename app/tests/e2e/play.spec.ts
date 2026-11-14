@@ -2,7 +2,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { note, soundingFreq } from "../../src/music/notes";
 import { sampleData } from "./seed";
-import { FAKE_MIC } from "./util";
+import { FAKE_MIC, menuTo } from "./util";
 
 async function setup(page: Page, data: unknown = sampleData()) {
   await page.addInitScript(FAKE_MIC);
@@ -129,7 +129,7 @@ test("„Weiß nicht“ beim Spielen: Griffbild, danach darf gespielt werden", a
 
 test("Stimmgerät zeigt die gehörte Note", async ({ page }) => {
   await setup(page);
-  await page.getByRole("link", { name: "Stimmgerät" }).click();
+  await menuTo(page, "Stimmgerät");
   await page.waitForFunction(() => (window as never as { __osc: unknown }).__osc !== null);
   await play(page, "fis1");
   await expect(page.getByTestId("tuner-name")).toHaveText("fis1");
@@ -140,7 +140,7 @@ test("Stimmgerät zeigt die gehörte Note", async ({ page }) => {
 
 test("Stimmgerät: wackelnder Ton nahe der Mitte zwischen zwei Halbtönen lässt den Namen nicht flackern", async ({ page }) => {
   await setup(page);
-  await page.getByRole("link", { name: "Stimmgerät" }).click();
+  await menuTo(page, "Stimmgerät");
   await page.waitForFunction(() => (window as never as { __osc: unknown }).__osc !== null);
   // fis¹ +30 Cent mit Vibrato ±35 Cent: roh reicht das bis +65 Cent, also ins g¹
   await wobble(page, 35);
@@ -167,7 +167,7 @@ test("Stimmgerät: wackelnder Ton nahe der Mitte zwischen zwei Halbtönen lässt
 test("Stimmgerät: schneller Wechsel g¹–a¹–h¹ auf- und abwärts (Flötenklang) zeigt nur g¹, a¹, h¹; kürzeres Fenster, weniger Zwischenwerte", async ({ page }) => {
   test.setTimeout(60_000);
   await setup(page);
-  await page.getByRole("link", { name: "Stimmgerät" }).click();
+  await menuTo(page, "Stimmgerät");
   await page.waitForFunction(() => (window as never as { __osc: unknown }).__osc !== null);
   await page.waitForFunction(() => (window as never as { __mic: { running: boolean } }).__mic.running);
   const tones = ["g1", "a1", "h1"].map((id) => soundingFreq(note(id)));

@@ -11,6 +11,7 @@ import { fluteView } from "./ui/flute";
 import { settingsView } from "./ui/settings";
 import { songAddView } from "./ui/own-songs";
 import { songListView, songView } from "./ui/songs";
+import { installMenu } from "./ui/menu";
 import { applyTheme } from "./ui/theme";
 import { tunerView } from "./ui/tuner";
 import { defaultData } from "./store/data";
@@ -117,6 +118,7 @@ function start() {
   applyTheme(ctx.data.settings.theme);
   if (res.fresh) ctx.save();
   requestPersistence();
+  installMenu(root);
   window.addEventListener("hashchange", () => render(ctx));
   // Nach einem Neuladen gibt es keine laufende Sitzung mehr
   if (["uebung", "ende"].includes(routeName())) history.replaceState(null, "", location.pathname + location.search);
@@ -133,7 +135,7 @@ function showLoadError(error: string, raw: string) {
   const draw = (msg = "") => {
     root.innerHTML = `
 <main class="screen page">
-  ${topbar("Daten nicht lesbar", "#")}
+  ${topbar("Daten nicht lesbar", "#", false)}
   <p class="banner">${error}</p>
   <p class="help">Die gespeicherten Übungsdaten lassen sich nicht lesen. Es wurde nichts gelöscht. Du kannst eine Sicherung einlesen oder die beschädigten Daten zur Aufbewahrung herunterladen.</p>
   <div class="btnrow">

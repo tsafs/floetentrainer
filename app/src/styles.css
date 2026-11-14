@@ -51,6 +51,8 @@
   --playhead: rgba(31, 111, 186, 0.5);
   --mark-tint: #e2e5e0;
   --mark-sel: #d0d9d8;
+  /* Abdunklung hinter dem Menü */
+  --shade: rgba(20, 16, 12, 0.32);
 }
 
 /* Dunkelmodus: folgt dem Handy, außer in den Einstellungen ist „Hell“ oder „Dunkel“ gewählt.
@@ -83,6 +85,7 @@
     --playhead: rgba(98, 174, 240, 0.62);
     --mark-tint: #2f3234;
     --mark-sel: #3b444a;
+  --shade: rgba(0, 0, 0, 0.5);
   }
 }
 :root[data-theme="dark"] {
@@ -112,6 +115,7 @@
   --playhead: rgba(98, 174, 240, 0.62);
   --mark-tint: #2f3234;
   --mark-sel: #3b444a;
+  --shade: rgba(0, 0, 0, 0.5);
 }
 
 * {
@@ -263,6 +267,108 @@ svg.acc {
 .iconbtn svg {
   stroke: currentColor;
 }
+.iconbtn.menubtn {
+  margin-left: 0;
+  margin-right: -12px;
+}
+
+/* ---------------------------------------------------------------- Menü (ui/menu.ts) */
+.menushade {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: var(--shade);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.22s ease,
+    visibility 0s linear 0.22s;
+}
+.menu {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 51;
+  width: min(80vw, 320px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--paper);
+  border-left: 1px solid var(--line);
+  box-shadow: -10px 0 30px rgba(20, 16, 12, 0.12);
+  padding: max(10px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) 26px;
+  transform: translateX(100%);
+  visibility: hidden;
+  transition:
+    transform 0.24s ease,
+    visibility 0s linear 0.24s;
+}
+.menu-open .menushade {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.22s ease;
+}
+.menu-open .menu {
+  transform: none;
+  visibility: visible;
+  transition: transform 0.24s ease;
+}
+.menu-open body {
+  overflow: hidden;
+}
+.menuhead {
+  display: flex;
+  justify-content: flex-end;
+  min-height: 48px;
+  margin-bottom: 6px;
+}
+.menuhead .iconbtn {
+  margin: 0 -12px 0 0;
+}
+.menu ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.menu a {
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+  padding: 4px 0 4px 14px;
+  border-left: 1.5px solid transparent;
+  font-size: 1.3rem;
+  color: var(--ink);
+  text-decoration: none;
+}
+.menu a[aria-current="page"] {
+  font-weight: 500;
+  border-left-color: var(--ink);
+}
+@media (prefers-reduced-motion: reduce) {
+  .menushade,
+  .menu,
+  .menu-open .menushade,
+  .menu-open .menu {
+    transition: none;
+  }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  /* × schwebt oben rechts neben „Startseite“, damit alle sieben Einträge ohne Scrollen passen */
+  .menuhead {
+    position: absolute;
+    top: max(4px, env(safe-area-inset-top));
+    right: max(18px, env(safe-area-inset-right));
+    min-height: 0;
+    margin: 0;
+  }
+  .menu ul {
+    margin-right: 40px;
+  }
+  .menu a {
+    min-height: 44px;
+    font-size: 1.2rem;
+  }
+}
 
 .big {
   display: block;
@@ -297,6 +403,14 @@ svg.acc {
 .home h1 {
   font-size: 2rem;
   line-height: 1.1;
+}
+/* Titel und Menüknopf in einer Zeile; der Knopf ragt wie in der Kopfzeile in den Rand */
+.homehead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: -6px 0 -6px;
 }
 .today {
   display: flex;
@@ -481,32 +595,6 @@ svg.acc {
 }
 .actions .alt small {
   color: var(--soft);
-}
-.links {
-  display: flex;
-  justify-content: space-around;
-  font-style: italic;
-  color: var(--soft);
-  margin-top: -8px;
-}
-.links a {
-  color: inherit;
-  text-decoration: none;
-  padding: 10px 6px;
-  min-height: 48px;
-  display: grid;
-  align-items: center;
-  white-space: nowrap;
-}
-/* passt die Zeile nicht (home.ts misst), wird sie zweizeilig – bei gleicher Schrift */
-.links.two {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  justify-items: center;
-  row-gap: 0;
-}
-.links.two a {
-  padding: 4px 6px;
 }
 .banner {
   border-radius: 12px;
@@ -1150,11 +1238,13 @@ svg.acc {
     grid-template-columns: 1fr 1fr;
     column-gap: 36px;
     row-gap: 12px;
-    grid-template-areas: "title act" "today act" "tracks nav";
+    grid-template-areas: "title act" "today act" "tracks act";
     grid-template-rows: auto 1fr auto;
   }
-  .home h1 {
+  .homehead {
     grid-area: title;
+  }
+  .home h1 {
     font-size: 1.7rem;
   }
   .today {
@@ -1175,11 +1265,6 @@ svg.acc {
   .actions {
     grid-area: act;
     align-content: center;
-  }
-  .links {
-    grid-area: nav;
-    align-self: end;
-    margin-top: 0;
   }
   .num {
     font-size: 2.5rem;

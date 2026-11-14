@@ -161,3 +161,12 @@ export const FAKE_MIC = () => {
     return dest.stream;
   };
 };
+
+/** Menü oben rechts öffnen und einen Eintrag wählen (z. B. „Stimmgerät“). */
+export async function menuTo(page: Page, entry: string) {
+  await page.getByRole("button", { name: "Menü", exact: true }).click();
+  const menu = page.getByRole("dialog", { name: "Menü" });
+  await expect(menu).toBeVisible();
+  await menu.getByRole("link", { name: entry, exact: true }).click();
+  await expect(menu).toBeHidden();
+}
