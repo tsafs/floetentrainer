@@ -82,11 +82,14 @@ test.describe("Lesen", () => {
     await tap(page, "g1");
     await tap(page, "fis1"); // falsch (e¹)
     await expect(m.locator('.sn[data-i="2"]')).toHaveClass(/miss/);
-    await expect(m.locator('.sn[data-i="2"] .sl')).toHaveText("e1");
+    await expect(m.locator('.sn[data-i="2"] .sl')).toHaveText("fis1"); // ihre Antwort, rot
     await expect(m.locator(".sn.cur")).toHaveAttribute("data-i", "3");
     await tap(page, "a1");
     await expect(page.getByTestId("panel")).toContainText("Nicht ganz");
-    await expect(page.getByTestId("panel")).toContainText("Du hast fis1 gewählt");
+    // im Feld die ganze richtige Folge, der Fehler rot; kein Griffbild, kein Hinweistext
+    await expect(page.getByTestId("panel")).toContainText("e1 g1 e1 a1");
+    await expect(page.locator(".panel .names .bad")).toHaveText("e1");
+    await expect(page.locator(".panel .flute")).toHaveCount(0);
     const d = await stored(page);
     expect(d.history.lesen.e1.at(-1)[0]).toBe(0); // an einer Stelle falsch → falsch
     expect(d.history.lesen.g1.at(-1)[0]).toBe(1);
@@ -118,7 +121,8 @@ test.describe("Lesen", () => {
     await m.getByRole("button", { name: "Weiß nicht" }).click();
     await expect(page.getByTestId("panel")).toContainText("Auflösung");
     await expect(m.locator(".sn.miss")).toHaveCount(2);
-    await expect(m.locator('.sn[data-i="2"] .sl')).toHaveText("c2");
+    await expect(m.locator('.sn[data-i="2"] .sl')).toHaveText(""); // keine Antwort
+    await expect(page.getByTestId("panel")).toContainText("a1 h1 c2");
     const d = await stored(page);
     expect(d.history.lesen.a1.at(-1)[0]).toBe(1);
     expect(d.history.lesen.c2.at(-1)[0]).toBe(0);
@@ -222,7 +226,8 @@ test.describe("Spielen", () => {
     await page.waitForTimeout(150);
     await playSeq(page, ["h1", "c2"]);
     await expect(page.getByTestId("panel")).toContainText("Nicht ganz");
-    await expect(m.locator('.sn[data-i="1"] .sl')).toHaveText("h1");
+    await expect(m.locator('.sn[data-i="1"] .sl')).toHaveText("d1"); // der falsch gespielte Ton
+    await expect(page.getByTestId("panel")).toContainText("a1 h1 c2");
     await expect(m.locator('.sn[data-i="2"]')).toHaveClass(/hit/);
     await expect(m.getByRole("button", { name: "Anhören" })).toBeVisible();
     const d = await stored(page);

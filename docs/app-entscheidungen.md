@@ -178,19 +178,19 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   - Oben eine breite Notenzeile mit allen Noten (ganze Notenköpfe ohne Takt und Hals), **Vorzeichen an
     jeder Note**. Die aktuelle Note hat einen feinen Strich darunter; darunter wachsen die Namen mit.
   - **Lesen** („Wie heißen diese Noten? Der Reihe nach.“): Namenknöpfe nach Tonhöhe, alle Töne der Folge
-    plus verwechselbare, zusammen bis zu 8, mindestens 2 nicht aus der Folge. Richtig: Note grün, Name
-    darunter, weiter. Falsch: Note rot, darunter ihr richtiger Name, weiter mit der nächsten.
+    plus verwechselbare, zusammen bis zu 8, mindestens 2 nicht aus der Folge. Unter jeder Note steht
+    *ihre Antwort*: richtig grün, falsch rot (der getippte Name), weiter mit der nächsten.
   - **Spielen** („Spiel diese Töne nacheinander.“, darunter „Ich höre“): gewertet wie das Mitspielen im
     Warte-Modus (wartet auf jede Note, Tonwiederholung braucht einen neuen Einsatz, Übergangsklänge beim
     Fingerwechsel zählen nicht, Oktave zu hoch nur ein Hinweis), mit Toleranz, Haltedauer und Klarheit
     (0,9) wie bei der Spielen-Karte und Stimmton und Werten der aktiven Flöte. Falscher Ton: Note rot,
-    „Du spielst d²“, die Markierung wartet weiter auf den richtigen Ton; mit Kopfhörern erklingt kurz der
+    darunter der (erste) falsch gespielte Ton, „Du spielst d²“, die Markierung wartet weiter auf den richtigen Ton; mit Kopfhörern erklingt kurz der
     richtige.
   - Nach der letzten Note wie bei Karten: ganz richtig kurz „Richtig“ und von selbst weiter, sonst ein
-    rötliches Feld mit dem Griffbild der ersten falschen Note, der Folge (falsche rot) und dem Hinweis,
-    darunter „Weiter“. Beim Spielen zusätzlich „Anhören“ (spielt die Folge einmal vor; nach „Richtig“ hält
+    rötliches Feld, alles mittig: „Nicht ganz“ und die ganze richtige Folge (falsche Töne rot) – so stehen
+    oben ihre Antworten, unten die Lösung. Kein Griffbild, kein Hinweistext. Darunter „Weiter“. Beim Spielen zusätzlich „Anhören“ (spielt die Folge einmal vor; nach „Richtig“ hält
     es das automatische Weitergehen an).
-  - „Weiß nicht“ löst die restlichen Noten auf; sie zählen als falsch.
+  - „Weiß nicht“ löst die restlichen Noten auf; sie zählen als falsch, unter ihnen steht nichts.
 - **„Weiß nicht“:** Bei jeder Übungsart gibt es einen kleinen Knopf „Weiß nicht“. Er zeigt die
   Auflösung und zählt als Fehler.
 - **Notennamen:** Deutsch (c d e f g a h, cis, es, b …), immer mit Oktavzahl.
@@ -206,9 +206,9 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
     - Gewertet wird erst ab einem neuen Toneinsatz nach der Kartenanzeige, also nach Stille oder einem
       Tonwechsel und frühestens 400 ms nach der Anzeige. Ein Nachklang der vorigen Karte zählt so nicht.
     - Ein Fehler wird höchstens einmal je Karte gewertet. „Erst falsch, dann richtig“ ist ein Fehler.
-    - Die App zeigt dann „Du spielst a¹“ und das Griffbild des gesuchten Tons. Die Nutzerin spielt
+    - Die App zeigt dann „Du spielst a¹“ und den Namen des gesuchten Tons. Die Nutzerin spielt
       weiter, bis der richtige Ton kommt, oder tippt „Weiter“.
-  - **Weiß nicht:** Das Griffbild erscheint, und sie darf den Ton danach spielen. Es zählt als Fehler.
+  - **Weiß nicht:** Der Name erscheint, und sie darf den Ton danach spielen. Es zählt als Fehler.
   - **Erkennung, damit nichts ungerecht gewertet wird:**
     - Tonhöhe nur, wenn pitchy eine Klarheit von mindestens etwa 0,9 meldet und die Lautstärke über
       einer Schwelle liegt.
@@ -313,9 +313,8 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   - Laufend wird angezeigt, welchen Ton die App hört, mit Abweichung in Cent.
   - Einstellbar sind Toleranz und Haltedauer; der Stimmton gehört seit 14.11.2026 zur Flöte (Einstellungen →
     Flöte).
-- **Hinweis nach einem Fehler:** ein Satz aus festen Vorlagen. Je nach Verwechslung geht es um
-  Hilfslinien, Linie oder Zwischenraum, die Oktave (Daumen), ♯/♭ oder die Nachbarnote. Beispiel:
-  „Du hast d¹ gewählt. c¹ hat eine eigene Hilfslinie, d¹ hängt unter der untersten Linie.“
+- **Kein Hinweistext nach einem Fehler** (geändert am 14.11.2026, vorher ein Satz aus festen Vorlagen zu
+  Lage, Oktave, Vorzeichen): Der richtige Name reicht.
 
 ## 5. Rückmeldung
 
@@ -326,10 +325,12 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   - Im Hochformat bleiben die Knöpfe sichtbar (der richtige hervorgehoben, die anderen blass).
     Im Querformat ersetzt das Feld die Knöpfe.
 - **Falsch:**
-  - Ein rötlich getöntes Feld ersetzt die Knöpfe. Darin stehen „Nicht ganz“, der richtige Name, das
-    Griffbild und der Hinweis.
+  - Ein rötlich getöntes Feld ersetzt die Knöpfe. Darin steht alles mittig: „Nicht ganz“ (beim Spielen
+    „Du spielst a¹“) und groß der richtige Name – kein Griffbild, kein Hinweistext (geändert am
+    14.11.2026). Nur wo die Antwort selbst ein Bild ist, bleibt es neben dem Namen: das Griffbild bei
+    Note→Griff, die Note bei Griff→Note (das Feld verdeckt die Antwortknöpfe).
   - Darunter ein großer Knopf „Weiter“, es geht nicht von selbst weiter.
-  - Die Note bleibt oben stehen, sodass Note, Name und Griff zusammen sichtbar sind.
+  - Die Note bleibt oben stehen, sodass Note und Name zusammen sichtbar sind.
 - **Keine Beschreibung in Worten, welche Löcher zu sind.** Das Griffbild reicht. Griff-Tipps gibt es
   nur bei der Vorstellung.
 

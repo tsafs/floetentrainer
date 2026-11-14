@@ -67,7 +67,9 @@ test.describe("Üben", () => {
     i = await info(page);
     const wrongNote = await answer(page, false);
     await expect(page.getByTestId("panel")).toContainText("Nicht ganz");
-    await expect(page.getByTestId("panel")).toContainText("Du hast");
+    // nur der richtige Name, kein Hinweistext, kein Griffbild (bei Note→Name)
+    await expect(page.getByTestId("panel")).toContainText(wrongNote);
+    await expect(page.locator(".panel .sub")).toHaveCount(0);
     await expect(page.locator(".btns")).toBeHidden();
     await page.waitForTimeout(1500);
     await expect(page.getByTestId("panel")).toContainText("Nicht ganz"); // nicht von selbst weiter
