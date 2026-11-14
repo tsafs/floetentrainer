@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { soundingFreq } from "../../src/music/notes";
 import { FAKE_AUDIO } from "./fake-audio";
 import { sampleData } from "./seed";
-import { FAKE_MIC, seed, stored } from "./util";
+import { FAKE_MIC, menuTo, seed, stored } from "./util";
 
 const ABC = "X:1\nT:Kurz\nM:4/4\nL:1/4\nQ:1/4=120\nK:G\nG A B B | c A G2 |]\n";
 const SONG = "abc-kurz";
@@ -273,7 +273,7 @@ test("Stimmgerät: Abweichung zum Stimmton der Flöte, dazu klein der Wert des T
   await page.addInitScript(FAKE_MIC);
   await seed(page, data({ flutes: [{ id: "floete-1", name: "Meine Flöte", tuning: { hz: 440, known: true }, offsets: { a1: -25 }, updated: 1 }], activeFlute: "floete-1" }));
   await page.goto("./");
-  await page.getByRole("link", { name: "Stimmgerät" }).click();
+  await menuTo(page, "Stimmgerät");
   await page.waitForFunction(() => (window as unknown as { __osc: unknown }).__osc !== null);
   await page.evaluate((f) => (window as unknown as { __osc: { play(f: number): void } }).__osc.play(f), hz(69, -25));
   await expect(page.getByTestId("tuner-tuning")).toHaveText("Flöte: Meine Flöte · 440 Hz");

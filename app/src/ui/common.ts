@@ -42,8 +42,19 @@ export function pressGuard(root: HTMLElement): (e: Event, el: Element) => boolea
   return (e, el) => (e as MouseEvent).detail === 0 || pressed === el;
 }
 
-export function topbar(title: string, back = "#/"): string {
-  return `<header class="topbar"><a class="iconbtn" href="${back}" aria-label="Zurück">${ICON_BACK}</a><h1>${title}</h1><span></span></header>`;
+export const ICON_MENU = `<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13" fill="none" stroke-width="1.6" stroke-linecap="round"/></svg>`;
+
+/**
+ * Platz für den Menüknopf oben rechts. Der Knopf selbst ist ein einziges Element aus ui/menu.ts, das immer
+ * an derselben Stelle in der Bildschirmecke steht; er erscheint nur auf Seiten, die diesen Platz freihalten.
+ */
+export function menuSlot(): string {
+  return `<span class="menuslot" data-menu-slot></span>`;
+}
+
+/** Kopfzeile: Zurück, Titel, rechts der Menüknopf (menu = false: leerer Platz, z. B. auf der Fehlerseite). */
+export function topbar(title: string, back = "#/", menu = true): string {
+  return `<header class="topbar"><a class="iconbtn" href="${back}" aria-label="Zurück">${ICON_BACK}</a><h1>${title}</h1>${menu ? menuSlot() : "<span></span>"}</header>`;
 }
 
 /** „1 Karte“ / „5 Karten“ */

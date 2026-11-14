@@ -140,6 +140,15 @@ export interface AppData {
   stages: Record<Track, string>;
   /** Für das Freischalten zählen nur Antworten ab diesem Zeitpunkt (nach einem Senken). */
   countFrom: Record<Track, number>;
+  /**
+   * Startpunkt je Spur (Kennung der Stufe, seit 14.11.2026, docs/app-startpunkt.md): Die Töne der Stufen
+   * davor gelten als bekannt; fürs Freischalten zählen nur die Töne ab dieser Stufe. Optionales Feld ohne
+   * Versionssprung: Fehlt es, gilt Stufe 1 wie bisher – und es fehlt genau dann, wenn beim ersten Start noch
+   * nichts gewählt wurde (dann kommt die Willkommensseite). Eine ältere App ließe es beim Speichern weg; dann
+   * müssten fürs Freischalten wieder alle Töne sitzen – das bremst nur und lässt sich durch erneutes Wählen
+   * beheben.
+   */
+  start?: Record<Track, string>;
   /** Karten "ton|art" → Fach und Termin */
   cards: Record<string, CardState>;
   /** letzte 20 gewertete Antworten je Spur und Ton */
@@ -329,6 +338,14 @@ export function normalizeData(raw: unknown): AppData {
     }
     const l = levelOf("lesen", out.stages.lesen);
     if (levelOf("spielen", out.stages.spielen) > l) out.stages.spielen = stagesOf("spielen")[Math.min(l, 11) - 1].id;
+  }
+  if (isObj(d.start)) {
+    // höchstens die aktuelle Stufe; Fehlerhaftes fällt still auf Stufe 1 zurück
+    const st = d.start;
+    out.start = {
+      lesen: stagesOf("lesen")[Math.min(levelOf("lesen", typeof st.lesen === "string" ? st.lesen : undefined), levelOf("lesen", out.stages.lesen)) - 1].id,
+      spielen: stagesOf("spielen")[Math.min(levelOf("spielen", typeof st.spielen === "string" ? st.spielen : undefined), levelOf("spielen", out.stages.spielen)) - 1].id,
+    };
   }
   if (isObj(d.countFrom)) {
     for (const t of ["lesen", "spielen"] as Track[]) if (isNum(d.countFrom[t])) out.countFrom[t] = d.countFrom[t];

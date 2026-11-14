@@ -1,9 +1,10 @@
 // Bildschirmfotos für die Durchsicht (nur mit SHOTS=1): npx playwright test shots
 import { expect, test, type Page } from "@playwright/test";
 import { sampleData } from "./seed";
-import { answer, FAKE_MIC, info, next, skipIntros } from "./util";
+import { answer, FAKE_MIC, info, next, menuTo, skipIntros } from "./util";
 import { FAKE_AUDIO } from "./fake-audio";
 import { note, soundingFreq } from "../../src/music/notes";
+import { dayKey } from "../../src/store/dates";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
@@ -102,6 +103,30 @@ for (const s of SIZES) {
       await page.getByRole("button", { name: "Sitzung beenden" }).click();
       await page.screenshot({ path: p("9-ende") });
     });
+    test("Menü", async ({ page }) => {
+      await seed(page);
+      const p = (x: string) => `${OUT}/${scheme}-${s.name}-${x}.png`;
+      const open = async () => {
+        await page.getByRole("button", { name: "Menü", exact: true }).click();
+        await expect(page.getByRole("dialog", { name: "Menü" })).toBeVisible();
+        await page.waitForTimeout(400); // Gleiten abwarten
+      };
+      await page.goto("./");
+      await page.evaluate(() => document.fonts.ready);
+      await page.screenshot({ path: p("m1-start") });
+      await open();
+      await page.screenshot({ path: p("m2-start-menue") });
+      await page.goto("./#/einstellungen");
+      await page.evaluate(() => document.fonts.ready);
+      await expect(page.getByRole("dialog", { name: "Menü" })).toBeHidden();
+      await page.screenshot({ path: p("m3-einstellungen") });
+      await open();
+      await page.screenshot({ path: p("m4-einstellungen-menue") });
+      await page.goto("./#/lied/alle-meine-entchen");
+      await page.evaluate(() => document.fonts.ready);
+      await expect(page.getByRole("dialog", { name: "Menü" })).toBeHidden();
+      await page.screenshot({ path: p("m5-lied") });
+    });
     test("Spielen und Stimmgerät", async ({ page }) => {
       await page.addInitScript(FAKE_MIC);
       await seed(page);
@@ -118,12 +143,91 @@ for (const s of SIZES) {
       await expect(page.getByTestId("panel")).toBeVisible();
       await page.screenshot({ path: p("b-spielen-falsch") });
       await page.goto("./");
-      await page.getByRole("link", { name: "Stimmgerät" }).click();
+      await menuTo(page, "Stimmgerät");
       await page.waitForFunction(() => (window as never as { __osc: unknown }).__osc !== null);
       await osc("b1");
       await expect(page.getByTestId("tuner-name")).toHaveText("b1");
       await page.waitForTimeout(200);
       await page.screenshot({ path: p("c-stimmgeraet") });
+    });
+    test("Tonfolgen", async ({ page }) => {
+      // nichts fällig, nichts neu: Sitzung aus Zusatzkarten, die zweite ist eine Tonfolge
+      const d = sampleData();
+      const today = dayKey();
+      for (const k of Object.keys(d.cards)) d.cards[k] = { box: 5, day: today, session: 5 };
+      await page.addInitScript(FAKE_MIC);
+      await seed(page, d);
+      const folgen = [["fis1", "g1", "a1", "a1", "h1"], ["e1", "fis1", "g1", "fis1", "e1"], ["d1", "e1", "fis1", "g1"], ["g1", "a1", "h1", "c2", "h1"]];
+      await page.addInitScript((f) => {
+        if (!sessionStorage.getItem("folgen")) {
+          sessionStorage.setItem("folgen", "1");
+          (window as never as { __folgen: string[][] }).__folgen = f;
+        }
+      }, folgen);
+      const p = (x: string) => `${OUT}/${scheme}-${s.name}-${x}.png`;
+      const toFolge = async () => {
+        for (let i = 0; i < 6 && (await info(page)).step !== "folge"; i++) {
+          await answer(page, true);
+          await next(page);
+        }
+      };
+      const tap = (id: string) => page.locator(`main[data-step="folge"] .btns button[data-choice="${id}"]`).click();
+      await page.goto("./");
+      await page.evaluate(() => document.fonts.ready);
+      await page.getByRole("button", { name: /Weiter üben/ }).click();
+      await toFolge();
+      await page.screenshot({ path: p("t1-folge-anfang") });
+      await tap("fis1");
+      await tap("g1");
+      await page.screenshot({ path: p("t2-folge-mitten") });
+      await tap("h1"); // falsch (a¹)
+      await page.waitForTimeout(400);
+      await page.screenshot({ path: p("t3-folge-fehler") });
+      await tap("a1");
+      await tap("h1");
+      await page.waitForTimeout(300);
+      await page.screenshot({ path: p("t4-folge-aufgeloest") });
+      await next(page);
+      await toFolge();
+      const ids = (await page.locator("main").getAttribute("data-notes"))!.split(" ");
+      for (const id of ids) await tap(id);
+      await page.screenshot({ path: p("t5-folge-richtig") });
+      // Spielen
+      await page.goto("./");
+      await page.evaluate(() => ((window as never as { __folgen: string[][] }).__folgen = [["g1", "a1", "a1", "h1", "c2"]]));
+      await page.getByRole("button", { name: /Weiter spielen/ }).click();
+      await page.waitForFunction(() => (window as never as { __osc: unknown }).__osc !== null);
+      const osc = (id: string | null) =>
+        page.evaluate((f) => {
+          const o = (window as never as { __osc: { play(f: number): void; silence(): void } }).__osc;
+          if (f === null) o.silence();
+          else o.play(f);
+        }, id ? soundingFreq(note(id)) : null);
+      const first = await info(page);
+      await page.waitForTimeout(450);
+      await osc(first.note);
+      await expect(page.locator("main.ok")).toBeVisible();
+      await osc(null);
+      await next(page);
+      for (const id of ["g1", "a1"]) {
+        await page.waitForTimeout(150);
+        await osc(id);
+        await page.waitForTimeout(650);
+        await osc(null);
+      }
+      await page.waitForTimeout(150);
+      await osc("d2"); // falsch
+      await page.waitForTimeout(900);
+      await page.screenshot({ path: p("t6-spielen-mitten") });
+      await osc(null);
+      for (const id of ["a1", "h1", "c2"]) {
+        await page.waitForTimeout(150);
+        await osc(id);
+        await page.waitForTimeout(650);
+        await osc(null);
+      }
+      await expect(page.getByTestId("panel")).toBeVisible();
+      await page.screenshot({ path: p("t7-spielen-ende") });
     });
     test("Lieder", async ({ page }) => {
       await page.addInitScript(FAKE_AUDIO);
@@ -133,7 +237,7 @@ for (const s of SIZES) {
       await page.goto("./");
       await page.evaluate(() => document.fonts.ready);
       await page.screenshot({ path: p("l1-start") });
-      await page.getByRole("link", { name: "Lieder" }).click();
+      await menuTo(page, "Lieder");
       await expect(page.getByTestId("can-play")).toBeVisible();
       await page.screenshot({ path: p("l2-liste") });
       await page.screenshot({ path: p("l2-liste-ganz"), fullPage: true });
@@ -342,7 +446,7 @@ for (const s of SIZES.filter((x) => x.name === "360x740" || x.name === "740x360"
       await page.screenshot({ path: p("r5-mitspielen-floete-diagnose") });
       // Stimmgerät mit Wert der Flöte
       await page.goto("./#/");
-      await page.getByRole("link", { name: "Stimmgerät" }).click();
+      await menuTo(page, "Stimmgerät");
       await page.waitForFunction(() => (window as unknown as { __osc: unknown }).__osc !== null);
       await page.evaluate((f) => (window as unknown as { __osc: { play(f: number): void } }).__osc.play(f), hz(69, -32));
       await expect(page.getByTestId("tuner-flute")).not.toHaveText("");

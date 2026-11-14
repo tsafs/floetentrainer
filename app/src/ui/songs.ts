@@ -30,7 +30,7 @@ import { missingHtml, playabilityFor } from "../songs/playable";
 import { baseTempo, clampPercent, secPerQuarter, TEMPO_MAX, TEMPO_MIN } from "../songs/tempo";
 import { buildTimeline, fromBarTimeline, type Timeline } from "../songs/timeline";
 import { tuningHz } from "../store/data";
-import { esc, ICON_BACK, plural, type View } from "./common";
+import { esc, ICON_BACK, menuSlot, plural, type View } from "./common";
 import { brokenSongPage, mountOwnBox, takeListNote } from "./own-songs";
 import { Playhead } from "./playhead";
 import { followBarHtml, ICON_MIC, mountFollow } from "./song-follow";
@@ -250,7 +250,7 @@ export const songListView: View = (root, ctx) => {
     .join("");
   root.innerHTML = `
 <main class="screen page songlist">
-  <header class="topbar"><a class="iconbtn" href="#/" aria-label="Zurück">${ICON_BACK}</a><h1>Lieder</h1><span></span></header>
+  <header class="topbar"><a class="iconbtn" href="#/" aria-label="Zurück">${ICON_BACK}</a><h1>Lieder</h1>${menuSlot()}</header>
   <p class="help intro">Jedes Lied lässt sich anhören und mitspielen: Die App spielt es vor und zeigt die Noten mit.</p>
   ${note ? `<p class="msg ok" data-testid="msg" role="status">${esc(note)}</p>` : ""}
   ${cards.join("")}
@@ -322,7 +322,7 @@ export const songView: View = (root, ctx) => {
       <h1>${esc(song.title)}</h1>
       <p class="meta">${song.subtitle ? `${esc(song.subtitle)} · ` : ""}${esc(song.keyName)} · ${timeHtml(song.time)} · <span class="nb">Grundtempo ${tempoMark(song, 100)}</span></p>
     </div>
-    <span></span>
+    ${menuSlot()}
   </header>
   <div class="seg modes" role="tablist" aria-label="Anhören oder mitspielen">
     <button role="tab" data-mode="listen" aria-selected="true">${ICON_EAR}<span>Anhören</span></button><button role="tab" data-mode="follow" aria-selected="false">${ICON_MIC}<span>Mitspielen</span></button>

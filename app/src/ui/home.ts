@@ -1,4 +1,4 @@
-// Startseite: Serie, Stufenleisten, Töne beim Lesen, Knöpfe Üben und Spielen.
+// Startseite: Titel mit Menüknopf, Serie, Stufenleisten, Töne beim Lesen, Knöpfe Üben und Spielen.
 
 import { mic } from "../audio/mic";
 import { maxLevel, unlockedNotes, type Track } from "../music/levels";
@@ -6,7 +6,7 @@ import { nameHtml } from "../music/names";
 import { dueCount } from "../srs/leitner";
 import { isWeak, level, noteAccuracy, streak, weekDots } from "../srs/progress";
 import { hasWork, Session } from "../srs/session";
-import { plural, type Ctx, type View } from "./common";
+import { menuSlot, plural, type Ctx, type View } from "./common";
 
 function trackRow(ctx: Ctx, track: Track): string {
   const lv = level(ctx.data, track);
@@ -84,7 +84,7 @@ export const homeView: View = (root, ctx) => {
   const spiel = buttonText(ctx, "spielen");
   root.innerHTML = `
 <main class="screen fit home">
-  <h1>Flötentrainer</h1>
+  <header class="homehead"><h1>Flötentrainer</h1>${menuSlot()}</header>
   ${ctx.saveFailed ? `<p class="banner">Speichern ist gerade nicht möglich. Bitte in den Einstellungen eine Sicherung herunterladen.</p>` : ""}
   <section class="today">
     <div class="stat"><span class="num" data-testid="streak">${st}</span><span class="lbl">${st === 1 ? "Tag in Folge" : "Tage in Folge"}</span></div>
@@ -97,23 +97,14 @@ export const homeView: View = (root, ctx) => {
     <button class="main" data-act="ueben">${lese.label}<small>${lese.sub}</small></button>
     <button class="alt" data-act="spielen">${spiel.label}<small>${spiel.sub}</small></button>
   </section>
-  <nav class="links"><a href="#/lieder">Lieder</a><a href="#/stimmgeraet" data-act="tuner">Stimmgerät</a><a href="#/griffe">Grifftabelle</a><a href="#/einstellungen">Einstellungen</a></nav>
 </main>`;
   const main = root.querySelector("main")!;
   main.querySelector('[data-act="ueben"]')!.addEventListener("click", () => startSession(ctx, "lesen"));
   main.querySelector('[data-act="spielen"]')!.addEventListener("click", () => startPlaying(ctx));
-  main.querySelector('[data-act="tuner"]')!.addEventListener("click", () => {
-    // Mikrofon aus dem Tippen heraus starten; das Stimmgerät zeigt Fehler selbst an
-    mic.start().catch(() => {});
-  });
 
   // Passt alles ohne Scrollen? Sonst die Tonübersicht verdichten oder ausblenden.
-  // Die untere Zeile wird zweizeilig, wenn ihre vier Einträge nicht nebeneinander passen.
-  const links = main.querySelector(".links") as HTMLElement;
   const fit = () => {
     main.classList.remove("dense", "denser");
-    links.classList.remove("two");
-    if (links.scrollWidth > links.clientWidth + 1) links.classList.add("two");
     const over = () => main.scrollHeight > main.clientHeight + 1;
     if (over()) main.classList.add("dense");
     if (over()) main.classList.add("denser");

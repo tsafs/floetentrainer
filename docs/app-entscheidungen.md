@@ -22,13 +22,23 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   3. **Zusatzkarten**, bis die Sitzung voll ist: zufällige Karten der freigeschalteten Töne,
      schwache Töne dreifach gewichtet. Zusatzkarten zählen für die Trefferquote (Abschnitt 3),
      **verändern aber keine Fächer und Termine.**
+     **Etwa jede zweite Zusatzkarte ist eine Tonfolge** (seit 14.11.2026, `docs/app-tonfolgen.md`;
+     abwechselnd, nicht gehäuft): mehrere Töne hintereinander lesen bzw. spielen (Abschnitt 4). Sie gibt
+     es, sobald in der Spur mindestens 5 Töne vorgestellt sind; sonst bleibt der Platz eine Zusatzkarte.
+     Eine Tonfolge ist keine Leitner-Karte, zählt in „7 von 20“ und für die Kartengrenze als **eine**
+     Position und im Ergebnis als richtig, wenn alle Töne richtig waren; jeder falsche Ton kommt in
+     „Schwierig waren“. Fällige und neue Karten bleiben wie sie sind.
 - Derselbe Ton kommt nie zweimal direkt hintereinander. Sonst würde die Auflösung der einen Karte
   die Antwort der nächsten verraten.
+  Das gilt auch an der Grenze zu einer Tonfolge: Die Karte danach fragt nicht ihren letzten Ton ab, und
+  eine Folge beginnt nicht mit dem Ton der Karte davor.
 - **Fehler in der Sitzung:**
   - Eine falsch beantwortete Karte kommt nach 2–3 anderen Karten nochmal, höchstens zweimal.
   - Diese Wiederholungen zählen nicht zur Kartengrenze, nicht zur Trefferquote und ändern das Fach
     nicht.
   - Steht beim Sitzungsende noch eine Wiederholung aus, entfällt sie.
+  - Eine Tonfolge mit Fehler kommt nach 2–3 anderen Schritten **einmal** wieder (ungewertet, wie bei
+    Karten). Diese Wiederholung darf direkt nach einer anderen Folge stehen.
 - **Abbrechen mit ×:** Bereits beantwortete Karten bleiben gewertet, alles andere bleibt unverändert.
 - **Nichts fällig, nichts neu:** Der Knopf heißt dann „Weiter üben“ bzw. „Weiter spielen“, darunter
   „Fälliges erledigt · zählt für Stufe n“, auch wenn Spielen gerade an der Lesen-Stufe ansteht (die
@@ -54,6 +64,10 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   „Nach n Tagen“ wird in Kalendertagen der lokalen Zeitzone gezählt.
 - Richtig: ein Fach höher, Fach 6 bleibt Fach 6. Falsch: Fach 1.
 - Eine neue Karte wird bei ihrer ersten Antwort einsortiert: richtig in Fach 2, falsch in Fach 1.
+- **Als bekannt angenommene Karten** (Startpunkt, seit 14.11.2026, `docs/app-startpunkt.md`): Wer bei einem
+  späteren Meilenstein beginnt, bekommt für die Töne davor Karten in **Fach 3**, gestaffelt fällig ab
+  morgen, höchstens 3 je Spur und Tag (die Töne nahe am Startpunkt zuerst). Als „Tag der letzten Antwort“
+  steht dabei der Tag, der zu diesem Termin passt.
 - **Serie:** die Kalendertage in Folge mit mindestens einer gewerteten Antwort, egal welcher Art.
   - Hat sie heute noch nicht geübt, zählt die Serie bis gestern und bleibt stehen. Der heutige Punkt
     bleibt offen.
@@ -65,6 +79,10 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
 - **Trefferquote eines Tons** in einer Spur: Anteil richtig unter seinen letzten 20 gewerteten
   Antworten. Gewertet sind normale Karten und Zusatzkarten, aber keine Wiederholungen und keine
   Vorstellungen.
+  - **Tonfolgen** (seit 14.11.2026): Jeder Ton einer Folge zählt für seine Trefferquote, aber **jeder
+    Ton höchstens einmal je Folge**. Kommt er mehrfach vor, ist er richtig, wenn er an allen Stellen
+    richtig war. Fächer und Termine bleiben unberührt (wie bei Zusatzkarten). Danach läuft die Prüfung
+    fürs Freischalten wie nach jeder Karte.
 - **Freischalten:** Die nächste Stufe einer Spur kommt automatisch, sobald *jeder* freigeschaltete Ton
   dieser Spur
   - mindestens 10 gewertete Antworten hat,
@@ -86,6 +104,19 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   - Nach einem Senken zählen für das Freischalten nur Antworten ab diesem Zeitpunkt. Sonst würde die
     Stufe sofort wieder steigen.
   - Daten von Tönen, die dadurch wieder gesperrt sind, bleiben erhalten.
+  - Senken unter den Startpunkt zieht den Startpunkt mit; Erhöhen von Hand lässt ihn stehen (die Töne der
+    übersprungenen Stufe kommen dann als neue Töne mit Vorstellung).
+- **Startpunkt** (seit 14.11.2026, Plan und Begründung in `docs/app-startpunkt.md`): Fünf Meilensteine
+  „Ich kann schon …“, Start jeweils die Stufe danach – Ganz von vorn (Start 1), Linke Hand: g¹ bis d² (3),
+  Erste Oktave: c¹ bis e², mit fis¹ (7), Hohe Töne bis c³, mit cis² (9), Alle Töne von c¹ bis c³, auch b, es
+  und gis (12; Spielen dann ganz oben, auch Stufe 11 bekannt). Wählbar für Lesen und Spielen gemeinsam (Standard), nur Lesen oder nur Spielen
+  (Spielen höchstens bis zur Lesen-Stufe).
+  - Die Töne vor dem Startpunkt gelten als bekannt: als vorgestellt vermerkt, Karten in Fach 3 (Abschnitt 2).
+  - **Fürs Freischalten zählen nur die Töne ab dem Startpunkt** (bei „Hohe Töne bis c³“ zunächst nur b¹ und es¹).
+    Ohne Startpunkt (ältere Daten) gilt Stufe 1 – alles wie bisher.
+  - Zurückgehen (auch „Ganz von vorn“): Zählung fürs Freischalten beginnt neu; Töne ab dem neuen
+    Startpunkt, die nie wirklich beantwortet wurden, werden wieder ganz neu (mit Vorstellung). Töne mit
+    Antworten behalten Karten und Antworten. Alles löschen bleibt „Alles zurücksetzen“.
 - **Stufen** (die Stufe „Rest“ aus dem Auftrag ist auf Wunsch in vier Stufen geteilt):
 
   | Stufe | Töne | Anmerkung |
@@ -135,6 +166,30 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   - Reichen die freigeschalteten Töne nicht, kommen Töne aus späteren Stufen dazu. Diese werden selbst
     nie abgefragt.
   - Nie zwei Möglichkeiten mit demselben Griff und nie zwei Schreibweisen desselben Tons.
+- **Tonfolge** (seit 14.11.2026, Einzelheiten in `docs/app-tonfolgen.md`), in Lesen und Spielen:
+  - Töne: nur die in dieser Spur schon vorgestellten und freigeschalteten, keine anderen Schreibweisen.
+    Melodisch statt zufällig: nach Tonhöhe geordnet, meist der Nachbarton, oft eine Terz, selten ein
+    größerer Sprung (höchstens eine Quinte); Halbtonschritte bevorzugt (f¹–fis¹, h¹–c² …); in etwa jeder
+    vierten Folge eine Tonwiederholung (nie dreimal derselbe Ton); schwache Töne dreifach gewichtet; in
+    einer Sitzung keine Folge zweimal. Erzeugt in `app/src/srs/sequences.ts`.
+  - Länge: Beginn mit 3 Tönen (bei genau 5 Tönen 2 oder 3), nach zwei fehlerfreien Folgen in Reihe +1,
+    nach einer fehlerhaften −1, 2 bis 5 Töne (ab Stufe 8 bis 6). Gilt nur innerhalb der Sitzung.
+  - Oben eine breite Notenzeile mit allen Noten (ganze Notenköpfe ohne Takt und Hals), **Vorzeichen an
+    jeder Note**. Die aktuelle Note hat einen feinen Strich darunter; darunter wachsen die Namen mit.
+  - **Lesen** („Wie heißen diese Noten? Der Reihe nach.“): Namenknöpfe nach Tonhöhe, alle Töne der Folge
+    plus verwechselbare, zusammen bis zu 8, mindestens 2 nicht aus der Folge. Richtig: Note grün, Name
+    darunter, weiter. Falsch: Note rot, darunter ihr richtiger Name, weiter mit der nächsten.
+  - **Spielen** („Spiel diese Töne nacheinander.“, darunter „Ich höre“): gewertet wie das Mitspielen im
+    Warte-Modus (wartet auf jede Note, Tonwiederholung braucht einen neuen Einsatz, Übergangsklänge beim
+    Fingerwechsel zählen nicht, Oktave zu hoch nur ein Hinweis), mit Toleranz, Haltedauer und Klarheit
+    (0,9) wie bei der Spielen-Karte und Stimmton und Werten der aktiven Flöte. Falscher Ton: Note rot,
+    „Du spielst d²“, die Markierung wartet weiter auf den richtigen Ton; mit Kopfhörern erklingt kurz der
+    richtige.
+  - Nach der letzten Note wie bei Karten: ganz richtig kurz „Richtig“ und von selbst weiter, sonst ein
+    rötliches Feld mit dem Griffbild der ersten falschen Note, der Folge (falsche rot) und dem Hinweis,
+    darunter „Weiter“. Beim Spielen zusätzlich „Anhören“ (spielt die Folge einmal vor; nach „Richtig“ hält
+    es das automatische Weitergehen an).
+  - „Weiß nicht“ löst die restlichen Noten auf; sie zählen als falsch.
 - **„Weiß nicht“:** Bei jeder Übungsart gibt es einen kleinen Knopf „Weiß nicht“. Er zeigt die
   Auflösung und zählt als Fehler.
 - **Notennamen:** Deutsch (c d e f g a h, cis, es, b …), immer mit Oktavzahl.
@@ -279,19 +334,55 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
 
 ## 6. Seiten
 
+- **Willkommensseite** (seit 14.11.2026): erscheint anstelle der Startseite, solange noch kein Startpunkt
+  gewählt und noch nie geübt wurde (keine Sitzung, keine Karten, keine Übungstage). „Willkommen“, ein Satz,
+  die ersten drei Töne als Notenzeile, Knöpfe „Von vorn beginnen“ (setzt den Startpunkt Stufe 1) und „Ich
+  kann schon Noten“ (→ `#/startpunkt/neu`, Meilensteine für beide Spuren gemeinsam; nach der Wahl ersetzt die
+  Startseite diesen Verlaufseintrag, und ist schon ein Startpunkt gewählt, gilt die Adresse als `#/startpunkt`
+  mit Spurwahl und Hinweisen). Im Querformat stehen die
+  Knöpfe nebeneinander. Auch nach „Neu beginnen“ bei unlesbaren Daten kommt sie.
+- **Startpunkt** (`#/startpunkt`): Erreichbar über „Startpunkt ändern“ unten auf der Fortschrittsseite und
+  „Startpunkt wählen“ in den Einstellungen unter „Stufen“. Oben der aktuelle Stand beider Spuren, darunter
+  die Wahl „Lesen und Spielen · nur Lesen · nur Spielen“ und die fünf Meilensteine als Karten: Name, „Start
+  bei Stufe n“ bzw. „dein Startpunkt“ (stärker umrandet), alle enthaltenen Töne als Notenzeile nach Tonhöhe
+  (neue schwarz, frühere blass, alle im selben Maßstab, höchstens 9 je Zeile) und „17 Töne · danach neu: b¹
+  und es¹“. Unten „Dazwischen? Wähle den kleineren und stelle in den Einstellungen unter „Stufen“ eine Stufe
+  höher.“ Antippen öffnet darunter die Bestätigung („Diese Töne gelten als bekannt …“; beim Zurückgehen
+  zusätzlich, dass ungeübte Töne wieder mit Vorstellung kommen und Antworten bleiben) mit „Hier beginnen“ und
+  „Abbrechen“; danach zur Startseite. Für „nur Spielen“ sind
+  Meilensteine über der Lesen-Stufe ausgegraut („Erst, wenn Lesen so weit ist.“).
 - **Startseite** (Entwurf `?s=home`):
-  - Titel; die fälligen Karten für Lesen und Spielen jeweils auf ihrem Knopf.
+  - Titel, rechts daneben der Menüknopf; die fälligen Karten für Lesen und Spielen jeweils auf ihrem Knopf.
   - „Tage in Folge“ mit den Wochenpunkten Mo–So.
   - Die beiden Spuren als Stufenleisten (12 bzw. 11 Abschnitte).
   - „Deine Töne beim Lesen“: Namen mit Trefferquote-Balken. Rot ist ein Ton mit mindestens 5 Antworten
     und unter 80 %.
-  - Unten die großen Knöpfe Üben und Spielen, darunter Stimmgerät · Grifftabelle · Einstellungen.
+  - Unten die großen Knöpfe Üben und Spielen. Die frühere Zeile „Lieder · Stimmgerät · Grifftabelle ·
+    Einstellungen“ ist seit 14.11.2026 durch das Menü ersetzt (wurde auf schmalen Handys zweizeilig);
+    der Platz kommt der Tonübersicht zugute.
+- **Menü** (seit 14.11.2026, `docs/app-navigation.md`): Knopf mit drei feinen Strichen **immer oben rechts in
+  der Bildschirmecke**, auf allen Seiten hoch wie quer an derselben Stelle (Nachsteuerung: quer stand er auf der
+  Startseite mitten im Bild) – nicht in der Übung, auf dem Sitzungsende, der Willkommensseite, „Wo steigst du
+  ein?“ und auf der Fehlerseite „Daten nicht lesbar“. Auf der Liedseite quer rückt der Umschalter „Anhören |
+  Mitspielen“ dafür links neben den Knopf und zeigt nur die Wörter. Er öffnet von rechts eine Leiste (80 % der
+  Breite, höchstens 320 px; quer zwei Spalten 4 + 3, spaltenweise, bis 440 px; Rest leicht abgedunkelt) mit Startseite · Lieder · Fortschritt · Grifftabelle ·
+  Stimmgerät · Flöte einstellen · Einstellungen; die aktuelle Seite fett mit feinem Strich links (auf
+  Liedseite und „Lied hinzufügen“ ist keiner markiert, „Lieder“ führt dort zur Liste). Schließen mit ×,
+  Tippen daneben, Escape, Wahl eines Eintrags oder der Zurück-Geste. Das Öffnen hält nichts an (Vorspielen,
+  Mitspielen, Stimmgerät); erst eine andere Seite räumt wie bisher auf, die aktuelle Seite wählen schließt
+  nur. „Stimmgerät“ startet das Mikrofon direkt aus dem Tippen; läuft es schon (Flöte einstellen,
+  Mitspielen), übernimmt das Stimmgerät es, statt dass die alte Seite es beim Aufräumen ausschaltet. Das × der
+  Leiste steht in einer eigenen Kopfzeile genau an der Stelle des Menüknopfs: Öffnen und Schließen an derselben
+  Stelle. Der Knopf steht im DOM vor dem Seiteninhalt (kommt beim Tabben zuerst). Wechselt die App bei offenem
+  Menü selbst die Seite (z. B. verweigertes Mikrofon), wird dessen übrig gebliebener Verlaufseintrag beim
+  Zurückgehen übersprungen.
 - **Übung** (Entwurf `?s=ok`, `?s=err`): oben ein ×-Knopf, ein feiner Fortschrittsstrich und
   „7 von 20“, darunter Notenzeile, Frage, Antworten und Rückmeldung.
 - **Sitzungsende:** wie viele richtig, welche Töne schwierig waren und gegebenenfalls „Neu: …“.
   Danach zurück zur Startseite.
 - **Fortschritt:** Trefferquote je Ton, getrennt nach Lesen und Spielen. Erreichbar durch Tippen auf
-  die Spuren.
+  die Spuren. Unten „Zu leicht oder zu schwer? …“ mit dem Knopf „Startpunkt ändern“. Mit einem
+  Startpunkt über Stufe 1 heißt es „Dafür braucht jeder Ton ab deinem Startpunkt (Stufe n) …“.
 - **Stimmgerät:** freies Spielen mit laufender Anzeige der gehörten Note (auf den Linien, als Name und
   Griffbild) und der Abweichung in Cent. Die Abweichung ist die echte zum Stimmton der aktiven Flöte (so
   sieht sie ehrlich, wie ihre Flöte klingt, ohne die Werte je Ton herauszurechnen); ist für den Ton auf der
@@ -342,7 +433,7 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
     432) die Prüfung „ein anderer Ton?“ an ihrer wirklichen Lage.
   - Mitspielen: „Ich trage Kopfhörer“; darunter die Verzögerung im Takt je Kopfhörer-Zustand (Abgleich im
     Mitspiel-Bereich, siehe `docs/app-lieder.md`)
-  - beide Stufen von Hand
+  - beide Stufen von Hand, darunter „Startpunkt wählen“
   - Sicherung herunterladen und einlesen
   - alles zurücksetzen, mit Bestätigung in der Seite selbst
 
@@ -428,6 +519,9 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   - In `localStorage`, mit Versionsnummer im Datenformat und Umwandlung älterer Versionen.
   - Je Ton und Spur werden nur die letzten 20 Antworten gespeichert (richtig/falsch und Tag).
   - Die Stufen werden über ihre Kennungen gespeichert.
+  - Startpunkt `start` (je Spur eine Stufenkennung) kam ohne Versionssprung dazu: Fehlt er, gilt Stufe 1;
+    eine ältere App ließe ihn beim Speichern weg, dann müssten fürs Freischalten wieder alle Töne sitzen
+    (bremst nur, durch erneutes Wählen behoben). Beim Einlesen höchstens die aktuelle Stufe.
   - Flöten (`flutes`, `activeFlute`; je Flöte Name, Stimmton `tuning: { hz, known }` und Cent je Ton relativ
     dazu) kamen ohne Versionssprung dazu (lassen sich neu messen) und gehen mit in die Sicherung – die Flöte
     zieht mit ihr um, die Tonhöhe hängt nicht vom Mikrofon ab.

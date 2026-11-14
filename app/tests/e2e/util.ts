@@ -39,8 +39,17 @@ export async function waitNext(page: Page, s: string) {
 
 /** Aktuelle Karte richtig oder falsch beantworten (Tipp-Übungen). */
 export async function answer(page: Page, right: boolean) {
-  const { note, seq: s } = await info(page);
+  const { note, seq: s, step } = await info(page);
   const scope = page.locator(`main[data-seq="${s}"]`);
+  if (step === "folge") {
+    // Tonfolge: der Reihe nach tippen, bei „falsch“ die erste Note falsch
+    const notes = (await scope.getAttribute("data-notes"))!.split(" ");
+    for (let i = 0; i < notes.length; i++) {
+      const sel = right || i > 0 ? `.btns button[data-choice="${notes[i]}"]` : `.btns button:not([data-choice="${notes[i]}"])`;
+      await scope.locator(sel).first().click();
+    }
+    return notes[0];
+  }
   const sel = right ? `.btns button[data-choice="${note}"]` : `.btns button:not([data-choice="${note}"])`;
   await scope.locator(sel).first().click();
   return note;
@@ -161,3 +170,12 @@ export const FAKE_MIC = () => {
     return dest.stream;
   };
 };
+
+/** Menü oben rechts öffnen und einen Eintrag wählen (z. B. „Stimmgerät“). */
+export async function menuTo(page: Page, entry: string) {
+  await page.getByRole("button", { name: "Menü", exact: true }).click();
+  const menu = page.getByRole("dialog", { name: "Menü" });
+  await expect(menu).toBeVisible();
+  await menu.getByRole("link", { name: entry, exact: true }).click();
+  await expect(menu).toBeHidden();
+}

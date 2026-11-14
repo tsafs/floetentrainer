@@ -239,3 +239,18 @@ export function fromBarTimeline(song: Song, bar: number): Timeline {
   if (i0 < 0) i0 = order.findIndex((i) => i >= b);
   return timelineOfBars(song, i0 < 0 ? order : order.slice(i0));
 }
+
+/**
+ * Einfacher Zeitplan aus Tönen gleicher Länge (je eine Viertel), ohne Takte und Einzählen – für
+ * Tonfolgen in der Übung (Wertung im Warte-Modus und „Anhören“). ids[i] = [i].
+ */
+export function toneTimeline(midis: number[]): Timeline {
+  return {
+    tones: midis.map((midi, i) => ({ start: i, dur: 1, midi, ids: [i], bar: 0, breathAfter: false })),
+    bars: [],
+    total: midis.length,
+    countIn: [],
+    countInDur: 0,
+    countInBeats: 0,
+  };
+}

@@ -34,6 +34,18 @@ Silben, Atemzeichen, Seitenumbrüche.
    Tests: `npm test` (Vitest) und `npm run e2e` (Playwright) im Ordner `app/`. Bildschirmfotos für die
    Durchsicht: `SHOTS=1 npx playwright test shots` (optional `SCHEME=dark`), landen in `app/shots/`.
    Veröffentlichung über `.github/workflows/pages.yml` auf https://tsafs.github.io/floetentrainer/.
+   - **Menü** (seit 14.11.2026, Plan `docs/app-navigation.md`, Regeln `docs/app-entscheidungen.md` 6): ersetzt
+     die Linkzeile unten auf der Startseite. Knopf und Leiste in `app/src/ui/menu.ts`, einmal in `main.ts`
+     eingehängt; beide liegen außerhalb von `#app`, damit sie das Neuzeichnen überstehen. Der Knopf ist **ein**
+     Element, immer in der Bildschirmecke (CSS-Variablen `--menu-top`/`--menu-right`, das × der Leiste nutzt
+     dieselben). Sichtbar ist er nur, wenn die Seite mit `menuSlot()` aus `common.ts` Platz freihält (steckt in
+     `topbar()`; Startseite, Liederliste, Liedseite und „Lied hinzufügen“ rufen es selbst auf; `topbar(…, false)`
+     ohne) – eine neue Seite ohne Menü braucht also nichts zu tun. Offen sperrt die Leiste `#app` (inert). Zurück-Geste: Öffnen legt
+     einen Verlaufseintrag mit gleicher Adresse an (kein hashchange), Schließen nimmt ihn zurück; bei Wahl einer
+     Seite wird erst danach die Adresse gewechselt, damit Zurück zur vorigen Seite führt und nur einmal
+     gezeichnet wird. Tests `app/tests/e2e/menu.spec.ts`, Hilfe `menuTo(page, "Stimmgerät")` in `util.ts`,
+     Bildschirmfotos `*-m1…m5-*.png` (m5 = Liedseite, quer mit dem Umschalter neben dem Knopf). Wird bei offenem Menü neu geladen, nimmt der Start dessen
+     Verlaufseintrag zurück.
 3. Lieder-Erweiterung (`docs/app-lieder.md`): **Runde 1 umgesetzt** (Liederliste `#/lieder`, Liedseite
    `#/lied/<kennung>` mit Notensatz, Vorspielen, Tempo je Lied, Einzählen, Metronom; Schleife und
    Griffbild sind mit der Nachsteuerung vom 14.11.2026 entfallen). Runde 2 (ABC-Dateien) und Runde 3 (Mitspielen) umgesetzt.
@@ -102,3 +114,24 @@ Silben, Atemzeichen, Seitenumbrüche.
      Mikrofon- und Browserangaben), keinen Ton. Auswerten: `node app/scripts/diagnose.mjs <datei>` (je Note
      erwartet/erkannt, Cent, Einsatz-Versatz, Grund für Rot, Median-Versatz, Anteil unklarer Messungen).
      Aufnahme `app/src/audio/diagnose.ts`. Bildschirmfotos `*-r1…r12-*.png`.
+4. **Tonfolgen in den Sitzungen** (`docs/app-tonfolgen.md`, umgesetzt am 14.11.2026): Etwa jede zweite
+   Zusatzkarte ist eine Folge von 2–6 Tönen zum Lesen bzw. Spielen, sobald in der Spur 5 Töne vorgestellt
+   sind. Erzeugen `app/src/srs/sequences.ts`, Ablauf und Wertung `app/src/srs/session.ts`
+   (`answerFolge`: je Ton einmal, keine Fächer), Notenzeile `staffSeqSvg` in `app/src/music/staff.ts`,
+   Oberfläche `renderFolge` in `app/src/ui/practice.ts` (Spielen mit `WaitFollower`). Tests
+   `sequences.test.ts`, `session.test.ts` („Tonfolgen“), `app/tests/e2e/folge.spec.ts`; feste Folgen für
+   Browser-Tests über `window.__folgen`. Bildschirmfotos `*-t1…t7-*.png`. Abweichungen vom Plan am Ende von
+   `docs/app-tonfolgen.md`.
+5. **Startpunkt im Lernplan** (`docs/app-startpunkt.md`, umgesetzt 14.11.2026): Willkommensseite beim
+   allerersten Start, Seite `#/startpunkt` mit fünf Meilensteinen „Ich kann schon …“ (Notenzeile nach Tonhöhe, neue Töne schwarz) (über Fortschritt und
+   Einstellungen). Töne vor dem Startpunkt gelten als bekannt (Fach 3, gestaffelt höchstens 3 je Tag und
+   Spur, keine Vorstellung), fürs Freischalten zählen nur die Töne ab dem Startpunkt. Logik
+   `app/src/srs/startpoint.ts` (dazu `startLevel`/`countedNotes` in `progress.ts`), Seiten
+   `app/src/ui/startpoint.ts` mit eigenem `startpoint.css`, Datenfeld `start` (optional, kein
+   Versionssprung). Tests `app/tests/unit/startpoint.test.ts`, `app/tests/e2e/startpunkt.spec.ts`,
+   Bildschirmfotos `SHOTS=1 npx playwright test shots-startpunkt` (`*-w1…w6-*.png`). Idee für später: kurzer Einstufungstest.
+   **Für Browser-Tests wichtig:** `playwright.config.ts` legt per `storageState` Daten mit gewähltem
+   Startpunkt an, sonst käme in jedem Test ohne eigene Daten die Willkommensseite; `seed(page, null)`
+   entfernt sie (dann wie beim allerersten Start). Nicht angefasst: `session.ts`, `practice.ts`, Startseite.
+   Bekannte Grenze: Zusatzkarten verteilen sich auf alle Töne, auf hohen Stufen kommen die neuen darum
+   langsam auf 10 Antworten; Abhilfe (aktuelle Stufe stärker gewichten) erst nach den Tonfolgen.

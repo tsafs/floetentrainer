@@ -1,0 +1,185 @@
+import { describe, expect, it } from "vitest";
+import { isAltSpelling, unlockedNotes } from "../../src/music/levels";
+import { note } from "../../src/music/notes";
+import {
+  FOLGE_MAX_LEAP,
+  FolgeLength,
+  folgeChoices,
+  folgeKey,
+  folgeMaxLen,
+  folgePool,
+  makeFolge,
+} from "../../src/srs/sequences";
+import { defaultData } from "../../src/store/data";
+import { seeded } from "./helpers";
+
+const POOL8 = ["h1", "a1", "g1", "c2", "d2", "e1", "d1", "fis1"];
+const POOL_F = ["h1", "a1", "g1", "c2", "d2", "e1", "d1", "fis1", "e2", "f1", "c1", "cis2", "f2", "g2"];
+
+function many(pool: string[], len: number, n = 400, seed = 1) {
+  const rng = seeded(seed);
+  return Array.from({ length: n }, () => makeFolge(pool, len, rng));
+}
+
+describe("Töne für Tonfolgen", () => {
+  it("nur in dieser Spur vorgestellte und freigeschaltete Töne, nach Tonhöhe", () => {
+    const d = defaultData();
+    d.stages.lesen = "fis1";
+    d.introduced.lesen = ["h1", "a1", "g1", "c2", "d2", "e1"];
+    expect(folgePool(d, "lesen")).toEqual(["e1", "g1", "a1", "h1", "c2", "d2"]);
+    // Spielen hat eigene Vorstellungen
+    d.stages.spielen = "c2-d2";
+    d.introduced.spielen = ["h1", "a1", "g1", "c2"];
+    expect(folgePool(d, "spielen")).toEqual([]);
+    d.introduced.spielen.push("d2");
+    expect(folgePool(d, "spielen")).toEqual(["g1", "a1", "h1", "c2", "d2"]);
+  });
+  it("weniger als 5 Töne: keine Folgen; gesperrte Töne (Stufe gesenkt) zählen nicht", () => {
+    const d = defaultData();
+    d.introduced.lesen = ["h1", "a1", "g1", "c2", "d2"];
+    expect(folgePool(d, "lesen")).toEqual([]); // Stufe 1: c² und d² gesperrt
+  });
+  it("keine anderen Schreibweisen (Stufe 12)", () => {
+    const d = defaultData();
+    d.stages.lesen = "andere-schreibweisen";
+    d.introduced.lesen = unlockedNotes("lesen", 12);
+    const pool = folgePool(d, "lesen");
+    expect(pool.length).toBe(25);
+    expect(pool.some(isAltSpelling)).toBe(false);
+  });
+});
+
+describe("Erzeugen", () => {
+  it("nur Töne aus dem Pool, richtige Länge", () => {
+    for (const len of [2, 3, 4, 5, 6]) {
+      for (const f of many(POOL_F, len, 200, len)) {
+        expect(f).toHaveLength(len);
+        expect(f.every((n) => POOL_F.includes(n))).toBe(true);
+      }
+    }
+  });
+  it("Sprünge höchstens eine Quinte; meist Nachbarn in der Reihe", () => {
+    let steps = 0;
+    let neighbour = 0;
+    const sorted = POOL_F.slice().sort((a, b) => note(a).midi - note(b).midi);
+    for (const f of many(POOL_F, 5)) {
+      for (let i = 1; i < f.length; i++) {
+        const leap = Math.abs(note(f[i]).midi - note(f[i - 1]).midi);
+        expect(leap).toBeLessThanOrEqual(FOLGE_MAX_LEAP);
+        if (leap === 0) continue;
+        steps++;
+        if (Math.abs(sorted.indexOf(f[i]) - sorted.indexOf(f[i - 1])) === 1) neighbour++;
+      }
+    }
+    expect(neighbour / steps).toBeGreaterThan(0.5);
+  });
+  it("Halbtonschritte kommen vor (f¹–fis¹, fis¹–g¹ …)", () => {
+    const pairs = new Set<string>();
+    for (const f of many(POOL_F, 5)) {
+      for (let i = 1; i < f.length; i++) {
+        if (Math.abs(note(f[i]).midi - note(f[i - 1]).midi) === 1) pairs.add([f[i - 1], f[i]].sort().join("-"));
+      }
+    }
+    expect(pairs.has("f1-fis1")).toBe(true);
+    expect(pairs.has("fis1-g1")).toBe(true);
+    expect(pairs.has("c2-cis2")).toBe(true);
+  });
+  it("Tonwiederholungen in etwa jeder vierten Folge, nie dreimal derselbe Ton in Reihe", () => {
+    const list = many(POOL8, 4, 800);
+    let withRepeat = 0;
+    for (const f of list) {
+      let reps = 0;
+      for (let i = 1; i < f.length; i++) if (f[i] === f[i - 1]) reps++;
+      for (let i = 2; i < f.length; i++) expect(f[i] === f[i - 1] && f[i] === f[i - 2]).toBe(false);
+      expect(reps).toBeLessThanOrEqual(1);
+      if (reps) withRepeat++;
+    }
+    expect(withRepeat / list.length).toBeGreaterThan(0.15);
+    expect(withRepeat / list.length).toBeLessThan(0.35);
+  });
+  it("beginnt nicht mit dem Ton davor", () => {
+    const rng = seeded(5);
+    for (let k = 0; k < 300; k++) expect(makeFolge(POOL8, 3, rng, { avoidFirst: "a1" })[0]).not.toBe("a1");
+  });
+  it("schwache Töne kommen häufiger vor", () => {
+    const count = (weak?: Set<string>) => {
+      const rng = seeded(9);
+      let n = 0;
+      for (let k = 0; k < 600; k++) n += makeFolge(POOL8, 4, rng, { weak }).filter((x) => x === "fis1").length;
+      return n;
+    };
+    expect(count(new Set(["fis1"]))).toBeGreaterThan(count() * 1.5);
+  });
+  it("keine Folge zweimal (soweit möglich)", () => {
+    const rng = seeded(2);
+    const used = new Set<string>();
+    for (let k = 0; k < 40; k++) {
+      const f = makeFolge(POOL8, 4, rng, { used });
+      expect(used.has(folgeKey(f))).toBe(false);
+      used.add(folgeKey(f));
+    }
+  });
+  it("fester Zufall → feste Folgen", () => {
+    const a = many(POOL8, 4, 5, 42);
+    const b = many(POOL8, 4, 5, 42);
+    expect(a).toEqual(b);
+    expect(a[0]).toEqual(["a1", "c2", "h1", "a1"]);
+  });
+});
+
+describe("Länge", () => {
+  it("Beginn mit 3, bei genau 5 Tönen 2 oder 3", () => {
+    expect(new FolgeLength(8, 5, seeded(1)).len).toBe(3);
+    const at5 = new Set(Array.from({ length: 40 }, (_, i) => new FolgeLength(5, 5, seeded(i)).len));
+    expect([...at5].sort()).toEqual([2, 3]);
+  });
+  it("nach zwei fehlerfreien +1, nach einer fehlerhaften −1, Bereich 2 bis 5 (ab Stufe 8: 6)", () => {
+    expect(folgeMaxLen(7)).toBe(5);
+    expect(folgeMaxLen(8)).toBe(6);
+    const l = new FolgeLength(8, 5, seeded(1));
+    l.update(true);
+    expect(l.len).toBe(3);
+    l.update(true);
+    expect(l.len).toBe(4);
+    l.update(true);
+    l.update(false); // Fehler unterbricht die Reihe
+    expect(l.len).toBe(3);
+    l.update(true);
+    expect(l.len).toBe(3);
+    for (let i = 0; i < 20; i++) l.update(true);
+    expect(l.len).toBe(5);
+    for (let i = 0; i < 20; i++) l.update(false);
+    expect(l.len).toBe(2);
+    const l6 = new FolgeLength(14, folgeMaxLen(8), seeded(1));
+    for (let i = 0; i < 20; i++) l6.update(true);
+    expect(l6.len).toBe(6);
+  });
+});
+
+describe("Antwortknöpfe fürs Lesen", () => {
+  it("alle Töne der Folge, mindestens 2 andere, insgesamt bis 8, nach Tonhöhe", () => {
+    const rng = seeded(3);
+    for (let k = 0; k < 200; k++) {
+      const f = makeFolge(POOL_F, 5, rng);
+      const c = folgeChoices(f, POOL_F, rng);
+      expect(c.length).toBe(8);
+      for (const n of f) expect(c).toContain(n);
+      expect(c.filter((x) => !f.includes(x)).length).toBeGreaterThanOrEqual(2);
+      const midis = c.map((x) => note(x).midi);
+      expect(midis).toEqual(midis.slice().sort((a, b) => a - b));
+      expect(new Set(midis).size).toBe(c.length);
+    }
+  });
+  it("wenige Töne: entsprechend weniger, aber immer 2 nicht aus der Folge", () => {
+    const pool5 = ["h1", "a1", "g1", "c2", "d2"];
+    const c = folgeChoices(["g1", "a1", "h1", "c2"], pool5, seeded(1));
+    expect(c).toEqual(expect.arrayContaining(["g1", "a1", "h1", "c2", "d2"]));
+    expect(c.filter((x) => !["g1", "a1", "h1", "c2"].includes(x)).length).toBeGreaterThanOrEqual(2);
+    expect(folgeChoices(["g1", "a1"], pool5, seeded(1))).toHaveLength(5);
+  });
+  it("keine anderen Schreibweisen", () => {
+    const all = unlockedNotes("lesen", 12);
+    const c = folgeChoices(["es1", "f1", "g1"], all, seeded(4));
+    expect(c.some(isAltSpelling)).toBe(false);
+  });
+});
