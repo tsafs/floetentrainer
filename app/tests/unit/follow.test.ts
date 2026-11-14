@@ -409,7 +409,8 @@ describe("Mitspielen: Takt-Modus", () => {
   it("verspätet: innerhalb des Ausgleichs getroffen, ohne Ausgleich bei kurzen Noten nicht", () => {
     const tl = buildTimeline(song("g'16 a'16 h'16 c''16 d''16 c''16 h'16 a'16 g'2. ||"));
     const spq = 0.6; // Sechzehntel = 150 ms
-    const fs = beatFrames(tl, { spq, latency: 80, gap: 0 });
+    // 110 ms Verzögerung: ohne Ausgleich bleiben nur 40 ms im eigenen Fenster (nötig: 50 ms)
+    const fs = beatFrames(tl, { spq, latency: 110, gap: 0 });
     const withComp = new BeatFollower(tl, { secPerQuarter: spq, startMs: START });
     feed(withComp, fs);
     expect(withComp.passes[0].hits).toBe(9);
@@ -430,16 +431,47 @@ describe("Mitspielen: Takt-Modus", () => {
     expect(tooLate.passResults[0].map((r) => r?.ok)).toEqual([false, false, false, false, true, true]);
   });
 
-  it("sehr kurze Noten: mindestens 80 ms erkannt nötig", () => {
+  it("sehr kurze Noten: mindestens 50 ms erkannt nötig, staccato zählt noch", () => {
     const tl = buildTimeline(song("g'16 a'16 h'16 c''16 d''4 r2 ||"));
-    const spq = 0.6; // Sechzehntel = 150 ms → 80 ms nötig (mehr als die Hälfte)
+    const spq = 0.6; // Sechzehntel = 150 ms → nötig: Hälfte von (150 − 50) = 50 ms
+    // nur 25 ms je Sechzehntel klingen (Rest Stille): zu wenig
     const b = new BeatFollower(tl, { secPerQuarter: spq, startMs: START });
-    // nur 75 ms je Sechzehntel klingen (Rest Stille)
-    feed(b, beatFrames(tl, { spq, gap: 75 }));
+    feed(b, beatFrames(tl, { spq, gap: 125 }));
     expect(b.passResults[0].map((r) => r?.ok)).toEqual([false, false, false, false, true]);
+    // 75 ms (staccato) reichen
     const b2 = new BeatFollower(tl, { secPerQuarter: spq, startMs: START });
-    feed(b2, beatFrames(tl, { spq, gap: 50 }));
+    feed(b2, beatFrames(tl, { spq, gap: 75 }));
     expect(b2.passes[0].hits).toBe(5);
+  });
+
+  it("angestoßene Sechzehntel mit Zungen-Lücke, unklarem Einsatz und Wackeln: bis ♩ = 120 messbar", () => {
+    const tl = buildTimeline(song("g'16 a'16 g'16 a'16 h'16 c''16 h'16 c''16 d''16 c''16 h'16 a'16 g'16 a'16 h'16 c''16 | g'2 r2 ||"));
+    for (const bpm of [70, 90, 108, 120]) {
+      for (const late of [-30, 0, 30]) {
+        const spq = 60 / bpm;
+        const ms = spq * 1000;
+        const fs: Frame[] = [];
+        for (let t = START - 300; t < START + tl.total * ms + 600; t += STEP) {
+          const g = (t - DEFAULT_FOLLOW.latencyMs - late - START) / ms;
+          const i = tl.tones.findIndex((n) => g >= n.start && (g - n.start) * ms < n.dur * ms - 35);
+          if (i < 0) fs.push({ t, freq: null, clarity: 0, rms: 0.001 });
+          else if ((g - tl.tones[i].start) * ms < 25) fs.push({ t, freq: 300, clarity: 0.5, rms: 0.05 }); // Einsatz unklar
+          else fs.push({ t, freq: hz(tl.tones[i].midi, 20 * Math.sin(t / 40)), clarity: 0.95, rms: 0.1 });
+        }
+        const b = new BeatFollower(tl, { secPerQuarter: spq, startMs: START });
+        feed(b, fs);
+        b.finish(START + tl.total * ms + 2000);
+        expect(b.passResults[0].slice(0, 16).every((r) => r?.ok), `♩ = ${bpm}, versetzt ${late} ms`).toBe(true);
+      }
+    }
+  });
+
+  it("falsch gespielte Sechzehntel bleiben trotz kleinerer Schwelle falsch", () => {
+    const tl = buildTimeline(song("g'16 a'16 h'16 c''16 d''4 r2 ||"));
+    const spq = 0.5; // ♩ = 120, Sechzehntel = 125 ms
+    const b = new BeatFollower(tl, { secPerQuarter: spq, startMs: START });
+    feed(b, beatFrames(tl, { spq, gap: 35, wrong: { 1: H, 2: C2 } }));
+    expect(b.passResults[0].map((r) => r?.ok)).toEqual([true, false, false, true, true]);
   });
 
   it("Tonwiederholung: ohne neuen Einsatz zählt die erkannte Zeit im jeweiligen Fenster", () => {

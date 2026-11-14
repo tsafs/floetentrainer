@@ -211,3 +211,12 @@ den Abschnitten oben vor.
   darin nur der Hinweis und „Lied hinzufügen“ stehen oder gerade ein Lied hinzugefügt/gelöscht wurde; ist
   „Kannst du schon spielen“ leer, ist „Eigene Lieder“ bzw. das erste Kapitel offen. Der Klappzustand wird
   je Gerät im Browser gemerkt (nicht im Datenformat und nicht in der Sicherung – er gehört zur Ansicht).
+
+### Sechzehntel im Takt-Modus messbar (14.11.2026)
+
+Die Regel „mindestens die Hälfte der Dauer, mindestens 80 ms erkannt“ machte angestoßene Sechzehntel
+ab etwa ♩ = 105 unmessbar: Von einer Sechzehntel (bei ♩ = 108 rund 140 ms) sind wegen Zungen-Lücke
+und unklarem Einsatz nur etwa 80 ms als Ton messbar. Neu: Von der Notendauer werden zuerst 50 ms für
+Zungen-Lücke und Einsatz abgezogen, davon muss die Hälfte erkannt sein, mindestens aber 50 ms
+(zwei Messungen). Geprüft mit Test bis ♩ = 120, auch 30 ms zu früh oder zu spät. Falsche Töne bleiben
+falsch; eine kurz (staccato) gespielte Sechzehntel zählt als getroffen.
