@@ -303,19 +303,20 @@ test("Takt-Modus mit falschen Tönen: diese Noten rot, sonst nichts", async ({ p
   await noScore(page);
 });
 
-test("Takt-Modus mit Verspätung: 0,1 s wird ausgeglichen, 0,35 s macht die Noten rot", async ({ page }) => {
+// Bewusst geändert (robustere Regeln, Verzögerung 120 ms): früher wurden schon 0,35 s zu spät rot. Jetzt
+// gehen 0,25 s noch (Einsatz-Fenster und Anteil im mittleren Teil); erst rund eine ganze Note zu spät ist rot.
+test("Takt-Modus mit Verspätung: 0,25 s wird ausgeglichen, 0,7 s macht die Noten rot", async ({ page }) => {
   await open(page);
   await start(page, "Im Takt");
-  await playBeat(page, { delay: 100 });
+  await playBeat(page, { delay: 250 });
   await finished(page);
   expect(await colors(page)).toEqual(Array(7).fill("hit"));
-  // nochmal, deutlich zu spät: Nur die zweite h¹ (der verspätete erste Ton passt) und die lange
-  // Schlussnote haben genug Zeit mit ihrem Ton.
+  // nochmal, eine ganze Note zu spät: Nur die zweite h¹ (der verspätete erste Ton passt) hat ihren Ton.
   await go(page).click();
   await page.waitForFunction(() => (window as unknown as { __lied: { follow(): FollowDebug } }).__lied.follow().started);
-  await playBeat(page, { delay: 350 });
+  await playBeat(page, { delay: 700 });
   await finished(page);
-  expect(await colors(page)).toEqual(["miss", "miss", "miss", "hit", "miss", "miss", "hit"]);
+  expect(await colors(page)).toEqual(["miss", "miss", "miss", "hit", "miss", "miss", "miss"]);
 });
 
 test("Kopfhörer: Schalter im Mitspielen und in den Einstellungen ist dieselbe Einstellung; Melodie leise im Takt-Modus, Zielton im Warte-Modus", async ({ page }) => {

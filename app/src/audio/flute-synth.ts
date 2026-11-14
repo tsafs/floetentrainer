@@ -43,8 +43,8 @@ export const GLIDE = 0.02;
 /** Obertöne (Amplituden ab Grundton), wenig wie bei der Blockflöte */
 const HARMONICS = [1, 0.1, 0.06, 0.02, 0.01];
 
-const CLICK_FREQ = 1250;
-const CLICK_ACCENT_FREQ = 1900;
+export const CLICK_FREQ = 1250;
+export const CLICK_ACCENT_FREQ = 1900;
 const CLICK_GAIN = 0.13;
 const CLICK_ACCENT_GAIN = 0.24;
 const CLICK_LEN = 0.04;

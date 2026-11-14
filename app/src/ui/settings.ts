@@ -1,11 +1,17 @@
-// Einstellungen: Sitzungslänge, Spielen, Stufen, Sicherung, Zurücksetzen.
+// Einstellungen: Sitzungslänge, Spielen, Flöte, Mitspielen, Stufen, Sicherung, Zurücksetzen.
+//
+// Abschnitt „Flöte“: Liste der Flöten (eine aktiv), „Flöte einstellen“ (#/floete, ./flute.ts),
+// umbenennen, hinzufügen, löschen (Bestätigung in der Seite). Die Werte gelten für die Übung (Spielen) und
+// das Mitspielen (../audio/flute-profile.ts).
 
+import { inputLatency } from "../audio/follow";
+import { mic } from "../audio/mic";
 import { maxLevel, stagesOf, type Track } from "../music/levels";
 import { joinNames } from "../music/names";
 import { level, levelCap, setLevel } from "../srs/progress";
-import { defaultData, SETTING_LIMITS, type NumSetting, type Theme } from "../store/data";
+import { activeFlute, defaultData, FLUTE_NAME_MAX, newFluteId, SETTING_LIMITS, type AppData, type NumSetting, type Theme } from "../store/data";
 import { applyTheme } from "./theme";
-import { backupFileName, backupJson, parseBackup } from "../store/storage";
+import { backupFileName, backupJson, keepDeviceSettings, parseBackup } from "../store/storage";
 import { esc, topbar, type Ctx, type View } from "./common";
 
 interface NumField {
@@ -54,6 +60,45 @@ function importText(inBackup: number, now: number): string {
   return `Die Sicherung ist in Ordnung${has}. Sie ersetzt alle jetzigen Daten${lost}.`;
 }
 
+/** „7 Töne eingestellt“ bzw. „noch nicht eingestellt“ */
+function fluteState(n: number): string {
+  return n ? `${n === 1 ? "1 Ton" : `${n} Töne`} eingestellt` : "noch nicht eingestellt";
+}
+
+/** Verzögerung im Takt-Modus je Kopfhörer-Zustand, z. B. „140 ms (abgeglichen)“ */
+function latencyText(d: AppData, headphones: boolean): string {
+  const l = inputLatency({ ...d.settings, headphones });
+  return `${l.ms} ms ${l.calibrated ? "(abgeglichen)" : "(Standard)"}`;
+}
+
+/** Abschnitt „Flöte“ */
+function fluteSection(d: AppData, ui: { rename: boolean; del: boolean }): string {
+  const act = activeFlute(d);
+  const rows = d.flutes
+    .map((f) => {
+      const on = f.id === act.id;
+      return `<button class="flpick" role="radio" aria-checked="${on}" data-flute="${f.id}"><i></i><span class="lab">${esc(f.name)}<small>${fluteState(Object.keys(f.offsets).length)}</small></span></button>`;
+    })
+    .join("");
+  const rename = ui.rename
+    ? `<div class="flrename"><input type="text" maxlength="${FLUTE_NAME_MAX}" value="${esc(act.name)}" aria-label="Name der Flöte" data-testid="flute-name-input"><div class="btnrow two"><button class="big" data-act="fl-rename-ok">Übernehmen</button><button class="big alt" data-act="fl-rename-no">Abbrechen</button></div></div>`
+    : "";
+  const del = ui.del
+    ? `<div class="confirm"><p>„${esc(act.name)}“ wirklich löschen? Ihre Werte gehen verloren.</p><div class="btnrow"><button class="big danger" data-act="fl-del-yes">Ja, löschen</button><button class="big alt" data-act="fl-del-no">Abbrechen</button></div></div>`
+    : "";
+  return `<section><h2>Flöte</h2>
+    <div class="flutes" role="radiogroup" aria-label="Aktive Flöte">${rows}</div>
+    ${rename}${del}
+    <button class="big" data-act="fl-cal">„${esc(act.name)}“ einstellen</button>
+    <div class="fllinks">
+      <button class="clear" data-act="fl-rename">Umbenennen</button>
+      <button class="clear" data-act="fl-add">Flöte hinzufügen</button>
+      ${d.flutes.length > 1 ? `<button class="clear" data-act="fl-del">Löschen</button>` : ""}
+    </div>
+    <p class="help">Jede Flöte klingt etwas anders, viele günstige sind insgesamt zu tief. Eingestellt wertet die App jeden Ton im Verhältnis zu deiner Flöte; beim Mitspielen verfeinern sich die Werte von selbst.</p>
+  </section>`;
+}
+
 function levelText(track: Track, lv: number): string {
   return joinNames(stagesOf(track)[lv - 1].notes);
 }
@@ -62,6 +107,7 @@ export const settingsView: View = (root, ctx) => {
   let confirmReset = false;
   let pendingImport: ReturnType<typeof parseBackup> | null = null;
   let message: { ok: boolean; text: string } | null = null;
+  const flui = { rename: false, del: false };
 
   function render() {
     const d = ctx.data;
@@ -85,12 +131,14 @@ export const settingsView: View = (root, ctx) => {
 <main class="screen page settings">
   ${topbar("Einstellungen")}
   ${sections}
+  ${fluteSection(d, flui)}
   <section><h2>Mitspielen</h2>
     <div class="setting"><span class="lab" id="phones-lab">Ich trage Kopfhörer<small>${
       s.headphones
         ? "Beim Mitspielen klingt die Melodie leise mit."
         : "Ohne Kopfhörer bleibt beim Mitspielen die Melodie aus, sonst würde das Mikrofon das Handy mithören."
     }</small></span><button class="switch" role="switch" aria-checked="${s.headphones}" aria-labelledby="phones-lab" data-act="phones"><i></i></button></div>
+    <p class="help" data-testid="latency-info">Verzögerung im Takt: ohne Kopfhörer ${latencyText(d, false)}, mit Kopfhörern ${latencyText(d, true)}. Abgleichen kannst du sie beim Mitspielen „Im Takt“; sie gilt nur für dieses Gerät.</p>
   </section>
   <section><h2>Darstellung</h2>
     <div class="seg" role="group" aria-label="Darstellung">${THEME_OPTIONS.map(
@@ -161,6 +209,72 @@ export const settingsView: View = (root, ctx) => {
       ctx.save();
       render();
     });
+    // Flöte
+    root.querySelectorAll<HTMLButtonElement>("[data-flute]").forEach((b) =>
+      b.addEventListener("click", () => {
+        d.activeFlute = b.dataset.flute!;
+        flui.rename = flui.del = false;
+        ctx.save();
+        render();
+      }),
+    );
+    on("fl-cal", () => {
+      // Mikrofon direkt aus dem Tippen heraus (wie beim Stimmgerät); Fehler zeigt die Seite selbst
+      mic.start().catch(() => {});
+      ctx.go("#/floete");
+    });
+    on("fl-rename", () => {
+      flui.rename = true;
+      flui.del = false;
+      render();
+      const inp = root.querySelector<HTMLInputElement>('[data-testid="flute-name-input"]');
+      inp?.focus();
+      inp?.select();
+    });
+    on("fl-rename-ok", () => {
+      const v = root.querySelector<HTMLInputElement>('[data-testid="flute-name-input"]')!.value.trim().slice(0, FLUTE_NAME_MAX);
+      if (v) activeFlute(d).name = v;
+      flui.rename = false;
+      ctx.save();
+      render();
+    });
+    on("fl-rename-no", () => {
+      flui.rename = false;
+      render();
+    });
+    root.querySelector<HTMLInputElement>('[data-testid="flute-name-input"]')?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") (root.querySelector('[data-act="fl-rename-ok"]') as HTMLButtonElement).click();
+    });
+    on("fl-add", () => {
+      const id = newFluteId(d.flutes);
+      d.flutes.push({ id, name: `Flöte ${d.flutes.length + 1}`, offsets: {}, updated: 0 });
+      d.activeFlute = id;
+      ctx.save();
+      flui.del = false;
+      flui.rename = true;
+      render();
+      const inp = root.querySelector<HTMLInputElement>('[data-testid="flute-name-input"]');
+      inp?.focus();
+      inp?.select();
+    });
+    on("fl-del", () => {
+      flui.del = true;
+      flui.rename = false;
+      render();
+    });
+    on("fl-del-no", () => {
+      flui.del = false;
+      render();
+    });
+    on("fl-del-yes", () => {
+      if (d.flutes.length > 1) {
+        d.flutes = d.flutes.filter((f) => f.id !== d.activeFlute);
+        d.activeFlute = d.flutes[0].id;
+        ctx.save();
+      }
+      flui.del = false;
+      render();
+    });
     on("export", () => {
       const blob = new Blob([backupJson(ctx.data)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
@@ -189,7 +303,7 @@ export const settingsView: View = (root, ctx) => {
       render();
     });
     on("import-yes", () => {
-      if (pendingImport) replaceData(ctx, pendingImport);
+      if (pendingImport) replaceData(ctx, keepDeviceSettings(pendingImport, ctx.data));
       pendingImport = null;
       message = { ok: true, text: "Sicherung eingelesen." };
       render();

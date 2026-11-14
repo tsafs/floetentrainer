@@ -14,7 +14,8 @@ import type { Frame } from "./judge";
  * Genauigkeit bleibt: Die Sopranflöte klingt ab 523 Hz, das sind mindestens 11 Perioden im Fenster.
  * Für c¹–d³ (523–2349 Hz) bei leichtem bis kräftigem Rauschen höchstens 1–7 Cent Fehler (2048: 1–6),
  * Klarheit mindestens 0,977 (2048: 0,979); die Klarheit fällt bei beiden Fenstern erst bei sehr starkem
- * Rauschen unter 0,9, an derselben Stelle. Die Klarheitsschwelle (0,9) bleibt daher.
+ * Rauschen unter 0,9, an derselben Stelle. Die Klarheitsschwelle (0,9) bleibt daher (beim Mitspielen seit
+ * dem 14.11.2026 0,85, siehe ./follow.ts).
  */
 const BUF = 1024;
 const MIN_RMS = 0.006;
@@ -118,6 +119,36 @@ class Mic {
     this.detector = PitchDetector.forFloat32Array(n);
     this.detector.minVolumeDecibels = -45;
     if (this.analyser) this.analyser.fftSize = n;
+  }
+
+  /**
+   * Angaben zum Mikrofon für die Diagnose-Aufnahme (../audio/diagnose.ts): Einstellungen der Spur,
+   * deren Statistik (Chrome: MediaStreamTrack.stats mit Eingangs-Verzögerung, falls vorhanden) und die
+   * gemeldeten Verzögerungen des AudioContext. Nur Messwerte, kein Ton.
+   */
+  info(): Record<string, unknown> {
+    const track = this.stream?.getAudioTracks()[0];
+    const out: Record<string, unknown> = { windowSamples: this.size, intervalMs: INTERVAL_MS, minRms: MIN_RMS };
+    try {
+      if (track) {
+        out.trackSettings = track.getSettings();
+        out.trackLabel = track.label;
+        const stats = (track as unknown as { stats?: Record<string, unknown> }).stats;
+        if (stats) {
+          const s: Record<string, unknown> = {};
+          for (const k of ["deliveredFrames", "deliveredFramesDuration", "totalFrames", "totalFramesDuration", "latency", "averageLatency", "minimumLatency", "maximumLatency"]) {
+            if (k in stats) s[k] = stats[k];
+          }
+          out.trackStats = s;
+        }
+      }
+      if (this.ctx) {
+        out.context = { sampleRate: this.ctx.sampleRate, baseLatency: this.ctx.baseLatency, outputLatency: this.ctx.outputLatency, state: this.ctx.state };
+      }
+    } catch {
+      /* nicht unterstützt */
+    }
+    return out;
   }
 
   listen(fn: Listener): () => void {

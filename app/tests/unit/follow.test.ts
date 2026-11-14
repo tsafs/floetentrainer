@@ -3,6 +3,7 @@ import type { Frame } from "../../src/audio/judge";
 import {
   BeatFollower,
   DEFAULT_FOLLOW,
+  DEFAULT_INPUT_LATENCY,
   followConfig,
   summarize,
   WaitFollower,
@@ -49,9 +50,12 @@ function frames(pieces: Piece[], t0 = 0): Frame[] {
 }
 const feed = (fl: { push(f: Frame): unknown }, fs: Frame[]) => fs.forEach((f) => fl.push(f));
 
-/** Jeden Ton des Zeitplans spielen: ms lang, danach eine Lücke (wie beim Anstoßen mit der Zunge) */
-const playAll = (tl: Timeline, ms = 200, gap = 60, wrong: Record<number, number> = {}): Piece[] =>
-  tl.tones.flatMap((n, i) => [...(i in wrong ? [tone(wrong[i], 200), rest(60)] : []), tone(n.midi, ms), rest(gap)]);
+/**
+ * Jeden Ton des Zeitplans spielen: ms lang, danach eine Lücke (wie beim Anstoßen mit der Zunge); vor
+ * Note i ggf. ein falscher Ton (wrongMs lang, seit der robusteren Regel 300 ms – 200 ms sind kein Fehler mehr)
+ */
+const playAll = (tl: Timeline, ms = 200, gap = 60, wrong: Record<number, number> = {}, wrongMs = 300): Piece[] =>
+  tl.tones.flatMap((n, i) => [...(i in wrong ? [tone(wrong[i], wrongMs), rest(60)] : []), tone(n.midi, ms), rest(gap)]);
 
 // ---------------------------------------------------------------- Warte-Modus
 
@@ -97,7 +101,7 @@ describe("Mitspielen: Warte-Modus", () => {
     feed(w, frames(playAll(tl, 200, 60, { 1: H, 3: A })));
     expect(w.done).toBe(true);
     expect(w.results.map((r) => r?.ok)).toEqual([true, false, true, false, true]);
-    expect(w.results[1]).toEqual({ ok: false, wrongMidi: H });
+    expect(w.results[1]).toMatchObject({ ok: false, wrongMidi: H });
     expect(wrongs).toEqual([
       [1, H],
       [3, A],
@@ -119,31 +123,42 @@ describe("Mitspielen: Warte-Modus", () => {
     expect(w.results.map((r) => r?.ok)).toEqual([true, true]);
   });
 
-  it("Ton knapp außerhalb der Toleranz: weder richtig noch falsch; Toleranz und Stimmton aus den Einstellungen", () => {
+  // Bewusst geändert (Befund am Gerät, 14.11.2026): früher galt die Toleranz der Einstellungen (±40 Cent),
+  // 45 Cent daneben war weder richtig noch falsch. Jetzt zählt der nächste Halbton.
+  it("Toleranz = nächster Halbton: 45 Cent daneben ist noch der Zielton; Stimmton aus den Einstellungen", () => {
     const tl = melody();
     const w = new WaitFollower(tl);
-    feed(w, frames([{ freq: hz(G, 45), ms: 1000 }]));
-    expect(w.index).toBe(0);
-    expect(w.wrongMidi).toBeNull();
+    feed(w, frames([{ freq: hz(G, -45), ms: 400 }]));
+    expect(w.index).toBe(1);
+    expect(w.results[0]).toMatchObject({ ok: true });
 
-    const cfg = followConfig({ tuningHz: 415, toleranceCents: 20 });
-    expect(cfg).toEqual({ tuning: 415, toleranceCents: 20 });
+    const cfg = followConfig({ tuningHz: 415, inputLatencyMs: { speaker: null, headphones: null }, headphones: false });
+    expect(cfg).toEqual({ tuning: 415, latencyMs: DEFAULT_INPUT_LATENCY });
     const w2 = new WaitFollower(tl, { cfg });
     feed(w2, frames([{ freq: hz(G, 30, 415), ms: 500 }]));
-    expect(w2.index).toBe(0);
-    feed(w2, frames([{ freq: hz(G, 10, 415), ms: 500 }], 500));
     expect(w2.index).toBe(1);
   });
 
-  it("Oktavfehler mit niedriger Klarheit zählt nicht als falsch, mit hoher schon", () => {
+  // Bewusst geändert: Eine Oktave zu hoch (Überblasen) war bei hoher Klarheit ein Fehler. Jetzt nie rot,
+  // nur ein Hinweis – und kein Treffer. Die Oktave darunter bleibt wie beim Üben (nur bei hoher Klarheit).
+  it("Oktave zu hoch (überblasen): nicht rot, kein Treffer, ein Hinweis; Oktave darunter nur bei hoher Klarheit falsch", () => {
     const tl = melody();
-    const w = new WaitFollower(tl);
-    feed(w, frames([tone(G + 12, 500, { clarity: 0.93 }), rest(60), tone(G, 200)]));
-    expect(w.results[0]).toEqual({ ok: true });
+    const octaves: number[] = [];
+    const w = new WaitFollower(tl, { onOctave: (i) => octaves.push(i) });
+    feed(w, frames([tone(G + 12, 500, { clarity: 0.99 })]));
+    expect(w.index).toBe(0);
+    expect(w.wrongMidi).toBeNull();
+    expect(octaves).toEqual([0]);
+    feed(w, frames([rest(60), tone(G, 200)], 500));
+    expect(w.results[0]).toEqual({ ok: true, cents: 0 });
 
-    const w2 = new WaitFollower(tl);
-    feed(w2, frames([tone(G + 12, 500, { clarity: 0.99 }), rest(60), tone(G, 200)]));
-    expect(w2.results[0]).toEqual({ ok: false, wrongMidi: G + 12 });
+    const high = buildTimeline(song("c''4 d''4 ||"));
+    const low = new WaitFollower(high);
+    feed(low, frames([tone(C2 - 12, 500, { clarity: 0.93 }), rest(60), tone(C2, 200)]));
+    expect(low.results[0]).toMatchObject({ ok: true });
+    const low2 = new WaitFollower(high);
+    feed(low2, frames([tone(C2 - 12, 500, { clarity: 0.99 }), rest(60), tone(C2, 200)]));
+    expect(low2.results[0]).toMatchObject({ ok: false, wrongMidi: C2 - 12 });
   });
 
   it("Rauschen und niedrige Klarheit: nichts wird gewertet", () => {
@@ -156,7 +171,7 @@ describe("Mitspielen: Warte-Modus", () => {
       noise.push({ t, freq: 500 + (x % 1500), clarity: 0.3 + (x % 50) / 100 });
     }
     feed(w, noise);
-    feed(w, frames([tone(G, 1000, { clarity: 0.85 })], 2000)); // richtiger Ton, aber zu unklar
+    feed(w, frames([tone(G, 1000, { clarity: 0.8 })], 2000)); // richtiger Ton, aber zu unklar (Schwelle beim Mitspielen 0,85)
     feed(w, frames([{ freq: 200, ms: 500 }], 3000)); // außerhalb des Bereichs
     expect(w.index).toBe(0);
     expect(w.wrongMidi).toBeNull();
@@ -307,7 +322,7 @@ describe("Mitspielen: Warte-Modus", () => {
     feed(w, frames([tone(G, 200), tone(A, 200), tone(G, 600)]));
     expect(w.pass).toBe(1);
     expect(w.index).toBe(0); // g' weitergehalten: kein Einsatz für den neuen Durchgang
-    feed(w, frames([rest(60), tone(G, 200), tone(H, 200), tone(A, 200), tone(G, 200)], 1000));
+    feed(w, frames([rest(60), tone(G, 200), tone(H, 300), tone(A, 200), tone(G, 200)], 1000));
     expect(passes.map((s) => [s.hits, s.total])).toEqual([
       [3, 3],
       [2, 3],
@@ -391,8 +406,9 @@ describe("Mitspielen: Takt-Modus", () => {
       b.push(f);
       if (at < 0 && hits.length) at = f.t;
     }
-    // erste Note: Fenster 1000–1500 ms (+ Verzögerung von Mikrofon und Erkennung), halbe Dauer = 250 ms
-    expect(at).toBeGreaterThan(START + 250);
+    // erste Note: Fenster 1000–1500 ms (+ Verzögerung von Mikrofon und Erkennung); grün, sobald der
+    // Einsatz am Notenbeginn 40 ms gehalten hat (früher erst nach der halben Dauer)
+    expect(at).toBeGreaterThanOrEqual(START + DEFAULT_FOLLOW.latencyMs + DEFAULT_FOLLOW.onsetHoldMs);
     expect(at).toBeLessThan(START + 500 + DEFAULT_FOLLOW.latencyMs);
     expect(hits.map(([i]) => i)).toEqual([0, 1, 2, 3, 4, 5]);
   });
@@ -594,10 +610,11 @@ describe("Mitspielen: Takt-Modus", () => {
   it("vorzeitig beendet: nur begonnene Noten werden gewertet", () => {
     const tl = melody();
     const b = new BeatFollower(tl, { secPerQuarter: SPQ, startMs: START });
-    // abgebrochen bei 1,2 s: die dritte Note hat erst 200 von 500 ms geklungen
+    // abgebrochen bei 1,2 s: die dritte Note hat erst 200 von 500 ms geklungen – richtig, also grün
+    // (früher rot, weil die halbe Dauer fehlte); die vierte hatte noch nicht begonnen
     feed(b, beatFrames(tl).filter((f) => f.t < START + 1200 + LAT));
     const s = b.finish(START + 1200 + LAT);
-    expect(s).toMatchObject({ hits: 2, total: 3, complete: false });
+    expect(s).toMatchObject({ hits: 3, total: 3, complete: false });
     expect(b.finish(START + 5000)).toBe(s);
   });
 

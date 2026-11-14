@@ -220,3 +220,96 @@ und unklarem Einsatz nur etwa 80 ms als Ton messbar. Neu: Von der Notendauer wer
 Zungen-Lücke und Einsatz abgezogen, davon muss die Hälfte erkannt sein, mindestens aber 50 ms
 (zwei Messungen). Geprüft mit Test bis ♩ = 120, auch 30 ms zu früh oder zu spät. Falsche Töne bleiben
 falsch; eine kurz (staccato) gespielte Sechzehntel zählt als getroffen.
+
+(Abgelöst durch den folgenden Abschnitt; der Test bis ♩ = 120 gilt weiter.)
+
+### Mitspielen robuster (14.11.2026)
+
+**Befund am echten Gerät** (Android-Handy, günstige 20-€-Sopranflöte, erwachsene Anfängerin): Das
+Stimmgerät zeigt die richtigen Namen, aber etwa −30 Cent (Flöte zu tief, ≈ a = 432 Hz; einzelne Töne
+streuen je nach Blasdruck). „Im Takt“: fast alle Noten rot, auffällig wird die zweite von zwei gleichen
+Noten grün (Zeitversatz). „Wartet auf mich“: überwiegend grün, aber oft rot.
+
+**Recherche** (Quelltext von UltraStar Deluxe und Performous): Gesangsspiele werten nach dem *nächsten
+Halbton* (±50 Cent), falten Oktaven, werten nach dem Anteil der Notendauer und gleichen eine
+*einstellbare* Eingangs-Verzögerung aus (UltraStar Standard 140 ms, Performous 90 ms, beide mit Abgleich).
+Unsere App maß die Mikrofon-Verzögerung nirgends (AnalyserNode im 25-ms-Takt, Zeitstempel
+`performance.now`); fest 50 ms war zu wenig. Einschwing-Frames („Chiff“) haben niedrige Klarheit und
+fehlten in der erkannten Zeit.
+
+**Regeln jetzt** (Code `app/src/audio/follow.ts`, `flute-profile.ts`, `latency.ts`; Übung und Stimmgerät
+bleiben bei ihren Regeln, außer dem Flötenprofil in der Übung):
+
+- **Toleranz = nächster Halbton** (beide Arten): Ein Ton zählt als Zielton, wenn er näher am Zielton liegt
+  als an jedem Nachbarton (|Abweichung| < 50 Cent) – gemessen an der Lage dieses Tons auf *ihrer* Flöte.
+- **Flötenprofile** (Wunsch der Nutzerin: mehrere Flöten, in den Einstellungen wechselbar und einstellbar):
+  Je Flöte je Ton die Abweichung vom Stimmton in Cent, gemessen mit „Flöte einstellen“ (Einstellungen →
+  Flöte, Ablauf in `docs/app-entscheidungen.md` Abschnitt 6). Angewandt beim Mitspielen und in der
+  Spielen-Übung; ungemessene Töne: Median der gemessenen, sonst 0. Beim Mitspielen wird jeder Ton langsam
+  nachgeführt (je Messung 3 % des Abstands zum Median seiner letzten 40 Messungen, höchstens 0,5 Cent;
+  gemessene Töne höchstens 15 Cent je Durchgang vom gespeicherten Wert). Gespeichert wird das nur nach
+  einem *vollständigen* Durchgang und nur für Töne mit mindestens 10 Messungen – ein abgebrochener Versuch
+  (oft gerade, weil es nicht klappte) soll das Profil nicht verschieben. So gleicht sich auch eine nie
+  eingestellte, insgesamt zu tiefe Flöte nach wenigen Noten an (Rückfall-Median). Eine eigene
+  Gesamtverschiebung gibt es nicht. Im Mitspiel-Bereich steht klein „Flöte: Meine Flöte · etwa 30 Cent tief,
+  wird ausgeglichen“ (Median der Werte, ab 8 Cent) bzw. „Tipp: Flöte einstellen, dann wird genauer gewertet.“;
+  der Name führt zu den Einstellungen.
+- **Klarheit ab 0,85** (nur Mitspielen, sonst 0,9): Synthetisch gemessen (Flötenklang mit Obertönen, weißes
+  Rauschen und tiefes Atemgeräusch, 1024 Samples): Bei sehr starkem Rauschen fällt die Klarheit eines
+  Flötentons auf etwa 0,86 – mit 0,9 käme kein Frame durch, mit 0,85 neun von zehn; die wenigen falschen
+  Werte darunter sind Oktavfehler (zählen nicht) und Einzelwerte (Median und Nachbarprüfung entfernen sie).
+  Reines Rauschen oder Atem ohne Ton erreicht im Bereich 480–2300 Hz nie 0,85.
+- **Warte-Modus, weniger „falsch“:** Rot nur, wenn ein anderer Ton (a) mindestens einen Halbton daneben
+  liegt (nächster Halbton, dazu 10 Cent Abstand zur Grenze, damit nichts an der Kante kippt), (b) nach dem
+  Weiterspringen neu eingesetzt hat – der gehaltene alte Ton zählt nie – und (c) 250 ms stabil bleibt.
+  „Richtig“ braucht weiter nur 120 ms. Übergangsklänge beim Fingerwechsel dauern auf der Blockflöte typisch
+  20–80 ms (die Nachbarprüfung im Glätter entfernt einzelne schon vorher) und bleiben folgenlos.
+  **Eine Oktave zu hoch** beim Zielton (Überblasen): nicht rot – es ist der richtige Griff mit zu viel Luft –,
+  aber auch kein Treffer; dezent „eine Oktave zu hoch – sanfter blasen“. Die Oktave darunter zählt wie beim
+  Üben nur bei hoher Klarheit als falsch. Hält sie die getroffene Note weiter, werden diese Messungen fürs
+  Nachführen genutzt.
+- **Takt-Modus, großzügiger:**
+  - Eingangs-Verzögerung Standard **120 ms** (statt 50), mit Kopfhörern **200 ms** (Bluetooth-Headsets
+    verzögern auch das Mikrofon um typisch 100–200 ms, manche Browser melden die Ausgabe zu knapp; mit
+    Kabel-Kopfhörern sind 80 ms zu viel gut verträglich). Die Ausgabe-Seite kommt weiter aus `outputClock`
+    (`startMs` = Zeitpunkt, zu dem sie den Zeitplan-Beginn *hört*); Frames werden um die Verzögerung früher
+    einsortiert. Die Rechnung in `song-follow.ts`/`follow.ts` war richtig, nur der Wert zu klein.
+  - **Verzögerung abgleichen** (Mitspiel-Bereich, „Im Takt“: „Verzögerung 120 ms (Standard) · abgleichen“):
+    vier Klicks Einzählen, dann acht Klicks im Puls ♩ = 80; sie spielt zu jedem Klick einen kurzen Ton,
+    egal welchen. Einsatz = erster gültiger Frame eines Tons von mindestens 75 ms (wie die Wertung ihn
+    sieht), je Klick der erste Einsatz von 250 ms vor bis 450 ms nach dem *gehörten* Klick; Median, Werte
+    über 80 ms davon weg verworfen, mindestens 4 von 8 nötig, plausibel 0–400 ms. Ergebnis: „Dein Handy hört
+    etwa 140 ms verzögert.“, dazu ein feiner Schieber (± 10 ms) und „Standard“. Gemessen und gespeichert wird
+    **je Kopfhörer-Zustand** (Anzeige „ohne Kopfhörer“/„mit Kopfhörern“); fehlt der Wert für Kopfhörer:
+    „mit Kopfhörern noch nicht abgeglichen“. Speicherort `settings.inputLatencyMs` = `{ speaker, headphones }`
+    im Speicher dieses Browsers, **nicht in der Sicherung** (ein anderes Handy hört anders verzögert; beim
+    Einlesen bleibt der Wert des Geräts).
+  - **Wertung je Note:** gewertet wird nur der mittlere Teil (ohne die ersten 60 ms, höchstens 30 % der Note,
+    und ohne die letzten 20 %). Unklare und fehlende Frames und die Oktave zählen dort weder für noch gegen
+    die Note, Stille und andere Töne schon. **Getroffen**, wenn der Zielton mindestens 38 % davon ausmacht und
+    mindestens 40 ms erkannt wurde – **oder** wenn der Zielton höchstens 120 ms vor oder nach dem
+    Notenbeginn einsetzt (zu früh höchstens eine halbe, zu spät höchstens eine ganze Note – sonst gälte ein
+    eine Sechzehntel zu früh gespielter Ton für die nächste) und mindestens 40 ms hält. Rot also nur, wenn
+    überwiegend ein anderer Ton oder gar nichts kam. Gewertet wird eine Note, wenn ihr Fenster vorbei ist und
+    kein später Einsatz mehr kommen kann. Sechzehntel bis ♩ = 120 (auch 30 ms daneben) gehen weiter.
+  - **Metronom-Klicks** (ohne Kopfhörer aus dem Lautsprecher): Sie sind keine Rauschimpulse, sondern kurze
+    Sinus-Töne (1250/1900 Hz, ≈ 40 ms), die pitchy mit voller Klarheit erkennt – 1250 Hz liegt fast genau auf
+    es² der Flöte. Ein Filter macht höchstens zwei Frames lange „Töne“ auf Klick-Höhe zu „unklar“; ein echter
+    Ton dort klingt länger und zählt. Auch im Abgleich, wo ein mitgehörter Klick sonst als Einsatz gälte.
+- **Diagnose-Aufnahme:** Während jedes Mitspiel-Durchgangs und beim Abgleich hält die App die Messwerte im
+  Speicher (nur der letzte Durchgang, höchstens 15 000 Messungen): je Messung Zeit, Frequenz, Klarheit,
+  Lautstärke, geglättete Frequenz und Einordnung (gehörter Ton, Cent, Note, Art, überbrückt/unstet/Klick),
+  dazu Ereignisse (Noten mit Ergebnis und Grund, Einsatz-Versatz, falsche Töne, Oktav-Hinweis, Abgleich-
+  Ergebnis), Notenfenster, Stimmton, Verzögerung (abgeglichen?), Flötenwerte, `track.getSettings()`,
+  `track.stats` (falls vorhanden), `AudioContext.baseLatency/outputLatency`, `getOutputTimestamp` und
+  Browserkennung. **Kein Ton, keine Aufnahme**; der Kopf der Datei sagt das. Danach dezent „Diagnose
+  speichern“: auf Android öffnet sich das Teilen-Menü (z. B. E-Mail), sonst wird die JSON-Datei
+  heruntergeladen. Auswertung: `node app/scripts/diagnose.mjs <datei>` (je Note erwartet/erkannt, mittlere
+  Cent-Abweichung, Einsatz-Versatz, Grund für Rot; Median des Versatzes; Anteil unklarer Messungen).
+- **Tests:** `follow-robust.test.ts`, `flute-profile.test.ts`, `latency.test.ts`, `diagnose.test.ts`,
+  `data.test.ts`; E2E `follow-robust.spec.ts` (Abgleich mit Tönen 140 ms nach den Klicks, −30 Cent
+  verstimmt in beiden Modi, Diagnose-Datei, Flöte einstellen und wechseln, Stimmgerät). Bewusst geänderte
+  ältere Tests: falsche Töne im Warte-Modus jetzt 300 statt 200 ms; „knapp außerhalb der Toleranz“ (45 Cent)
+  ist jetzt ein Treffer; Oktave zu hoch nicht mehr rot; Klarheit 0,85 statt 0,9 „zu unklar“ → 0,8; im Takt
+  „live grün“ schon nach gehaltenem Einsatz, eine abgebrochene, bis dahin richtig gespielte Note ist grün,
+  Verspätung im E2E 0,25 s grün statt 0,35 s rot (rot jetzt erst bei 0,7 s).
