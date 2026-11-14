@@ -3,7 +3,12 @@ import { GLIDE, toneFreq } from "../../src/audio/flute-synth";
 import {
   BREATH_GAP,
   FADE,
-  REPEAT_GAP,
+  ARTIC_MIN,
+  FRAME_LEAD,
+  LIMITER,
+  LIMITER_DELAY,
+  OUTPUT_FALLBACK,
+  gapSeconds,
   START_DELAY as S,
   SongPlayer,
   type PlayOptions,
@@ -67,6 +72,8 @@ function setup(tl: Timeline, opts: Partial<PlayOptions> = {}) {
 }
 
 const close = (a: number, b: number) => expect(a).toBeCloseTo(b, 6);
+/** Absetzen vor dem nächsten Ton bei einer klingenden Dauer von d Sekunden */
+const artic = (d: number) => gapSeconds("artic", d);
 const ACCENT = 1900;
 const CLICK = 1250;
 
@@ -80,14 +87,41 @@ describe("Flötenstimme", () => {
     close(h.ctx.tones()[0].freq, 442 * 2 ** (10 / 12));
   });
 
-  it("weicher Einsatz: Lautstärke beginnt bei 0 und steigt an", () => {
+  it("Einsatz auf dem Schlag: Lautstärke beginnt bei 0 und steigt kurz (10–15 ms) an, Anschleifen kurz und schwach", () => {
     const { h } = setup(timeline([[0, 1, 67]]), { countIn: false });
     h.advance(0.3);
-    const env = h.ctx.oscs[0].outs[0] as unknown as { gain: { events: { type: string; value: number; time: number }[] } };
+    const osc = h.ctx.oscs[0];
+    const env = osc.outs[0] as FakeGain;
     const [first, second] = env.gain.events;
     expect(first).toMatchObject({ type: "set", value: 0 });
     expect(second.type).toBe("linear");
-    expect(second.time - first.time).toBeGreaterThanOrEqual(0.02);
+    expect(second.time - first.time).toBeGreaterThanOrEqual(0.01);
+    expect(second.time - first.time).toBeLessThanOrEqual(0.015);
+    close(first.time, S); // genau auf dem Schlag, wie die Klicks
+    const [scoop, back] = osc.detune.events;
+    expect(Math.abs(scoop.value)).toBeLessThanOrEqual(8);
+    expect(back.time - scoop.time).toBeLessThanOrEqual(0.025);
+  });
+
+  it("Ausklingen endet genau auf 0, erst danach hält der Knoten an (kein Knacks am Tonende)", () => {
+    const { h } = setup(timeline([[0, 1, 67], [1, 1, 69]]), { countIn: false });
+    h.advance(2);
+    for (const o of h.ctx.oscs.filter((x) => x.type === "custom")) {
+      const ev = (o.outs[0] as FakeGain).gain.events;
+      const last = ev.at(-1)!;
+      expect(last).toMatchObject({ type: "linear", value: 0 });
+      expect(o.stopAt!).toBeGreaterThanOrEqual(last.time);
+      // vom aktuellen Pegel aus (Haltepegel), nicht von einem Sprung
+      const set = ev.at(-2)!;
+      expect(set.type).toBe("set");
+      expect(set.value).toBeGreaterThan(0.3);
+      expect(set.value).toBeLessThanOrEqual(0.5);
+    }
+    // Anblasgeräusch ebenso (die übrigen Regler mit Automatisierung)
+    const envs = new Set(h.ctx.oscs.map((o) => o.outs[0]));
+    const noise = h.ctx.gains.filter((g) => !envs.has(g) && g.gain.events.length);
+    expect(noise.length).toBe(2);
+    for (const g of noise) expect(g.gain.events.at(-1)).toMatchObject({ type: "linear", value: 0 });
   });
 });
 
@@ -117,8 +151,8 @@ describe("Abspieler: Zeitplan", () => {
     expect(tones.length).toBe(3);
     const t0 = S + 4 * 0.5;
     [0, 0.5, 1].forEach((d, i) => close(tones[i].start, t0 + d));
-    close(tones[0].end!, t0 + 0.5); // gebunden an den nächsten (legato)
-    close(tones[1].end!, t0 + 1);
+    close(tones[0].end!, t0 + 0.5 - artic(0.5)); // abgesetzt vor dem nächsten Ton
+    close(tones[1].end!, t0 + 1 - artic(0.5));
     close(tones[2].end!, t0 + 2);
     close(tones[0].freq, toneFreq(60));
   });
@@ -156,17 +190,30 @@ describe("Abspieler: Zeitplan", () => {
     h.advance(3);
     const tones = h.ctx.tones();
     expect(tones.length).toBe(2);
-    close(tones[0].end! - tones[0].start, 1.5);
+    close(tones[0].end! - tones[0].start, 1.5 - artic(1.5)); // ein Ton, abgesetzt erst vor dem nächsten
   });
 
-  it("Tonwiederholung: kleine Trennung, der nächste Ton kommt pünktlich", () => {
-    const { h } = setup(timeline([[0, 1, 67], [1, 1, 67], [2, 1, 69]]), { countIn: false });
+  it("Absetzen: jede Note neu angestoßen, vor dem nächsten Ton eine kurze Lücke, Töne kommen pünktlich", () => {
+    const { h } = setup(timeline([[0, 1, 67], [1, 1, 67], [2, 1, 69], [3, 1, 71]], { total: 8 }), { countIn: false });
     h.advance(3);
-    const [a, b, c] = h.ctx.tones();
-    close(a.end!, S + 0.5 - REPEAT_GAP);
+    const [a, b, c, d] = h.ctx.tones();
+    expect(new Set([a.osc, b.osc, c.osc, d.osc]).size).toBe(4);
+    close(a.end!, S + 0.5 - artic(0.5));
     close(b.start, S + 0.5);
-    close(b.end!, S + 1); // danach ein anderer Ton: keine Trennung
+    close(b.end!, S + 1 - artic(0.5)); // auch zu einem anderen Ton
     close(c.start, S + 1);
+    close(d.end!, S + 2); // vor der Pause: volle Dauer
+    // Anblasgeräusch bei jedem Einsatz
+    expect(h.ctx.gains.length).toBeGreaterThan(8);
+  });
+
+  it("Länge der Absetz-Lücke: 12 % der Dauer, mindestens 35 ms, höchstens 90 ms, bei sehr kurzen Noten höchstens 40 %", () => {
+    close(gapSeconds("artic", 0.5), 0.06);
+    close(gapSeconds("artic", 0.2), ARTIC_MIN);
+    close(gapSeconds("artic", 2), 0.09);
+    close(gapSeconds("artic", 0.05), 0.02);
+    close(gapSeconds("none", 1), 0);
+    close(gapSeconds("breath", 1), BREATH_GAP);
   });
 
   it("Atemzeichen: Ton endet früher, die Folgetöne verschieben sich nicht", () => {
@@ -264,7 +311,7 @@ describe("Abspieler: Schleife", () => {
     expect(tones.length).toBeGreaterThanOrEqual(10);
     const t0 = S + 2;
     tones.slice(0, 10).forEach((t, i) => close(t.start, t0 + i * 0.5));
-    close(tones[3].end!, tones[4].start); // Übergang ohne Lücke
+    close(tones[3].end!, tones[4].start - artic(0.5)); // Übergang im Takt, abgesetzt wie sonst
     expect(h.ctx.clicks().length).toBe(4); // nur der Einzähltakt
     expect(ended()).toBe(0);
     expect(positions.some((p) => p.pass === 2 && p.tone === 0)).toBe(true);
@@ -274,7 +321,7 @@ describe("Abspieler: Schleife", () => {
     const { h } = setup(timeline([[0, 2, 67], [2, 2, 67]]), { loop: true, countIn: false });
     h.advance(3);
     const [, b, c] = h.ctx.tones();
-    close(b.end!, S + 2 - REPEAT_GAP);
+    close(b.end!, S + 2 - artic(1));
     close(c.start, S + 2);
   });
 
@@ -308,8 +355,8 @@ describe("Abspieler: Tempo, Stopp, Rückmeldungen", () => {
     // schon eingeplante Töne bleiben, wie sie sind: der Wechsel liegt im Vorausschau-Fenster
     expect(tones[k + 1].start).toBeGreaterThan(1.0);
     expect(tones[k + 1].start).toBeLessThan(1.0 + 0.5);
-    // legato bleibt erhalten (kein Loch, keine Überlappung)
-    for (let i = 0; i < 11; i++) close(tones[i].end!, tones[i + 1].start);
+    // abgesetzt nach der jeweils klingenden Dauer (kein Überlappen)
+    for (let i = 0; i < 11; i++) expect(tones[i].end!).toBeCloseTo(tones[i + 1].start - artic(tones[i + 1].start - tones[i].start), 5);
   });
 
   it("Stopp: Eingeplantes wird abgebrochen und kurz ausgeblendet", () => {
@@ -323,7 +370,9 @@ describe("Abspieler: Tempo, Stopp, Rückmeldungen", () => {
     // was schon klingt, endet nach dem Ausblenden; was noch kommen sollte, erklingt nicht
     for (const o of h.ctx.oscs) expect(o.stopAt!).toBeLessThanOrEqual(Math.max(o.startAt!, 3 + FADE + 0.011));
     expect(h.ctx.oscs.some((o) => o.startAt! > 3)).toBe(true);
-    const bus = h.ctx.gains.find((g) => g.outs.includes(h.ctx.destination))!;
+    const lim = h.ctx.compressors[0];
+    expect(lim.outs).toEqual([h.ctx.destination]);
+    const bus = h.ctx.gains.find((g) => g.outs.includes(lim))!;
     expect(bus.gain.events.at(-1)).toMatchObject({ type: "linear", value: 0 });
     close(bus.gain.events.at(-1)!.time, 3 + FADE);
     h.advance(2);
@@ -355,19 +404,70 @@ describe("Abspieler: Tempo, Stopp, Rückmeldungen", () => {
     expect(h.timers.active).toBe(0);
   });
 
-  it("die Meldung kommt zur Zeit des Tons (aus der Audio-Uhr abgeleitet)", () => {
+  it("die Meldung kommt zur Zeit des Tons (aus der Audio-Uhr abgeleitet, ein Bild voraus)", () => {
     const tl = timeline([[0, 1, 60], [1, 1, 62]]);
     const h = new Harness();
     const player = new SongPlayer(h.env);
     const at: [number | null, number][] = [];
     player.play(tl, { secPerQuarter: 0.5, countIn: false, onPosition: (p) => at.push([p.tone, h.ctx.currentTime]) });
     h.advance(1.2, 5);
+    // das Bild steht FRAME_LEAD später auf dem Schirm, der Begrenzer verzögert um LIMITER_DELAY
+    const lead = FRAME_LEAD - LIMITER_DELAY;
     expect(at[0][0]).toBe(0);
-    expect(at[0][1]).toBeGreaterThanOrEqual(S);
-    expect(at[0][1]).toBeLessThan(S + 0.006);
+    expect(at[0][1]).toBeGreaterThanOrEqual(S - lead - 1e-9);
+    expect(at[0][1]).toBeLessThan(S - lead + 0.006);
     expect(at[1][0]).toBe(1);
-    expect(at[1][1]).toBeGreaterThanOrEqual(S + 0.5 - 1e-9);
-    expect(at[1][1]).toBeLessThan(S + 0.506);
+    expect(at[1][1]).toBeGreaterThanOrEqual(S + 0.5 - lead - 1e-9);
+    expect(at[1][1]).toBeLessThan(S + 0.5 - lead + 0.006);
+  });
+
+  it("Ausgabe-Verzögerung wird genau einmal abgezogen: getOutputTimestamp, sonst baseLatency + outputLatency", () => {
+    const tl = timeline([[0, 1, 60], [1, 1, 62]]);
+    const firstAt = (prep: (h: Harness) => void) => {
+      const h = new Harness();
+      prep(h);
+      const player = new SongPlayer(h.env);
+      let t: number | null = null;
+      player.play(tl, { secPerQuarter: 0.5, countIn: false, onPosition: (p) => p.tone === 0 && t === null && (t = h.ctx.currentTime) });
+      h.advance(1, 5);
+      return t! - (S - FRAME_LEAD + LIMITER_DELAY);
+    };
+    // mit getOutputTimestamp (enthält die Verzögerung selbst): 0,2 s Bluetooth
+    expect(firstAt((h) => (h.ctx.outputLatency = 0.2))).toBeCloseTo(0.2, 2);
+    // dazu baseLatency: zusammen
+    expect(firstAt((h) => ((h.ctx.outputLatency = 0.2), (h.ctx.baseLatency = 0.01)))).toBeCloseTo(0.21, 2);
+    // ohne getOutputTimestamp: dieselben Werte aus den Eigenschaften
+    expect(firstAt((h) => ((h.ctx.perfAt = null), (h.ctx.outputLatency = 0.2), (h.ctx.baseLatency = 0.01)))).toBeCloseTo(0.21, 2);
+    // gar nichts gemeldet: Rückfall
+    expect(firstAt((h) => (h.ctx.perfAt = null))).toBeCloseTo(OUTPUT_FALLBACK, 2);
+  });
+
+  it("onFrame meldet in jedem Bild die Stelle, stetig steigend", () => {
+    const tl = timeline([[0, 2, 60], [2, 2, 62]]);
+    const h = new Harness();
+    const player = new SongPlayer(h.env);
+    const qs: number[] = [];
+    player.play(tl, { secPerQuarter: 0.5, onFrame: (p) => qs.push(p.quarter) });
+    h.advance(2.6, 10);
+    expect(qs.length).toBeGreaterThan(200);
+    expect(qs[0]).toBeLessThan(-4); // Einzählen (4 Viertel) und Vorlauf: negativ
+    for (let i = 1; i < qs.length; i++) expect(qs[i]).toBeGreaterThan(qs[i - 1]);
+    expect(qs.some((q) => q > 0.2 && q < 0.3)).toBe(true);
+  });
+
+  it("Begrenzer am Ausgang: einer für alle Abspielvorgänge, setzt erst kurz unter Vollaussteuerung ein", () => {
+    const { h, player } = setup(timeline([[0, 1, 60]]), { countIn: false, metronome: true });
+    h.advance(0.3);
+    player.play(timeline([[0, 1, 62]]), { secPerQuarter: 0.5 });
+    h.advance(0.3);
+    expect(h.ctx.compressors.length).toBe(1);
+    const lim = h.ctx.compressors[0];
+    expect(lim.threshold.value).toBe(LIMITER.threshold);
+    expect(LIMITER.threshold).toBeGreaterThanOrEqual(-12);
+    expect(lim.ratio.value).toBeGreaterThanOrEqual(10);
+    expect(lim.attack.value).toBeLessThanOrEqual(0.005);
+    // beide Ausgänge (auch der ausgeblendete) hängen am Begrenzer, Klicks und Töne auf demselben Weg
+    expect(h.ctx.gains.filter((g) => g.outs.includes(lim) || g.disconnected).length).toBeGreaterThanOrEqual(2);
   });
 
   it("ein neues play beendet das laufende", () => {
@@ -399,11 +499,11 @@ describe("Abspieler: Bindebogen (legato)", () => {
     ]);
     [60, 62, 64, 65].forEach((m, i) => close(tones[i].freq, toneFreq(m)));
     [0, 0.5, 1, 1.5].forEach((d, i) => close(tones[i].start, S + d));
-    close(tones[2].end!, S + 1.5); // der gebundene Klang endet normal mit dem letzten Ton
-    // Einschwingen (Rampe der Lautstärke) nur einmal
+    close(tones[2].end!, S + 1.5 - artic(0.5)); // der gebundene Klang endet mit dem letzten Ton, abgesetzt vor f'
+    // Einschwingen (Rampe der Lautstärke) und Ausklingen nur einmal
     const env = flutes(h)[0].outs[0] as FakeGain;
-    expect(env.gain.events.filter((e) => e.type === "linear").length).toBe(1);
-    expect(env.gain.events.filter((e) => e.type === "target" && e.value === 0).length).toBe(1);
+    expect(env.gain.events.filter((e) => e.type === "linear" && e.value > 0).length).toBe(1);
+    expect(env.gain.events.filter((e) => e.type === "linear" && e.value === 0).length).toBe(1);
     // Gleiten: schnell, aber nicht sprunghaft
     const fe = flutes(h)[0].frequency.events;
     expect(fe.map((e) => e.type)).toEqual(["set", "exp", "set", "exp"]);
@@ -420,7 +520,7 @@ describe("Abspieler: Bindebogen (legato)", () => {
     h.advance(3);
     const [a, b, c] = h.ctx.tones();
     expect(a.osc).not.toBe(b.osc);
-    close(a.end!, S + 0.5 - REPEAT_GAP);
+    close(a.end!, S + 0.5 - artic(0.5));
     close(b.start, S + 0.5);
     expect(c.osc).toBe(b.osc); // g'→a' gebunden
     expect(c.legato).toBe(true);
@@ -455,7 +555,10 @@ describe("Abspieler: Bindebogen (legato)", () => {
     // erster Ton: g' gebunden zu a', danach ein neuer Einsatz auf g'
     expect(tones[1].osc).toBe(tones[0].osc);
     expect(tones[2].osc).not.toBe(tones[1].osc);
-    close(tones[1].end!, S + tl.tones[2].start * spq);
+    close(tones[1].end!, S + tl.tones[2].start * spq - artic((tl.tones[2].start - tl.tones[1].start) * spq));
+    // ungebundene Töne: abgesetzt (nicht legato)
+    const free = tl.tones.findIndex((t, i) => !t.slurToNext && !t.breathAfter && tl.tones[i + 1] && Math.abs(tl.tones[i + 1].start - t.start - t.dur) < 1e-6);
+    close(tones[free].end!, S + (tl.tones[free].start + tl.tones[free].dur) * spq - artic(tl.tones[free].dur * spq));
   });
 
   it("Tempoänderung mitten im Bogen: weiter gebunden, danach im neuen Tempo", () => {
@@ -498,7 +601,7 @@ describe("Abspieler: Bindebogen (legato)", () => {
     expect(tones.length).toBeGreaterThanOrEqual(6);
     expect(tones.slice(0, 6).map((t) => t.legato)).toEqual([false, true, false, true, false, true]);
     tones.slice(0, 6).forEach((t, i) => close(t.start, S + i));
-    close(tones[1].end!, S + 2); // Übergang zum nächsten Durchgang ohne Lücke
+    close(tones[1].end!, S + 2 - artic(1)); // Übergang zum nächsten Durchgang: neu angesetzt
     expect(tones[2].osc).not.toBe(tones[1].osc);
   });
 
@@ -587,17 +690,18 @@ describe("Abspieler: fürs Mitspielen", () => {
     const loud = setup(four(), { metronome: true, countIn: false });
     loud.h.advance(1.2);
     expect(quiet.h.ctx.tones().length).toBe(3);
-    // Weg eines Tons: Oszillator → Hüllkurve → Melodie-Regler (0,3) → Ausgang
+    // Weg eines Tons: Oszillator → Hüllkurve → Melodie-Regler (0,3) → Ausgang → Begrenzer
     const env = quiet.h.ctx.oscs.find((o) => o.type === "custom")!.outs[0] as FakeGain;
     const mel = env.outs[0] as FakeGain;
     expect(mel.gain.value).toBeCloseTo(0.3, 6);
     const out = mel.outs[0] as FakeGain;
-    expect(out.outs[0]).toBe(quiet.h.ctx.destination);
+    expect(out.outs[0]).toBe(quiet.h.ctx.compressors[0]);
+    expect(quiet.h.ctx.compressors[0].outs[0]).toBe(quiet.h.ctx.destination);
     // Klick: direkt an den Ausgang, wie ohne Melodie-Option
     const click = quiet.h.ctx.oscs.find((o) => o.type === "sine")!.outs[0] as FakeGain;
     expect(click.outs[0]).toBe(out);
     const loudEnv = loud.h.ctx.oscs.find((o) => o.type === "custom")!.outs[0] as FakeGain;
-    expect((loudEnv.outs[0] as FakeGain).outs[0]).toBe(loud.h.ctx.destination);
+    expect((loudEnv.outs[0] as FakeGain).outs[0]).toBe(loud.h.ctx.compressors[0]);
     // melody: 0 heißt wie false: keine Töne
     const none = setup(four(), { melody: 0, countIn: false });
     none.h.advance(2.5);

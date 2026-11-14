@@ -60,6 +60,15 @@ export class FakeFilter extends FakeNode {
   Q = new FakeParam(1);
 }
 
+/** Begrenzer am Ausgang (DynamicsCompressorNode) */
+export class FakeCompressor extends FakeNode {
+  threshold = new FakeParam(-24);
+  knee = new FakeParam(30);
+  ratio = new FakeParam(12);
+  attack = new FakeParam(0.003);
+  release = new FakeParam(0.25);
+}
+
 class FakeSource extends FakeNode {
   startAt: number | null = null;
   stopAt: number | null = null;
@@ -95,6 +104,12 @@ export class FakeAudioContext {
   destination = new FakeNode(this);
   oscs: FakeOsc[] = [];
   gains: FakeGain[] = [];
+  compressors: FakeCompressor[] = [];
+  /** gemeldete Verzögerungen (s); getOutputTimestamp rechnet sie ein wie ein echter Browser */
+  outputLatency = 0;
+  baseLatency = 0;
+  /** Uhr der Bildschirmzeit (ms) für getOutputTimestamp; null = ohne getOutputTimestamp (älterer Browser) */
+  perfAt: ((ctxTime: number) => number) | null = perfOf;
   resumes = 0;
   suspends = 0;
 
@@ -118,6 +133,16 @@ export class FakeAudioContext {
     this.oscs.push(o);
     return o;
   }
+  createDynamicsCompressor() {
+    const c = new FakeCompressor(this);
+    this.compressors.push(c);
+    return c;
+  }
+  get getOutputTimestamp() {
+    const at = this.perfAt;
+    if (!at) return undefined;
+    return () => ({ contextTime: Math.max(0, this.currentTime - this.outputLatency - this.baseLatency), performanceTime: at(this.currentTime) });
+  }
   createBiquadFilter() {
     return new FakeFilter(this);
   }
@@ -133,7 +158,8 @@ export class FakeAudioContext {
   }
 
   /**
-   * Flötentöne (eigene Wellenform) mit Beginn, Ende (Beginn des Ausklingens) und Frequenz.
+   * Flötentöne (eigene Wellenform) mit Beginn, Ende (Beginn des Ausklingens: setValueAtTime, dann
+   * linearRamp auf 0 an der Hüllkurve) und Frequenz.
    * Ein gebundener Tonwechsel (setValueAtTime + exponentialRamp auf der Frequenz, siehe Voice.glide)
    * zählt als eigener Ton mit `legato: true`; der Ton davor endet dort, wo das Gleiten beginnt.
    * `osc` ist der Index des Oszillators in `oscs` (gebundene Töne teilen sich einen).
@@ -143,7 +169,9 @@ export class FakeAudioContext {
     this.oscs.forEach((o, osc) => {
       if (o.type !== "custom") return;
       const env = o.outs[0] as FakeGain;
-      const rel = env.gain.events.find((e) => e.type === "target" && e.value === 0);
+      const ge = env.gain.events;
+      const ri = ge.findIndex((e, i) => i > 0 && e.type === "linear" && e.value === 0 && ge[i - 1].type === "set");
+      const rel = ri > 0 ? ge[ri - 1] : undefined;
       const fe = o.frequency.events;
       const segs = [{ freq: o.frequency.value, start: o.startAt!, legato: false }];
       for (let i = 0; i + 1 < fe.length; i++) {
@@ -163,6 +191,11 @@ export class FakeAudioContext {
   clicks() {
     return this.oscs.filter((o) => o.type === "sine").map((o) => ({ freq: o.frequency.value, start: o.startAt!, stop: o.stopAt! }));
   }
+}
+
+/** Bildschirm-Uhr der Attrappe: fest an die Audio-Uhr gekoppelt (ms) */
+export function perfOf(ctxTime: number): number {
+  return 1000 + ctxTime * 1000;
 }
 
 /** Zeitgeber, die nur auf Befehl laufen. */
@@ -197,7 +230,7 @@ export class FakeTimers implements PlayerTimers {
 /** Kontext und Zeitgeber zusammen: `advance` stellt die Audio-Uhr in 25-ms-Schritten weiter. */
 export class Harness {
   ctx = new FakeAudioContext();
-  timers = new FakeTimers();
+  timers = Object.assign(new FakeTimers(), { now: () => perfOf(this.ctx.currentTime) });
   created = 0;
   env = {
     createContext: () => {

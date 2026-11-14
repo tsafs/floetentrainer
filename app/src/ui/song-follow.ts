@@ -10,14 +10,15 @@
 //   (rot schon beim ersten falschen Ton, dazu dezent „Du spielst a¹“). Es erklingt nichts – mit
 //   Kopfhörern bei einem falschen Ton kurz und leise der richtige (siehe PREVIEW_VOL).
 // - Takt-Modus: Der Abspieler zählt ein und klickt leise im Tempo, ohne Melodie (mit Kopfhörern leise
-//   mit Melodie); die Markierung läuft mit, jede Note wird nach ihrem Ende grün oder rot.
+//   mit Melodie); Markierung und Balken laufen mit, jede Note wird nach ihrem Ende grün oder rot.
+//   Im Warte-Modus steht der Balken an der Note, auf die gewartet wird.
 // Mikrofon und AudioContext starten erst beim Tippen auf Start; nach jedem Durchgang, beim Stopp, beim
 // Wechsel in den Hintergrund und beim Verlassen der Seite gehen Mikrofon und Klicks wieder aus.
 // Die Lernspuren bleiben unberührt: Gespeichert wird nur der Bestwert je Lied und Art.
 
 import { BeatFollower, followConfig, WaitFollower, type FollowSummary } from "../audio/follow";
 import { keepAwake, mic } from "../audio/mic";
-import { songPlayer, type PlayerPosition } from "../audio/song-player";
+import { heardAtPerf, songPlayer, type PlayerPosition } from "../audio/song-player";
 import { fluteSvg } from "../music/flute";
 import { midiNameHtml, nameHtml, nameText } from "../music/names";
 import { chartNoteByMidi } from "../music/notes";
@@ -42,18 +43,15 @@ const ICON_PLAY = `<svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="
 const ICON_STOP = `<svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><rect x="7" y="7" width="12" height="12" rx="1.6"/></svg>`;
 export const ICON_MIC = `<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><rect x="7" y="2.2" width="6" height="10.2" rx="3" fill="none" stroke-width="1.4"/><path d="M4.3 9.6a5.7 5.7 0 0 0 11.4 0M10 15.3v2.6M7.2 17.9h5.6" fill="none" stroke-width="1.4" stroke-linecap="round"/></svg>`;
 
-/** Ausgabe-Verzögerung (ms), wenn der Browser keine meldet (outputLatency fehlt oder ist 0) */
-export const OUTPUT_FALLBACK_MS = 30;
-
 /**
  * Audiozeit t des Abspielers (s) → Zeitpunkt auf der Uhr der Mikrofon-Frames (performance.now), zu dem
- * sie den dort eingeplanten Klick *hört*: wie die Markierung des Abspielers mit der gemeldeten
- * Ausgabe-Verzögerung (bei Bluetooth-Kopfhörern oft 0,2 s und mehr). Die Verzögerung von Mikrofon und
- * Erkennung gleicht die Wertung selbst aus (FollowConfig.latencyMs).
+ * sie den dort eingeplanten Klick *hört*: dieselbe Abbildung wie für die Markierung des Abspielers
+ * (outputClock: getOutputTimestamp, sonst gemeldete Ausgabe-Verzögerung – bei Bluetooth-Kopfhörern oft
+ * 0,2 s und mehr). Die Verzögerung von Mikrofon und Erkennung gleicht die Wertung selbst aus
+ * (FollowConfig.latencyMs).
  */
-export function heardAt(ac: Pick<AudioContext, "currentTime" | "outputLatency">, t: number, now = performance.now()): number {
-  const out = ac.outputLatency > 0 ? ac.outputLatency * 1000 : OUTPUT_FALLBACK_MS;
-  return now + (t - ac.currentTime) * 1000 + out;
+export function heardAt(ac: AudioContext, t: number, now = performance.now()): number {
+  return heardAtPerf(ac, t, now);
 }
 
 const MODE_LABEL: Record<FollowMode, string> = { wait: "Warte-Modus", beat: "Takt-Modus" };
@@ -75,6 +73,8 @@ export interface FollowHost {
   percent(): number;
   setPercent(p: number, save: boolean): void;
   setCur(ids: number[]): void;
+  /** Balken an Stelle q (Viertel) im Zeitplan tl; null blendet ihn aus */
+  playhead(tl: Timeline | null, q: number | null): void;
   /** Noten grün (hit), rot (miss) oder wieder schwarz (null) färben */
   paint(ids: number[], cls: "hit" | "miss" | null): void;
   clearPaint(): void;
@@ -326,6 +326,7 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
     else songPlayer.idle();
     mic.stop();
     host.setCur([]);
+    host.playhead(null, null);
     showCount(null);
     fwrong.textContent = "";
     shownMidi = undefined;
@@ -390,6 +391,11 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
   const beginWait = (tl: Timeline, loop: boolean, my: number) => {
     const r = run!;
     const ok = () => my === token && run === r;
+    /** Markierung und Balken auf die Note, auf die gewartet wird */
+    const markAt = (i: number) => {
+      host.setCur(tl.tones[i].ids);
+      host.playhead(tl, tl.tones[i].start);
+    };
     const w = new WaitFollower(tl, {
       cfg: followConfig(settings),
       loop,
@@ -402,7 +408,7 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
         host.paint(tl.tones[i].ids, nr.ok ? "hit" : "miss");
         fwrong.textContent = "";
         if (w.index < tl.tones.length) {
-          host.setCur(tl.tones[w.index].ids);
+          markAt(w.index);
           showTone(w.index);
           host.scrollTo(tl.tones[w.index].bar);
         }
@@ -412,7 +418,7 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
         if (r.clearNext) {
           host.clearPaint();
           r.clearNext = false;
-          host.setCur(tl.tones[i].ids);
+          markAt(i);
         }
         host.paint(tl.tones[i].ids, "miss");
         fwrong.innerHTML = `Du spielst ${midiNameHtml(midi)}`;
@@ -434,7 +440,7 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
         passDone(s, pass);
         r.lastPass = [...w.results];
         r.clearNext = true;
-        host.setCur(tl.tones[0].ids);
+        markAt(0);
         showTone(0);
         host.scrollTo(tl.tones[0].bar);
       },
@@ -444,7 +450,7 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
     r.unlisten = mic.listen((f) => {
       if (ok()) w.push(f);
     });
-    host.setCur(tl.tones[0].ids);
+    markAt(0);
     showTone(0);
     host.scrollTo(tl.tones[0].bar, true);
     setStatus(loop ? `${sectionText()} in Schleife` : "");
@@ -481,6 +487,9 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
           setStatus(`Takt ${tl.bars[p.bar].index + 1}${loop ? ` · ${p.pass + 1}. Durchgang` : ""}`);
         } else if (p.countIn != null && tl.bars.length) host.scrollTo(tl.bars[0].index, true);
         clear();
+      },
+      onFrame: (p) => {
+        if (ok()) host.playhead(tl, p.quarter);
       },
       onEnd: () => {
         if (!ok()) return;
@@ -621,6 +630,7 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
       result = null;
       host.clearPaint();
       host.setCur([]);
+      host.playhead(null, null);
       keepAwake(false);
       render();
     },

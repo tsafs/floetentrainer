@@ -117,6 +117,114 @@ test("Abspielen: Einzählen, dann läuft die Markierung zur richtigen Zeit mit, 
   await expect(page.getByRole("button", { name: "Stopp" })).toBeVisible();
 });
 
+/** mitlaufender Balken: Mitte, oberer und unterer Rand (Fensterkoordinaten), Zeile; null, wenn nicht zu sehen */
+const playheadAt = (page: Page) =>
+  page.evaluate(() => {
+    const el = document.querySelector<HTMLElement>(".playhead");
+    if (!el?.classList.contains("on")) return null;
+    const r = el.getBoundingClientRect();
+    return { x: r.left + r.width / 2, top: r.top, bottom: r.bottom, sys: Number(el.dataset.sys), width: r.width };
+  });
+/** Mitte des Notenkopfs einer Note und Lage ihrer Zeile (Notensystem und erste Liedsilbe) */
+const headAt = (page: Page, id: number) =>
+  page.evaluate((i) => {
+    const h = document.querySelector(`.score g[data-id="${i}"] path.h`)!;
+    const svg = h.closest("svg")!;
+    const r = h.getBoundingClientRect();
+    const lines = [...svg.querySelectorAll(".sl")].map((l) => l.getBoundingClientRect());
+    const syl = svg.querySelector(".syl")?.getBoundingClientRect() ?? null;
+    return {
+      x: r.left + r.width / 2,
+      sys: [...document.querySelectorAll(".score svg.sys")].indexOf(svg),
+      staffTop: Math.min(...lines.map((l) => l.top)),
+      staffBottom: Math.max(...lines.map((l) => l.bottom)),
+      sylTop: syl ? syl.top : null,
+    };
+  }, id);
+
+test("Mitlaufender Balken: steht beim Einzählen an der ersten Note, läuft gleichmäßig mit, springt in die nächste Zeile", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await open(page, "#/lied/haenschen-klein");
+  await expect(page.locator(".score svg.sys").first()).toBeVisible();
+  expect(await playheadAt(page)).toBeNull(); // vor dem Start nicht zu sehen
+  await page.getByRole("button", { name: "Abspielen" }).click();
+  await page.clock.runFor(150);
+  const tl = (await lied(page))!;
+  // Einzählen: an der ersten Note, über die Höhe des Notensystems, nicht über den Liedtext
+  const first = await headAt(page, tl.tones[0].ids[0]);
+  let ph = (await playheadAt(page))!;
+  expect(ph).not.toBeNull();
+  expect(Math.abs(ph.x - first.x)).toBeLessThan(1);
+  expect(ph.sys).toBe(0);
+  expect(ph.width).toBeGreaterThanOrEqual(2);
+  expect(ph.width).toBeLessThanOrEqual(3);
+  expect(ph.top).toBeLessThan(first.staffTop);
+  expect(ph.bottom).toBeGreaterThan(first.staffBottom);
+  expect(ph.top).toBeGreaterThan(first.staffTop - 14);
+  if (first.sylTop != null) expect(ph.bottom).toBeLessThan(first.sylTop + 4);
+  await page.clock.runFor(1000);
+  expect(Math.abs((await playheadAt(page))!.x - first.x)).toBeLessThan(1); // steht still
+  // Töne: am Einsatz am Notenkopf, dazwischen gleichmäßig zwischen den Köpfen; stetig nach rechts
+  let log = await tones(page);
+  while (!log.length) {
+    await page.clock.runFor(50);
+    log = await tones(page);
+  }
+  const startOf = (k: number) => log[0].start + (tl.tones[k].start - tl.tones[0].start) * 0.625; // Viertel bei 96
+  let prevX = -Infinity;
+  let sawNext = false;
+  for (let k = 0; k + 1 < tl.tones.length && k < 12; k++) {
+    const a = await headAt(page, tl.tones[k].ids[0]);
+    const b = await headAt(page, tl.tones[k + 1].ids[0]);
+    await runTo(page, startOf(k));
+    ph = (await playheadAt(page))!;
+    expect(ph.sys).toBe(a.sys);
+    expect(Math.abs(ph.x - a.x)).toBeLessThan(4);
+    if (b.sys !== a.sys) {
+      // Zeilenwechsel: mit dem nächsten Ton in der nächsten Zeile
+      await runTo(page, startOf(k + 1) + 0.02);
+      const n = (await playheadAt(page))!;
+      expect(n.sys).toBe(b.sys);
+      expect(n.top).toBeGreaterThan(ph.bottom);
+      expect(Math.abs(n.x - b.x)).toBeLessThan(4);
+      sawNext = true;
+      break;
+    }
+    const xs: number[] = [];
+    for (const f of [0.25, 0.5, 0.75]) {
+      await runTo(page, startOf(k) + f * (startOf(k + 1) - startOf(k)));
+      xs.push((await playheadAt(page))!.x);
+    }
+    expect(xs[0]).toBeGreaterThan(Math.max(prevX, a.x - 4));
+    expect(xs[1]).toBeGreaterThan(xs[0]);
+    expect(xs[2]).toBeGreaterThan(xs[1]);
+    expect(xs[2]).toBeLessThan(b.x);
+    // gleichmäßig: gleiche Zeitabstände, gleiche Wege (± 1,5 px, ein Bild Raster)
+    expect(Math.abs(xs[1] - xs[0] - (xs[2] - xs[1]))).toBeLessThan(1.5);
+    prevX = xs[2];
+  }
+  expect(sawNext).toBe(true);
+  // Stopp: weg
+  await page.getByRole("button", { name: "Stopp" }).click();
+  expect(await playheadAt(page)).toBeNull();
+});
+
+test("Markierung der klingenden Note: deutlich (Farbe und Hinterlegung des Kopfs), ohne Übergang", async ({ page }) => {
+  await open(page, "#/lied/haenschen-klein");
+  await page.getByRole("button", { name: "Abspielen" }).click();
+  await page.clock.runFor(4 * 625 + 200);
+  const st = await page.evaluate(() => {
+    const g = document.querySelector<SVGGElement>(".score g.cur")!;
+    const h = g.querySelector("path.h")!;
+    const cs = getComputedStyle(g);
+    const hs = getComputedStyle(h);
+    return { fill: hs.fill, stroke: hs.stroke, sw: hs.strokeWidth, tr: cs.transitionDuration + "|" + hs.transitionDuration };
+  });
+  expect(st.stroke).not.toBe("none");
+  expect(parseFloat(st.sw)).toBeGreaterThan(0.3);
+  expect(st.tr).toBe("0s|0s");
+});
+
 test("Bindebogen (Stille Nacht): gebundene Töne stehen einzeln im Protokoll, Markierung läuft mit", async ({ page }) => {
   await open(page, "#/lied/stille-nacht-heilige-nacht");
   await expect(page.locator(".score svg.sys").first()).toBeVisible();

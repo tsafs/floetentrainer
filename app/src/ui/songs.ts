@@ -6,8 +6,9 @@
 // - Abschnitt wiederholen: einen Takt antippen (Anfang), einen zweiten antippen (Ende) – der Bereich läuft
 //   in Schleife. Langes Tippen wählt die ganze Zeile. Tippen bei bestehendem Abschnitt beginnt neu.
 //   Wischen (Scrollen) wählt nichts.
-// - Mitlaufen: Die klingende Note ist markiert; die Seite scrollt sanft mit, sobald die aktuelle Zeile
-//   aus dem gut sichtbaren Bereich läuft. Scrollt sie selbst, hält das Mitscrollen ein paar Sekunden still.
+// - Mitlaufen: Die klingende Note ist markiert, ein senkrechter Balken läuft gleichmäßig mit
+//   (./playhead.ts); die Seite scrollt sanft mit, sobald die aktuelle Zeile aus dem gut sichtbaren
+//   Bereich läuft. Scrollt sie selbst, hält das Mitscrollen ein paar Sekunden still.
 
 import { keepAwake } from "../audio/mic";
 import { songPlayer, type PlayerPosition } from "../audio/song-player";
@@ -24,6 +25,7 @@ import { baseTempo, clampPercent, secPerQuarter, TEMPO_MAX, TEMPO_MIN } from "..
 import { buildTimeline, sectionTimeline, type Timeline } from "../songs/timeline";
 import { esc, ICON_BACK, type View } from "./common";
 import { brokenSongPage, mountOwnBox, takeListNote } from "./own-songs";
+import { Playhead } from "./playhead";
 import { followBarHtml, ICON_MIC, mountFollow } from "./song-follow";
 
 /** so lange (ms) gilt ein Finger auf dem Takt als langes Tippen */
@@ -246,6 +248,8 @@ export const songView: View = (root, ctx) => {
   let shownMidi: number | null | undefined;
   /** Farben vom Mitspielen: Kennung → getroffen/verfehlt (bleibt beim Neuzeichnen erhalten) */
   const painted = new Map<number, "hit" | "miss">();
+  /** mitlaufender Balken */
+  const playhead = new Playhead(song);
 
   // ------------------------------------------------------------ Notenbild
   const draw = () => {
@@ -254,6 +258,7 @@ export const songView: View = (root, ctx) => {
     width = w;
     score = renderScore(song, { width: w });
     box.replaceChildren(score.el);
+    playhead.attach(box, score);
     // Zustand übernehmen
     for (const i of cur) score.noteEl(i)?.classList.add("cur");
     for (const [i, c] of painted) score.noteEl(i)?.classList.add(c);
@@ -387,6 +392,7 @@ export const songView: View = (root, ctx) => {
     lastPos = null;
     followedSys = -1;
     setCur([]);
+    playhead.hide();
     showCount(null);
     setPlayingUi(false);
     shownMidi = undefined;
@@ -429,6 +435,9 @@ export const songView: View = (root, ctx) => {
       metronome,
       loop: !!section,
       onPosition,
+      onFrame: (p) => {
+        if (playingTl === tl) playhead.show(tl, p.quarter);
+      },
       onEnd: () => {
         if (playingTl === tl) resetUi();
       },
@@ -590,6 +599,7 @@ export const songView: View = (root, ctx) => {
       }
     },
     setCur,
+    playhead: (tl, q) => playhead.show(tl, q),
     paint,
     clearPaint,
     scrollTo: (bar, force) => {
@@ -621,7 +631,7 @@ export const songView: View = (root, ctx) => {
     updateStatus();
   } else resetUi();
   // Für automatische Tests
-  (window as unknown as { __lied: unknown }).__lied = { song, player: songPlayer, timeline: () => playingTl, follow: () => follow.debug() };
+  (window as unknown as { __lied: unknown }).__lied = { song, full, player: songPlayer, timeline: () => playingTl, follow: () => follow.debug() };
 
   return () => {
     follow.destroy();
