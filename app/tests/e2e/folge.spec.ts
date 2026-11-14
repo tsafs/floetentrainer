@@ -72,18 +72,19 @@ test.describe("Lesen", () => {
 
   test("Folge mit Fehler: Note rot, richtiger Name darunter, weiter mit der nächsten; Auflösung und Wiederholung", async ({ page }) => {
     await seed(page, extrasOnly());
-    await page.addInitScript(() => ((window as never as { __folgen: string[][] }).__folgen = [["e1", "e1", "g1"]]));
+    await page.addInitScript(() => ((window as never as { __folgen: string[][] }).__folgen = [["e1", "g1", "e1", "a1"]]));
     await page.goto("./");
     await page.getByRole("button", { name: /Weiter üben/ }).click();
     const s = await toFolge(page);
     const m = folge(page);
     const before = (await stored(page)).history.lesen.fis1.length;
     await tap(page, "e1");
-    await tap(page, "fis1"); // falsch
-    await expect(m.locator('.sn[data-i="1"]')).toHaveClass(/miss/);
-    await expect(m.locator('.sn[data-i="1"] .sl')).toHaveText("e1");
-    await expect(m.locator(".sn.cur")).toHaveAttribute("data-i", "2");
     await tap(page, "g1");
+    await tap(page, "fis1"); // falsch (e¹)
+    await expect(m.locator('.sn[data-i="2"]')).toHaveClass(/miss/);
+    await expect(m.locator('.sn[data-i="2"] .sl')).toHaveText("e1");
+    await expect(m.locator(".sn.cur")).toHaveAttribute("data-i", "3");
+    await tap(page, "a1");
     await expect(page.getByTestId("panel")).toContainText("Nicht ganz");
     await expect(page.getByTestId("panel")).toContainText("Du hast fis1 gewählt");
     const d = await stored(page);
@@ -96,7 +97,7 @@ test.describe("Lesen", () => {
     for (let k = 0; k < 4; k++) {
       const i = await info(page);
       if (i.step === "folge" && i.retry) {
-        await expect(page.locator("main")).toHaveAttribute("data-notes", "e1 e1 g1");
+        await expect(page.locator("main")).toHaveAttribute("data-notes", "e1 g1 e1 a1");
         await expect(page.getByTestId("count")).toHaveText("nochmal");
         return;
       }
@@ -180,19 +181,19 @@ test.describe("Spielen", () => {
     throw new Error("keine Tonfolge");
   }
 
-  test("Folge mit Tonwiederholung richtig gespielt (neuer Einsatz), „Anhören“", async ({ page }) => {
-    await setup(page, [["g1", "a1", "a1", "h1"]]);
+  test("Folge richtig gespielt (ein Ton kommt wieder), „Anhören“", async ({ page }) => {
+    await setup(page, [["g1", "a1", "g1", "h1"]]);
     const s = await toFolge(page);
     const m = folge(page);
     await expect(m.locator(".q")).toHaveText("Spiel diese Töne nacheinander.");
     await expect(m.locator(".listen")).toBeVisible();
     await page.waitForTimeout(300);
-    // erst nur zwei Töne: die Markierung steht auf der dritten (Wiederholung braucht neuen Einsatz)
+    // erst nur zwei Töne: die Markierung steht auf der dritten
     await playSeq(page, ["g1", "a1"]);
     await expect(m.locator(".sn.hit")).toHaveCount(2);
     await page.waitForTimeout(600);
     await expect(m.locator(".sn.cur")).toHaveAttribute("data-i", "2");
-    await playSeq(page, ["a1", "h1"]);
+    await playSeq(page, ["g1", "h1"]);
     await expect(page.getByTestId("panel")).toContainText("Richtig");
     await expect(m.locator(".sn.hit")).toHaveCount(4);
     const d = await stored(page);

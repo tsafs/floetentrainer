@@ -21,7 +21,9 @@ wie f¹ – fis¹ – g¹.
    **jeder Ton höchstens einmal pro Folge**. Kommt ein Ton mehrfach vor, ist er richtig, wenn er an allen
    Stellen richtig war. Die Fächer und Termine (Leitner) bleiben unberührt – wie bei Zusatzkarten heute.
 4. **Lesen und Spielen**, beides.
-5. **Tonwiederholungen** (wie bei „Hänschen klein“: g¹ e¹ e¹) sind ausdrücklich erwünscht. Beim Spielen
+5. ~~**Tonwiederholungen** (wie bei „Hänschen klein“: g¹ e¹ e¹) sind ausdrücklich erwünscht.~~ **Geändert
+   (Nutzerin, später am 14.11.2026):** In keiner Übung kommt derselbe Ton zweimal direkt hintereinander –
+   das ist zu leicht. Später in der Folge darf er wiederkommen (d¹ g¹ d¹, a¹ h¹ c² a¹). Ursprünglich: Beim Spielen
    braucht es dafür einen neuen Einsatz (kurz absetzen oder neu anstoßen); die Warte-Wertung kann das
    schon (`WaitFollower` in `app/src/audio/follow.ts`).
 
@@ -59,7 +61,7 @@ wie f¹ – fis¹ – g¹.
   ebenfalls.
 - **Halbtonschritte** bevorzugen, wo beide Töne freigeschaltet sind (f¹–fis¹, fis¹–g¹, cis²–d², b¹–h¹ …):
   Gerade diese Griffwechsel sind schwer.
-- **Tonwiederholung** in etwa jeder vierten Folge einmal (nie dreimal derselbe Ton in Reihe).
+- ~~**Tonwiederholung** in etwa jeder vierten Folge einmal~~ – entfällt (siehe Entscheidung 5).
 - **Schwache Töne** (`isWeak`) häufiger einbauen (wie bei Zusatzkarten dreifach gewichtet).
 - In einer Sitzung keine Folge zweimal (außer der Wiederholung nach einem Fehler).
 - Zufall nur über das übergebene `rng`, damit Tests feste Folgen bekommen.

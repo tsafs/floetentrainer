@@ -169,8 +169,9 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
 - **Tonfolge** (seit 14.11.2026, Einzelheiten in `docs/app-tonfolgen.md`), in Lesen und Spielen:
   - Töne: nur die in dieser Spur schon vorgestellten und freigeschalteten, keine anderen Schreibweisen.
     Melodisch statt zufällig: nach Tonhöhe geordnet, meist der Nachbarton, oft eine Terz, selten ein
-    größerer Sprung (höchstens eine Quinte); Halbtonschritte bevorzugt (f¹–fis¹, h¹–c² …); in etwa jeder
-    vierten Folge eine Tonwiederholung (nie dreimal derselbe Ton); schwache Töne dreifach gewichtet; in
+    größerer Sprung (höchstens eine Quinte); Halbtonschritte bevorzugt (f¹–fis¹, h¹–c² …); nie derselbe Ton
+    zweimal direkt hintereinander (zu leicht; später in der Folge darf er wiederkommen, z. B. d¹ g¹ d¹ –
+    geändert am 14.11.2026, vorher gab es Tonwiederholungen); schwache Töne dreifach gewichtet; in
     einer Sitzung keine Folge zweimal. Erzeugt in `app/src/srs/sequences.ts`.
   - Länge: Beginn mit 3 Tönen (bei genau 5 Tönen 2 oder 3), nach zwei fehlerfreien Folgen in Reihe +1,
     nach einer fehlerhaften −1, 2 bis 5 Töne (ab Stufe 8 bis 6). Gilt nur innerhalb der Sitzung.
