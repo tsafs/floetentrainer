@@ -4,7 +4,8 @@
 // Bedienleiste zeigt zum Einstellen die Wahl „Wartet auf mich | Im Takt“ (letzte Wahl gemerkt), den
 // Schalter „Ich trage Kopfhörer“, im Takt-Modus das Tempo und darunter den großen Knopf „Mitspielen“
 // (mit Auswahl „Takt 5–7 mitspielen“). Gewählte Takte (Auswahl, siehe ./songs.ts) werden einmal gespielt,
-// ohne Auswahl das ganze Lied. Während des Spielens ist die Leiste knapp: Griffbild, Stopp, ggf. Tempo.
+// ohne Auswahl das ganze Lied. Während des Spielens ist die Leiste knapp: Stopp, Name der Note, ggf. Tempo.
+// Ein Griffbild gibt es hier bewusst nicht – sie soll die Noten lesen.
 //
 // Rückmeldung nur über Farben: jede Note wird grün (getroffen) oder rot (verfehlt). Keine Auswertung,
 // keine Bestwerte. Nach dem Durchgang bleiben die Farben im Notenbild stehen, bis sie neu startet oder die
@@ -24,9 +25,7 @@
 import { BeatFollower, followConfig, WaitFollower } from "../audio/follow";
 import { keepAwake, mic } from "../audio/mic";
 import { heardAtPerf, songPlayer } from "../audio/song-player";
-import { fluteSvg } from "../music/flute";
-import { midiNameHtml, nameHtml, nameText } from "../music/names";
-import { chartNoteByMidi } from "../music/notes";
+import { midiNameHtml, nameHtml } from "../music/names";
 import type { NoteEvent, Song } from "../songs/model";
 import { clampPercent, secPerQuarter, TEMPO_MAX, TEMPO_MIN } from "../songs/tempo";
 import { sectionTimeline, type Timeline } from "../songs/timeline";
@@ -91,7 +90,7 @@ export interface FollowHost {
 const tempoStepHtml = (cls: string) =>
   `<div class="tstep ${cls}" role="group" aria-label="Tempo">` +
   `<button data-dir="-1" aria-label="Langsamer">−</button>` +
-  `<span class="tv"><small>Tempo</small><output data-testid="follow-tempo"></output></span>` +
+  `<span class="tv"><small>Tempo</small><output data-testid="${cls}"></output></span>` +
   `<button data-dir="1" aria-label="Schneller">+</button></div>`;
 
 /** HTML der Bedienleiste fürs Mitspielen (in .player, neben der Leiste fürs Anhören) */
@@ -106,24 +105,23 @@ export function followBarHtml(): string {
         <div class="seg fmode" role="group" aria-label="Art des Mitspielens">
           <button data-mode="wait" aria-pressed="false">${MODE_LABEL.wait}</button><button data-mode="beat" aria-pressed="false">${MODE_LABEL.beat}</button>
         </div>
-        <div class="fopts">
-          <div class="fphones">
-            <button class="switch" role="switch" aria-checked="false" aria-labelledby="fphones-lab" data-act="phones"><i></i></button>
-            <span class="lab" id="fphones-lab">Ich trage Kopfhörer<small data-testid="phones-hint"></small></span>
-          </div>
-          ${tempoStepHtml("fset-tempo")}
+        <div class="fphones">
+          <button class="switch" role="switch" aria-checked="false" aria-labelledby="fphones-lab" data-act="phones"><i></i></button>
+          <span class="lab" id="fphones-lab">Ich trage Kopfhörer<small data-testid="phones-hint"></small></span>
         </div>
-        <button class="big fgo" data-act="fstart">${ICON_PLAY_SM}<span data-testid="follow-go">Mitspielen</span></button>
+        <div class="fgorow">
+          ${tempoStepHtml("fset-tempo")}
+          <button class="big fgo" data-act="fstart">${ICON_PLAY_SM}<span data-testid="follow-go">Mitspielen</span></button>
+        </div>
       </div>
       <div class="frun" hidden>
-        <div class="ffl" data-testid="follow-flute"></div>
+        <button class="playbtn on" data-act="fstop" aria-label="Stopp">${ICON_STOP}</button>
         <div class="finfo">
           <span class="pname" data-testid="follow-note"></span>
           <span class="pcount" data-testid="follow-count" hidden></span>
           <span class="fwrong" data-testid="follow-wrong" aria-live="polite"></span>
           <span class="pstat" data-testid="follow-status" aria-live="polite"></span>
         </div>
-        <button class="playbtn on" data-act="fstop" aria-label="Stopp">${ICON_STOP}</button>
         ${tempoStepHtml("frun-tempo")}
       </div>
     </div>`;
@@ -176,7 +174,6 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
   const selText = q<HTMLElement>(".fsl");
   const phonesBtn = q<HTMLButtonElement>('[data-act="phones"]');
   const phonesHint = q<HTMLElement>('[data-testid="phones-hint"]');
-  const fl = q<HTMLElement>(".ffl");
   const fname = q<HTMLElement>('[data-testid="follow-note"]');
   const fcount = q<HTMLElement>('[data-testid="follow-count"]');
   const fwrong = q<HTMLElement>(".fwrong");
@@ -204,9 +201,6 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
   const showNote = (midi: number | null, id?: string) => {
     if (midi === shownMidi) return;
     shownMidi = midi;
-    const chart = midi == null ? undefined : chartNoteByMidi(midi);
-    fl.classList.toggle("none", !chart);
-    fl.innerHTML = chart ? fluteSvg(chart.fingering, `Griffbild ${nameText(chart.id)}`) : "";
     fname.innerHTML = id ? nameHtml(id) : midi == null ? "" : midiNameHtml(midi);
   };
   const showTone = (i: number | null) => {
@@ -255,13 +249,13 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
       showTempo();
       phonesBtn.setAttribute("aria-checked", String(settings.headphones));
       phonesHint.textContent = !settings.headphones
-        ? "Sonst bleibt die Melodie aus – das Mikrofon hörte das Handy mit."
+        ? "Ohne bleibt die Melodie aus, sonst hörte das Mikrofon mit."
         : mode === "beat"
           ? "Die Melodie spielt leise mit."
-          : "Bei falschem Ton erklingt leise der richtige.";
+          : "Nach einem falschen Ton klingt leise der richtige.";
       const sec = host.section();
       selBox.hidden = !sec;
-      selText.textContent = sec ? `${barRangeText(sec)} gewählt` : "";
+      selText.innerHTML = sec ? `${barRangeText(sec)}<span class="gw"> gewählt</span>` : "";
       goText.textContent = sec ? `${barRangeText(sec)} mitspielen` : "Mitspielen";
     }
     host.changed();

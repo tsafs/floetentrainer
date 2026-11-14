@@ -17,8 +17,16 @@ const greensleeves = () => {
   return { id: "abc-greensleeves", title: "Greensleeves", abc: t.slice(t.indexOf("X:3")), number: 3, index: 0, shift: 0, added: Date.UTC(2026, 10, 13, 12) };
 };
 
+/** Karte „Eigene Lieder“ der Liederliste aufklappen (falls zu) */
+async function openOwn(page: Page) {
+  const head = page.getByTestId("own-songs").locator("button.cardhd");
+  if ((await head.getAttribute("aria-expanded")) !== "true") await head.click();
+  await expect(head).toHaveAttribute("aria-expanded", "true");
+}
+
 async function toAdd(page: Page) {
   await page.goto("./#/lieder");
+  await openOwn(page);
   await page.getByRole("link", { name: "Lied hinzufügen" }).click();
   await expect(page.locator(".songadd h1")).toHaveText("Lied hinzufügen");
 }
@@ -62,8 +70,9 @@ test("Datei mit mehreren Stücken: auswählen, Weggelassenes sehen, übernehmen;
   expect(d.ownSongs[0].abc).not.toContain("Greensleeves");
   // nach dem Neuladen noch da (aus dem Quelltext neu gelesen); die Meldung ist weg
   await page.reload();
-  await expect(page.locator('a[data-song="abc-greensleeves"]')).toBeVisible();
   await expect(page.getByTestId("msg")).toHaveCount(0);
+  await openOwn(page);
+  await expect(page.locator('a[data-song="abc-greensleeves"]')).toBeVisible();
   // dieselbe Datei noch einmal: doppelte Kennung wird aufgelöst
   await toAdd(page);
   await page.getByTestId("abc-file").setInputFiles(abcPath("sammlung.abc"));
@@ -164,6 +173,7 @@ test("Liedseite eines eigenen Lieds: Vorspielen, Tempo je Lied, Hinweise, Quelle
   await seed(page, withOwn([greensleeves()]));
   await page.goto("./#/lieder");
   await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 100);
+  await openOwn(page);
   await page.locator('a[data-song="abc-greensleeves"]').click();
   await expect(page.locator(".songhead h1")).toHaveText("Greensleeves");
   await expect(page.locator(".songhead .meta")).toContainText("a-Moll (dorisch)");
@@ -225,6 +235,7 @@ test("Sicherung: eigene Lieder kommen hinein und beim Einlesen wieder heraus", a
   await expect(page.getByTestId("import-info")).toHaveText("Die Sicherung ist in Ordnung und enthält ein eigenes Lied. Sie ersetzt alle jetzigen Daten.");
   await page.getByRole("button", { name: "Sicherung übernehmen" }).click();
   await page.goto("./#/lieder");
+  await openOwn(page);
   await page.locator('a[data-song="abc-greensleeves"]').click();
   await expect(page.locator(".score svg.sys").first()).toBeVisible();
   // eine Sicherung mit kaputtem Eintrag wird abgelehnt, die Daten bleiben
@@ -239,6 +250,7 @@ test("Ein Lied, das sich nicht mehr lesen lässt, bleibt und wird mit Hinweis ge
   const broken = { id: "abc-kaputt", title: "Kaputtes Lied", abc: "X:1\nT:Kaputtes Lied\nK:Xyz\nC D E|\n", number: 1, index: 0, shift: 0, added: 1 };
   await seed(page, withOwn([broken, greensleeves()]));
   await page.goto("./#/lieder");
+  await openOwn(page);
   const row = page.locator('a[data-song="abc-kaputt"]');
   await expect(row).toContainText("Kaputtes Lied");
   await expect(row.getByTestId("unreadable")).toHaveText("Lässt sich zurzeit nicht lesen");

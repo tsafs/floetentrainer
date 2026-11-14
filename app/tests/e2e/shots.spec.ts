@@ -135,16 +135,21 @@ for (const s of SIZES) {
       await page.screenshot({ path: p("l1-start") });
       await page.getByRole("link", { name: "Lieder" }).click();
       await expect(page.getByTestId("can-play")).toBeVisible();
-      await page.screenshot({ path: p("l2-liste"), fullPage: true });
-      // langes Lied mit Text beim Abspielen: Abschnitt gewählt, Markierung sichtbar
+      await page.screenshot({ path: p("l2-liste") });
+      await page.screenshot({ path: p("l2-liste-ganz"), fullPage: true });
+      // Kapitel aufgeklappt
+      await page.locator(".card.chap .cardhd").first().click();
+      await page.waitForTimeout(400);
+      await page.locator(".card.chap").first().scrollIntoViewIfNeeded();
+      await page.screenshot({ path: p("l2b-liste-kapitel") });
+      // langes Lied mit Text: Anhören ab Takt 5 (angetippt), Markierung sichtbar
       await page.goto("./#/lied/jingle-bells");
+      await page.screenshot({ path: p("l3a-lied-anhoeren") });
       await page.locator('rect.takt[data-bar="4"]').click();
-      await page.locator('rect.takt[data-bar="7"]').click();
-      await page.getByRole("button", { name: "Abspielen" }).click();
       await page.clock.runFor(5200);
       await expect(page.locator(".score .cur").first()).toBeVisible();
       await page.waitForTimeout(700); // sanftes Scrollen (läuft in Echtzeit)
-      await page.screenshot({ path: p("l3-lied-spielt") });
+      await page.screenshot({ path: p("l3-lied-ab-hier") });
       await page.getByRole("button", { name: "Stopp" }).click();
       await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
       await page.screenshot({ path: p("l4-lied-ende") });
@@ -164,6 +169,8 @@ for (const s of SIZES) {
       const p = (x: string) => `${OUT}/${scheme}-${s.name}-${x}.png`;
       await page.goto("./#/lieder");
       await page.evaluate(() => document.fonts.ready);
+      await page.getByTestId("own-songs").locator("button.cardhd").click();
+      await page.waitForTimeout(400);
       await page.screenshot({ path: p("e1-liste-eigene"), fullPage: true });
       // Lied hinzufügen: leer, dann Sammlung mit Auswahl und Weggelassenem
       await page.getByRole("link", { name: "Lied hinzufügen" }).click();
@@ -206,15 +213,14 @@ for (const s of SIZES) {
       const schedule = (list: [number, number | null][]) =>
         page.evaluate((l) => (window as unknown as { __osc: { schedule(l: [number, number | null][]): void } }).__osc.schedule(l), list);
       const now = () => page.evaluate(() => performance.now());
-      // Wahl: Warte-Modus, ohne Kopfhörer
+      // Einstellen: Warte-Modus, ohne Kopfhörer, ohne Auswahl
       await page.goto("./#/lied/jingle-bells");
       await page.evaluate(() => document.fonts.ready);
-      await page.screenshot({ path: p("f0-lied-mitspielen-knopf") });
-      await page.getByRole("button", { name: "Mitspielen" }).click();
+      await page.getByRole("tab", { name: "Mitspielen" }).click();
       await page.waitForTimeout(200);
-      await page.screenshot({ path: p("f1-mitspielen-wahl") });
+      await page.screenshot({ path: p("f1-mitspielen-einstellen") });
       // Warte-Modus mitten im Lied: fünf Noten, eine davon erst falsch; dann ein falscher Ton für die sechste
-      await page.getByRole("button", { name: "Start" }).click();
+      await page.getByRole("button", { name: "Mitspielen", exact: true }).click();
       await page.waitForFunction(() => (window as unknown as { __lied: { follow(): Dbg } }).__lied.follow().started);
       await page.waitForFunction(() => (window as unknown as { __osc: unknown }).__osc !== null);
       const tl = (await dbg()).timeline!;
@@ -236,11 +242,14 @@ for (const s of SIZES) {
       await page.screenshot({ path: p("f2-warte-modus") });
       await page.getByRole("button", { name: "Stopp" }).click();
       await page.waitForTimeout(300);
-      // Takt-Modus: Abschnitt Takt 5–8, mit zwei falschen Tönen; Bild mitten im Durchgang, dann Auswertung
-      await page.getByRole("button", { name: "Takt-Modus" }).click();
+      // Takt-Modus: Auswahl Takt 5–8 (Einstellen mit Auswahl), mit zwei falschen Tönen; Bild mitten im
+      // Durchgang, dann nach dem Durchgang (Farben bleiben stehen)
+      await page.getByRole("button", { name: "Im Takt" }).click();
       await page.locator('rect.takt[data-bar="4"]').click();
       await page.locator('rect.takt[data-bar="7"]').click();
-      await page.getByRole("button", { name: "Start" }).click();
+      await page.waitForTimeout(200);
+      await page.screenshot({ path: p("f1b-mitspielen-auswahl") });
+      await page.getByRole("button", { name: "Takt 5–8 mitspielen" }).click();
       await page.waitForFunction(() => (window as unknown as { __lied: { follow(): Dbg } }).__lied.follow().startMs !== null);
       const d = await dbg();
       const spq = await page.evaluate(() => (window as unknown as { __lied: { player: { secPerQuarter: number } } }).__lied.player.secPerQuarter);
@@ -254,13 +263,12 @@ for (const s of SIZES) {
       const endMs = d.startMs! + (d.timeline as unknown as { total: number }).total * spq * 1000;
       await page.waitForTimeout(Math.max(0, d.startMs! + 16 * spq * 1000 * 0.55 - (await now())));
       await page.screenshot({ path: p("f3-takt-modus") });
-      await page.waitForTimeout(Math.max(0, endMs + 600 - (await now())));
-      await page.getByRole("button", { name: "Stopp" }).click();
-      await expect(page.getByTestId("follow-result")).toContainText("getroffen");
+      await page.waitForTimeout(Math.max(0, endMs + 800 - (await now())));
+      await expect(page.getByRole("button", { name: "Takt 5–8 mitspielen" })).toBeVisible();
       await page.waitForTimeout(200);
-      await page.screenshot({ path: p("f4-auswertung") });
-      // Kopfhörer an (Hinweis ändert sich)
-      await page.getByRole("button", { name: "Schleife aufheben" }).click();
+      await page.screenshot({ path: p("f4-nach-dem-durchgang") });
+      // Auswahl aufheben, Kopfhörer an (Hinweis ändert sich)
+      await page.getByRole("button", { name: "Auswahl aufheben" }).click();
       await page.getByRole("switch", { name: /Kopfhörer/ }).click();
       await page.waitForTimeout(200);
       await page.screenshot({ path: p("f5-mitspielen-kopfhoerer") });

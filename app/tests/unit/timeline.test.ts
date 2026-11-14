@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SONGS, songById } from "../../src/songs/library";
-import { buildTimeline, playOrder, sectionTimeline } from "../../src/songs/timeline";
+import { buildTimeline, fromBarTimeline, playOrder, sectionTimeline } from "../../src/songs/timeline";
 import { song } from "./songs-helpers";
 
 const tones = (music: string, extra = {}) => buildTimeline(song(music, extra)).tones.map((t) => [t.start, t.dur, t.midi]);
@@ -240,6 +240,36 @@ describe("Abschnitt wiederholen", () => {
     expect(sectionTimeline(s, 0, 1).bars.map((b) => b.index)).toEqual([0, 1]);
     expect(sectionTimeline(s, 1, 2).bars.map((b) => b.index)).toEqual([1, 0, 2]);
     expect(sectionTimeline(s, 2, 3).bars.map((b) => b.index)).toEqual([2, 3]);
+  });
+});
+
+describe("Anhören ab einem Takt (fromBarTimeline)", () => {
+  it("vom ersten Vorkommen des Takts bis zum Liedende, Start bei 0, Wiederholungen ausgeschrieben", () => {
+    const s = song("|: c'1 | d'1 | e'1 | f'1 :| g'1 | a'1 ||");
+    const tl = fromBarTimeline(s, 2);
+    expect(tl.bars.map((b) => b.index)).toEqual([2, 3, 0, 1, 2, 3, 4, 5]);
+    expect(tl.bars[0].start).toBe(0);
+    expect(tl.tones[0]).toMatchObject({ start: 0, midi: 64, bar: 2 });
+    expect(tl.total).toBe(8 * 4);
+    expect(fromBarTimeline(s, 5).bars.map((b) => b.index)).toEqual([5]);
+    expect(fromBarTimeline(s, 0).bars.map((b) => b.index)).toEqual(playOrder(s));
+  });
+
+  it("Takt der 2. Klammer; Werte außerhalb werden begrenzt", () => {
+    const s = song("|: c'1 | [1 d'1 :| [2 e'1 | f'1 ||");
+    expect(fromBarTimeline(s, 2).bars.map((b) => b.index)).toEqual([2, 3]);
+    expect(fromBarTimeline(s, 99).bars.map((b) => b.index)).toEqual([3]);
+    expect(fromBarTimeline(s, -3).bars.map((b) => b.index)).toEqual(playOrder(s));
+  });
+
+  it("Heft-Lied: erster Ton ist der erste Ton des Takts im ganzen Zeitplan", () => {
+    const j = songById("jingle-bells")!;
+    const full = buildTimeline(j);
+    const tl = fromBarTimeline(j, 4);
+    const first = full.tones.find((t) => t.bar === 4)!;
+    expect(tl.tones[0].midi).toBe(first.midi);
+    expect(tl.tones[0].ids).toEqual(first.ids);
+    expect(tl.tones.length).toBe(full.tones.length - full.tones.indexOf(first));
   });
 });
 

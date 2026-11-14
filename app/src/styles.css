@@ -1257,11 +1257,12 @@ svg.acc {
   cursor: pointer;
   transition: fill 0.15s;
 }
-.score svg.sys .takt.inloop {
+/* Mitspielen: gewählte Takte; Anhören: Takt, ab dem gerade vorgespielt wird */
+.score svg.sys .takt.picked {
   fill: var(--mark-tint);
 }
-.score svg.sys .takt.sel {
-  fill: var(--mark-sel);
+.score svg.sys .takt.from {
+  fill: var(--neutral-tint);
 }
 /* klingende Note: kräftiger Farbton, der Kopf zart hinterlegt (breiter halbdurchsichtiger Rand
    hinter der Füllung). Keine Übergänge: die Markierung soll genau mit dem Ton kommen. */
@@ -1301,24 +1302,141 @@ svg.bm {
   white-space: nowrap;
 }
 
-/* Liederliste */
+/* Liederliste: Abschnitte als Karten mit getönter Kopfzeile, über die Kopfzeile ein- und ausklappbar */
 .songlist {
-  gap: 26px;
+  gap: 0;
 }
 .songlist .topbar {
   margin-bottom: 0;
 }
-.songlist section {
-  gap: 4px;
+.songlist .intro {
+  margin: 0 2px 16px;
+  font-size: 0.95rem;
 }
-.songlist h2 {
-  font-size: 1.2rem;
+.songlist .msg {
+  margin: -6px 2px 14px;
 }
-.songlist .chap h2 {
-  font-weight: 400;
+.songlist .card {
+  display: block;
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--btn);
+  overflow: hidden;
+}
+.cardh {
+  margin: 0;
+  font: inherit;
+}
+.cardhd {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: baseline;
+  column-gap: 10px;
+  width: 100%;
+  min-height: 60px;
+  padding: 11px 14px 10px 16px;
+  background: var(--neutral-tint);
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  color: var(--ink);
+  transition: border-color 0.24s;
+}
+.card.closed .cardhd {
+  border-bottom-color: transparent;
+}
+.cardhd:focus-visible {
+  outline: 2px solid var(--wood-line);
+  outline-offset: -3px;
+  border-radius: 15px;
+}
+.cardhd .ct {
+  font-weight: 500;
+  font-size: 1.15rem;
+  line-height: 1.2;
+}
+.cardhd .cn {
   font-style: italic;
   color: var(--soft);
-  font-size: 1.05rem;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+.cardhd .chev {
+  align-self: center;
+  stroke: var(--soft);
+  transition: transform 0.24s ease;
+}
+.card.closed .chev {
+  transform: rotate(-90deg);
+}
+.cardhd .cs {
+  grid-column: 1 / 3;
+  margin-top: 2px;
+  font-style: italic;
+  color: var(--soft);
+  font-size: 0.88rem;
+  line-height: 1.25;
+}
+/* Aufklappen: Höhe über grid-template-rows (0fr ↔ 1fr), zugeklappt unsichtbar und nicht erreichbar */
+.cardbody {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 0.24s ease, visibility 0.24s;
+}
+.card.closed .cardbody {
+  grid-template-rows: 0fr;
+  visibility: hidden;
+}
+.cardin {
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 16px;
+}
+.cardin > .help {
+  margin: 0;
+  padding: 12px 0;
+  font-size: 0.95rem;
+}
+.cardin > .help + .help,
+.cardin > ul + .help {
+  padding-top: 0;
+}
+.addrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 54px;
+  margin: 0 -16px;
+  border-top: 1px solid var(--track);
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 1.1rem;
+}
+.addrow svg {
+  stroke: currentColor;
+  flex: none;
+}
+.songlist .grp {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 4px 12px;
+  font-style: italic;
+  color: var(--soft);
+}
+.songlist .grp::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+@media (prefers-reduced-motion: reduce) {
+  .cardbody,
+  .cardhd,
+  .cardhd .chev {
+    transition: none;
+  }
 }
 ul.songs {
   list-style: none;
@@ -1378,7 +1496,36 @@ ul.songs li + li {
   color: var(--soft);
   font-style: italic;
 }
+/* Umschalter „Anhören | Mitspielen“ */
+.songpage .modes {
+  grid-template-columns: 1fr 1fr;
+  border-radius: 25px;
+}
+.modes button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  font-size: 1.08rem;
+}
+.modes button svg {
+  stroke: currentColor;
+  flex: none;
+}
+.modes button[aria-selected="true"] {
+  background: var(--ink);
+  color: var(--paper);
+}
+/* während des Mitspielens gesperrt: die gewählte Art bleibt kräftig, die andere tritt zurück */
+.modes button:disabled {
+  cursor: default;
+}
+.modes button:disabled:not([aria-selected="true"]) {
+  opacity: 0.4;
+}
 .songpage .hint {
+  margin-top: -4px;
   font-size: 0.92rem;
   font-style: italic;
   color: var(--soft);
@@ -1445,7 +1592,9 @@ ul.songs li + li {
   margin-top: 8px;
 }
 
-/* Bedienleiste: im Hochformat unten fest */
+/* Bedienleiste: im Hochformat unten fest. Kein Griffbild (nur der kleine Name der Note): knapp,
+   damit viele Noten sichtbar bleiben. Anhören: links Abspielen, daneben Name/Takt über dem Tempo,
+   rechts das Metronom. */
 .player {
   position: fixed;
   left: 0;
@@ -1460,44 +1609,33 @@ ul.songs li + li {
   max-width: 720px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   grid-template-areas:
-    "fl info info info"
-    "fl play tempo metro";
+    "play info metro"
+    "play tempo metro";
   column-gap: 14px;
-  row-gap: 4px;
+  row-gap: 0;
   align-items: center;
-}
-.pfl {
-  grid-area: fl;
-  height: 108px;
-  width: 21px;
-  align-self: center;
-}
-.pfl.none {
-  border-left: 1px dashed var(--line);
-  width: 1px;
-  margin: 0 10px;
 }
 .pinfo {
   grid-area: info;
   display: flex;
-  align-items: center;
-  gap: 4px 12px;
-  min-height: 48px;
+  align-items: baseline;
+  gap: 2px 12px;
+  min-height: 26px;
   min-width: 0;
 }
 .pname {
-  font-size: 1.75rem;
+  font-size: 1.3rem;
   line-height: 1;
   font-weight: 500;
-  min-width: 1.6em;
-  padding-top: 0.15em;
+  min-width: 1.4em;
+  padding-top: 0.25em;
 }
 .pcount {
   display: flex;
   gap: 0.55em;
-  font-size: 1.3rem;
+  font-size: 1.15rem;
   line-height: 1;
   color: var(--line);
   font-variant-numeric: tabular-nums;
@@ -1621,58 +1759,61 @@ ul.songs li + li {
   color: var(--paper);
 }
 
-/* Querformat (Handy): Noten links, Griffbild und Bedienung rechts */
+/* Querformat (Handy): Noten links, rechts eine Spalte mit dem Umschalter oben und der Bedienleiste */
 @media (orientation: landscape) and (max-height: 520px) {
   .songpage {
     max-width: none;
     margin: 0;
-    padding-right: calc(250px + max(24px, env(safe-area-inset-right)));
+    padding-right: calc(272px + max(24px, env(safe-area-inset-right)));
     padding-bottom: 28px;
+  }
+  .songpage .modes {
+    position: fixed;
+    z-index: 6;
+    top: max(12px, env(safe-area-inset-top));
+    right: max(18px, env(safe-area-inset-right));
+    width: 236px;
+  }
+  .modes button {
+    font-size: 1rem;
+    gap: 6px;
+  }
+  .songpage .hint {
+    margin-top: 0;
   }
   .player {
     left: auto;
     top: 0;
-    width: 250px;
+    width: 272px;
     border-top: 0;
     border-left: 1px solid var(--line);
-    padding: max(12px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) 20px;
-    display: grid;
-    align-content: center;
+    padding: calc(max(12px, env(safe-area-inset-top)) + 62px) max(18px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) 18px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
   }
   .pin {
-    grid-template-columns: auto auto minmax(0, 1fr);
+    width: 100%;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas:
-      "fl info info"
+      "info info info"
       "tempo tempo tempo"
-      "play metro .";
+      "play . metro";
     row-gap: 10px;
-    column-gap: 16px;
-  }
-  .pfl {
-    height: min(150px, calc(100vh - 190px));
-    width: auto;
-    aspect-ratio: 26.5 / 136;
   }
   .pinfo {
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: center;
-    gap: 6px;
+    min-height: 40px;
   }
   .pname {
-    font-size: 2.2rem;
-  }
-  .clear {
-    padding-left: 0;
-  }
-  .metro {
-    justify-self: start;
+    font-size: 1.8rem;
   }
 }
 
 /* ---------------------------------------------------------------- Mitspielen (src/ui/song-follow.ts)
-   Knopf „Mitspielen“ oben auf der Liedseite; im Zustand .following ersetzt .fpin die Leiste fürs
-   Vorspielen. Noten im Notensatz: .hit getroffen, .miss verfehlt/falsch (die aktuelle bleibt markiert). */
+   Im Zustand .following ersetzt .fpin die Leiste fürs Anhören. Einstellen (.fset): ggf. Auswahl mit
+   „Auswahl aufheben“, Wahl der Art, Kopfhörer, darunter Tempo (nur „Im Takt“) und der große Knopf.
+   Während des Spielens (.frun) eine Zeile: Stopp, Name der Note und Hinweise, ggf. Tempo.
+   Noten im Notensatz: .hit getroffen, .miss verfehlt/falsch (die aktuelle bleibt markiert). */
 .score .hit {
   fill: var(--ok);
   stroke: var(--ok);
@@ -1686,112 +1827,129 @@ ul.songs li + li {
   fill: var(--mark);
   stroke: var(--mark);
 }
-.songtools {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.followbtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 48px;
-  padding: 4px 20px 4px 15px;
-  border: 1.2px solid var(--line);
-  border-radius: 24px;
-  background: var(--btn);
-  color: var(--ink);
-  font-size: 1.05rem;
-}
-.followbtn svg {
-  stroke: currentColor;
-  flex: none;
-}
-.songpage.following .songtools,
 .songpage.following .pin {
   display: none;
 }
 .fpin {
   max-width: 720px;
   margin: 0 auto;
-  display: grid;
-  gap: 8px;
 }
 .fset {
   display: grid;
   gap: 6px;
 }
+.fsel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -4px 0 -6px;
+}
+.fsl {
+  font-size: 1.02rem;
+  white-space: nowrap;
+}
 .fmode {
   grid-template-columns: repeat(2, 1fr);
-  margin-bottom: 2px;
 }
-.fexpl,
-.fbest,
-.fgo {
-  margin: 0;
-  font-size: 0.92rem;
-  font-style: italic;
-  color: var(--soft);
-  line-height: 1.3;
-}
-.fres {
-  display: grid;
-  gap: 4px;
-}
-.fres p {
-  margin: 0;
-}
-.fscore {
-  font-size: 1.15rem;
-  line-height: 1.3;
-}
-.fscore b {
-  font-weight: 500;
-}
-.fscore .flab {
-  display: block;
-  font-size: 0.9rem;
-  font-style: italic;
-  color: var(--soft);
-}
-.fnew {
-  font-style: italic;
-  color: var(--ok);
-}
-.fhard {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 8px;
-  font-style: italic;
-  color: var(--soft);
-  font-size: 0.92rem;
-}
-.barbtn {
-  min-height: 40px;
-  padding: 2px 14px;
-  border: 1px solid var(--err);
-  border-radius: 20px;
-  background: var(--err-tint);
-  color: var(--err);
-  font-size: 0.95rem;
-  font-style: normal;
+.fmode button {
+  font-size: 1.02rem;
 }
 .fphones {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  min-height: 48px;
+}
+.fphones .switch {
+  margin-left: -4px;
 }
 .fphones .lab,
 .setting .lab {
   display: grid;
   line-height: 1.25;
 }
+.fphones .lab {
+  line-height: 1.15;
+}
 .fphones .lab small {
   font-style: italic;
   color: var(--soft);
   font-size: 0.85rem;
+}
+.fgorow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.fgo.big {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 52px;
+  border-radius: 26px;
+  font-size: 1.12rem;
+  line-height: 1.1;
+  padding: 4px 16px;
+}
+.fgo svg {
+  fill: currentColor;
+  flex: none;
+}
+/* Tempo in Schritten: − Tempo 80 % + */
+.tstep {
+  display: flex;
+  align-items: center;
+  height: 52px;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 26px;
+  background: var(--btn);
+}
+.tstep button {
+  width: 44px;
+  height: 50px;
+  font-size: 1.45rem;
+  line-height: 1;
+  color: var(--ink);
+}
+.tstep button:disabled {
+  opacity: 0.3;
+}
+.tstep .tv {
+  display: grid;
+  min-width: 3.3em;
+  text-align: center;
+  line-height: 1;
+}
+.tstep small {
+  font-style: italic;
+  color: var(--soft);
+  font-size: 0.72rem;
+  margin-bottom: 3px;
+}
+.tstep output {
+  font-size: 1.02rem;
+  font-variant-numeric: tabular-nums;
+}
+/* schmale Handys: Tempo knapper, damit „Takt 5–7 mitspielen“ in eine Zeile passt */
+@media (max-width: 400px) {
+  .tstep button {
+    width: 38px;
+  }
+  .tstep .tv {
+    min-width: 2.7em;
+  }
+  .fpin.beat .fgo svg {
+    display: none;
+  }
+  .fgo.big {
+    padding: 4px 12px;
+    font-size: 1.08rem;
+  }
 }
 /* Schalter (Kopfhörer) */
 .switch {
@@ -1837,26 +1995,24 @@ ul.songs li + li {
   border-radius: 16px;
 }
 .frun {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  column-gap: 14px;
+  display: flex;
   align-items: center;
+  gap: 14px;
+  min-height: 56px;
 }
-.ffl {
-  height: 108px;
-  width: 21px;
-}
-.ffl.none {
-  border-left: 1px dashed var(--line);
-  width: 1px;
-  margin: 0 10px;
+.frun .playbtn {
+  flex: none;
 }
 .finfo {
-  display: grid;
-  gap: 4px;
-  align-content: center;
-  min-height: 48px;
+  flex: 1 1 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 12px;
   min-width: 0;
+}
+.finfo .pstat {
+  flex: 1 1 auto;
 }
 .fwrong {
   font-style: italic;
@@ -1867,99 +2023,13 @@ ul.songs li + li {
 .fwrong:empty {
   display: none;
 }
-.fctl {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 14px;
-}
-.fctl .playbtn {
-  flex: none;
-}
-.fctl .tempo {
-  flex: 1 1 150px;
-}
-.fctl .fgo {
-  flex: 1 1 120px;
-}
-.fgo:empty,
-.fpin.beat .fgo {
-  display: none;
-}
-.ffoot {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: -4px;
-}
-.ffoot .clear:first-child {
-  padding-left: 0;
-}
-.fxs {
-  display: none;
-}
-/* Während des Mitspielens im Hochformat (und am Desktop) so knapp wie die Leiste fürs Vorspielen:
-   Griffbild links über zwei Zeilen, oben Name und Hinweise, darunter Stopp, Tempo und „Beenden“
-   (an der Stelle des Metronoms). Die Gruppen .frun/.fctl/.ffoot lösen sich dafür ins Raster auf. */
-@media (orientation: portrait), (min-height: 521px) {
-  .fpin.running {
-    grid-template-columns: auto auto minmax(0, 1fr) auto;
-    grid-template-areas:
-      "fl info info info"
-      "fl play mid exit";
-    column-gap: 14px;
-    row-gap: 4px;
-    align-items: center;
-  }
-  .fpin.running .frun,
-  .fpin.running .fctl,
-  .fpin.running .ffoot {
-    display: contents;
-  }
-  .fpin.running .ffl {
-    grid-area: fl;
-  }
-  .fpin.running .finfo {
-    grid-area: info;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 2px 12px;
-  }
-  .fpin.running .finfo .pstat {
-    flex: 1 1 auto;
-  }
-  .fpin.running .playbtn {
-    grid-area: play;
-  }
-  .fpin.running .ftempo {
-    grid-area: mid;
-  }
-  .fpin.running [data-act="fexit"] {
-    grid-area: exit;
-    padding-left: 4px;
-  }
-  .fpin.running .fxl {
-    display: none;
-  }
-  .fpin.running .fxs {
-    display: inline;
-  }
-}
 
 @media (orientation: landscape) and (max-height: 520px) {
-  .songpage.following {
-    padding-right: calc(280px + max(24px, env(safe-area-inset-right)));
-  }
-  /* Bedienung bleibt sichtbar; nur Wahl, Erklärung und Auswertung scrollen, wenn es eng wird */
+  /* Einstellen: was nicht passt, scrollt; der große Knopf bleibt unten sichtbar */
   .songpage.following .player {
-    width: 280px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
+    justify-content: flex-end;
   }
   .fpin {
-    gap: 10px;
     width: 100%;
     min-height: 0;
     max-height: 100%;
@@ -1971,54 +2041,43 @@ ul.songs li + li {
     overflow-y: auto;
     overscroll-behavior: contain;
   }
-  .fset,
-  .fctl,
-  .ffoot,
-  .frun {
-    flex: none;
-  }
-  .fset {
-    flex: 0 1 auto;
-  }
-  .fmode button {
-    font-size: 0.95rem;
-  }
-  .ffl {
-    height: min(150px, calc(100vh - 230px));
-    width: auto;
-    aspect-ratio: 26.5 / 136;
-  }
-  .frun .pname {
-    font-size: 2.2rem;
-  }
-  .ffoot {
+  .fgorow {
+    position: sticky;
+    bottom: 0;
+    background: var(--paper);
     flex-wrap: wrap;
-    justify-content: flex-start;
-    column-gap: 18px;
   }
-  .ffoot .clear {
-    padding-left: 0;
-    min-height: 40px;
+  .fgorow .fgo.big,
+  .fgorow .tstep {
+    flex-basis: 100%;
+  }
+  .fgorow .tstep {
+    justify-content: space-between;
+  }
+  .fsl .gw {
+    display: none;
   }
   .fphones .lab small {
     font-size: 0.8rem;
+  }
+  .frun {
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+  .frun .finfo {
+    order: -1;
+    flex-basis: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .frun .pname {
+    font-size: 1.8rem;
   }
 }
 
 /* ---------------------------------------------------------------- Eigene Lieder (ABC)
    Liederliste (Kapitel „Eigene Lieder“), Seite „Lied hinzufügen“ (src/ui/own-songs.ts), Kasten auf der
    Liedseite. Nur dieser Abschnitt gehört zur Erweiterung „Eigene Lieder“. */
-.songlist .own .addsong {
-  display: grid;
-  place-items: center;
-  margin-top: 10px;
-  max-width: 380px;
-  text-align: center;
-  text-decoration: none;
-}
-.songlist .own .help {
-  padding: 2px 0;
-}
 .songrow.broken .miss {
   color: var(--err);
 }

@@ -1,4 +1,5 @@
-// Lieder: Liste, Liedseite, Vorspielen mit Markierung, Tempo, Metronom, Abschnitt, Drehen, Verlassen.
+// Lieder: Liste (Karten, ein- und ausklappbar), Liedseite: Anhören mit Markierung, Tempo, Metronom, ab
+// angetipptem Takt; Auswahl beim Mitspielen; Drehen, Verlassen.
 // Audio-Uhr, Timer und requestAnimationFrame laufen über page.clock: Die Tests warten nie in Echtzeit.
 import { expect, test, type Page } from "@playwright/test";
 import { chartNoteByMidi } from "../../src/music/notes";
@@ -45,6 +46,16 @@ async function setTempo(page: Page, pct: number) {
   }, pct);
 }
 
+/** Karte der Liederliste aufklappen, in der das Lied steht (falls zu) */
+async function openCardOf(page: Page, songId: string) {
+  const card = page.locator(".card", { has: page.locator(`a[data-song="${songId}"]`) });
+  const head = card.locator("button.cardhd");
+  if ((await head.getAttribute("aria-expanded")) !== "true") await head.click();
+  await expect(card.locator(`a[data-song="${songId}"]`)).toBeVisible();
+}
+/** Name der angezeigten Note als Text, z. B. „d2“ */
+const noteName = (page: Page) => page.getByTestId("note-name");
+
 /** Lesen-Stufe setzen (Beispieldaten) */
 const withStage = (lesen: string) => ({ ...sampleData(), stages: { lesen, spielen: "erste-toene" } });
 
@@ -67,7 +78,7 @@ test("Liste: „Kannst du schon spielen“ und „Fehlt noch“ nach dem Lernsta
   const entchen = page.locator('.chap a[data-song="alle-meine-entchen"]');
   await expect(entchen).toContainText("Fehlt noch: e2");
   await expect(entchen).toContainText("2/4");
-  await expect(page.locator(".chap:not(.own) h2").first()).toHaveText("Kinder- und Weihnachtslieder");
+  await expect(page.locator(".card.chap .ct").first()).toHaveText("Kinder- und Weihnachtslieder");
   // anderer Lernstand: e² und f¹ bekannt → Alle meine Entchen spielbar
   await page.evaluate(() => {
     const d = JSON.parse(localStorage.getItem("floetentrainer")!);
@@ -77,16 +88,18 @@ test("Liste: „Kannst du schon spielen“ und „Fehlt noch“ nach dem Lernsta
   await page.reload();
   await expect(page.getByTestId("can-play").locator('a[data-song="alle-meine-entchen"]')).toBeVisible();
   // jedes Lied lässt sich öffnen, auch ein noch nicht spielbares
+  await openCardOf(page, "stille-nacht-heilige-nacht");
   await page.locator('a[data-song="stille-nacht-heilige-nacht"]').click();
   await expect(page.locator(".score svg.sys").first()).toBeVisible();
   await expect(page.locator(".songhead h1")).toHaveText("Stille Nacht, heilige Nacht");
 });
 
-test("Abspielen: Einzählen, dann läuft die Markierung zur richtigen Zeit mit, Griffbild wechselt", async ({ page }) => {
+test("Abspielen: Einzählen, dann läuft die Markierung zur richtigen Zeit mit, Name der Note wechselt, kein Griffbild", async ({ page }) => {
   await open(page, "#/lied/haenschen-klein");
   await expect(page.locator(".score svg.sys").first()).toBeVisible();
-  // vor dem Start: Griffbild der ersten Note (d²)
-  await expect(page.locator(".pfl .flute")).toHaveAttribute("data-fingering", chartNoteByMidi(74)!.fingering);
+  // vor dem Start: Name der ersten Note (d²); ein Griffbild zeigt die Liedseite nicht
+  await expect(noteName(page)).toHaveText(chartNoteByMidi(74)!.id);
+  await expect(page.locator(".songpage .flute")).toHaveCount(0);
   await page.getByRole("button", { name: "Abspielen" }).click();
   await page.clock.runFor(150);
   await expect(page.getByTestId("count")).toBeVisible();
@@ -104,7 +117,7 @@ test("Abspielen: Einzählen, dann läuft die Markierung zur richtigen Zeit mit, 
     await runTo(page, t.start + 0.03);
     expect(t.freq).toBeCloseTo(freqOf(tl.tones[k].midi), 1);
     expect(await curIds(page)).toEqual(tl.tones[k].ids);
-    await expect(page.locator(".pfl .flute")).toHaveAttribute("data-fingering", chartNoteByMidi(tl.tones[k].midi)!.fingering);
+    await expect(noteName(page)).toHaveText(chartNoteByMidi(tl.tones[k].midi)!.id);
     await expect(page.getByTestId("count")).toBeHidden();
   }
   // eingezählt wurde genau ein Takt, betont auf der Eins, vor dem ersten Ton
@@ -115,6 +128,7 @@ test("Abspielen: Einzählen, dann läuft die Markierung zur richtigen Zeit mit, 
   // Abstände: Viertel bei 96 Schlägen pro Minute
   expect(log[1].start - log[0].start).toBeCloseTo(60 / 96, 2);
   await expect(page.getByRole("button", { name: "Stopp" })).toBeVisible();
+  await expect(page.locator(".songpage .flute")).toHaveCount(0);
 });
 
 /** mitlaufender Balken: Mitte, oberer und unterer Rand (Fensterkoordinaten), Zeile; null, wenn nicht zu sehen */
@@ -304,99 +318,181 @@ test("Metronom an: Klicks während des ganzen Lieds", async ({ page }) => {
   expect(during[0].start).toBeCloseTo(first, 2);
 });
 
-test("Abschnitt per Tippen: Schleife wiederholt die richtigen Takte ohne neues Einzählen", async ({ page }) => {
+test("Anhören: Takt antippen spielt ab diesem Takt (mit Einzählen), bis zum Ende, ohne Schleife", async ({ page }) => {
   await open(page, "#/lied/haenschen-klein");
-  await expect(page.getByTestId("hint")).not.toHaveClass(/gone/);
-  await page.locator('rect.takt[data-bar="1"]').click();
-  await expect(page.locator('rect.takt[data-bar="1"]')).toHaveClass(/sel/);
-  await expect(page.getByTestId("status")).toContainText("Ab Takt 2");
-  await page.locator('rect.takt[data-bar="2"]').click();
-  await expect(page.getByTestId("status")).toHaveText("Takt 2–3 in Schleife");
-  await expect(page.locator("rect.takt.inloop")).toHaveCount(2);
-  await expect(page.getByTestId("hint")).toHaveClass(/gone/);
-  await page.getByRole("button", { name: "Abspielen" }).click();
+  await expect(page.getByTestId("hint")).toHaveText("Tippe einen Takt an, um ab dort zu hören.");
+  await page.locator('rect.takt[data-bar="4"]').click();
+  expect(await playing(page)).toBe(true);
+  await expect(page.locator('rect.takt[data-bar="4"]')).toHaveClass(/from/);
+  await expect(page.locator("rect.takt.picked")).toHaveCount(0);
   const tl = (await lied(page))!;
-  expect(tl.bars.map((b) => b.index)).toEqual([1, 2]);
-  // Einzählen + drei Durchgänge
-  await page.clock.runFor((4 + 3 * tl.total) * 625 + 300);
-  const log = await tones(page);
-  const per = tl.tones.length;
-  expect(log.length).toBeGreaterThanOrEqual(3 * per);
-  for (let k = 0; k < 3 * per; k++) expect(log[k].freq).toBeCloseTo(freqOf(tl.tones[k % per].midi), 1);
-  // zweiter Durchgang beginnt nahtlos eine Abschnittslänge später
-  expect(log[per].start - log[0].start).toBeCloseTo(tl.total * 0.625, 2);
-  // nur einmal eingezählt
+  const full = await page.evaluate(() => (window as unknown as { __lied: { full: Tl } }).__lied.full);
+  expect(tl.bars[0].index).toBe(4);
+  // bis zum Liedende: alle Takte ab Takt 5 in Spielreihenfolge
+  expect(tl.bars.map((b) => b.index)).toEqual(full.bars.slice(full.bars.findIndex((b) => b.index === 4)).map((b) => b.index));
+  // erster eingeplanter Ton ist der erste Ton dieses Takts, nach einem Takt Einzählen
+  let log = await tones(page);
+  while (!log.length) {
+    await page.clock.runFor(50);
+    log = await tones(page);
+  }
+  const first = full.tones.find((t) => t.bar === 4)!;
+  expect(log[0].freq).toBeCloseTo(freqOf(first.midi), 1);
   const cl = await clicks(page);
   expect(cl.length).toBe(4);
-  expect(Math.max(...cl.map((c) => c.start))).toBeLessThan(log[0].start);
-  // Markierung bleibt im Abschnitt
-  const ids = new Set(tl.tones.flatMap((t) => t.ids));
-  for (const i of await curIds(page)) expect(ids.has(i)).toBe(true);
-
-  // Schleife aufheben: Hinterlegung weg, der laufende Durchgang endet, dann ist Schluss
-  await page.getByRole("button", { name: "Schleife aufheben" }).click();
-  await expect(page.locator("rect.takt.inloop")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Schleife aufheben" })).toBeHidden();
-  await page.clock.runFor(tl.total * 625 + 800);
+  for (const c of cl) expect(c.start).toBeLessThan(log[0].start);
+  await runTo(page, log[0].start + 0.03);
+  expect(await curIds(page)).toEqual(first.ids);
+  await expect(page.getByTestId("status")).toHaveText("Takt 5");
+  // keine Schleife: nach dem Ende ist Schluss, genau so viele Töne wie der Zeitplan hat
+  await page.clock.runFor(Math.ceil(tl.total * 625) + 1500);
   expect(await playing(page)).toBe(false);
-  await expect(page.getByRole("button", { name: "Abspielen" })).toBeVisible();
-  expect(await curIds(page)).toEqual([]);
+  expect((await tones(page)).length).toBe(tl.tones.length);
+  await expect(page.locator("rect.takt.from")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Schleife aufheben" })).toHaveCount(0);
+  // „Abspielen“ beginnt wieder am Anfang
+  await page.getByRole("button", { name: "Abspielen" }).click();
+  expect((await lied(page))!.bars[0].index).toBe(0);
 });
 
-test("Abschnitt während des Spielens: gleicher Takt zweimal = ein Takt, sofort umgestellt", async ({ page }) => {
+test("Anhören: Tippen während des Spielens springt sofort dorthin, ohne neues Einzählen", async ({ page }) => {
   await open(page, "#/lied/haenschen-klein");
   await page.getByRole("button", { name: "Abspielen" }).click();
   await page.clock.runFor(3500);
   const clicksBefore = (await clicks(page)).length;
-  const n = (await tones(page)).length; // die Uhr steht: bis zum Umstellen kommt nichts dazu
-  await page.locator('rect.takt[data-bar="4"]').click();
-  await page.locator('rect.takt[data-bar="4"]').click();
-  await expect(page.getByTestId("status")).toHaveText("Takt 5 in Schleife");
+  const n = (await tones(page)).length; // die Uhr steht: bis zum Springen kommt nichts dazu
+  await page.locator('rect.takt[data-bar="6"]').click();
   const tl = (await lied(page))!;
-  expect(tl.bars.map((b) => b.index)).toEqual([4]);
-  await page.clock.runFor(4000);
+  expect(tl.bars[0].index).toBe(6);
+  await page.clock.runFor(1500);
   const log = (await tones(page)).slice(n);
-  expect(log.length).toBeGreaterThan(tl.tones.length);
-  log.slice(0, tl.tones.length * 2).forEach((t, k) => expect(t.freq).toBeCloseTo(freqOf(tl.tones[k % tl.tones.length].midi), 1));
+  expect(log.length).toBeGreaterThan(0);
+  expect(log[0].freq).toBeCloseTo(freqOf(tl.tones[0].midi), 1);
   expect((await clicks(page)).length).toBe(clicksBefore); // kein neues Einzählen
+  await expect(page.getByTestId("status")).toHaveText("Takt 7");
 });
 
-test("Langes Tippen wählt die ganze Zeile, Wischen wählt nichts", async ({ page }) => {
+test("Wischen tippt keinen Takt an", async ({ page }) => {
   await open(page, "#/lied/haenschen-klein");
   const rect = page.locator('rect.takt[data-bar="5"]');
   const box = (await rect.boundingBox())!;
-  // Wischen
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 + 40, { steps: 4 });
   await page.mouse.up();
-  await expect(page.locator("rect.takt.sel, rect.takt.inloop")).toHaveCount(0);
-  // langes Tippen
+  expect(await playing(page)).toBe(false);
+  await page.getByRole("tab", { name: "Mitspielen" }).click();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
-  await page.clock.runFor(700);
+  await page.mouse.move(box.x + box.width / 2 + 40, box.y + box.height / 2, { steps: 4 });
   await page.mouse.up();
-  const lineBars = await rect.evaluate((r) => [...(r as unknown as SVGRectElement).ownerSVGElement!.querySelectorAll<SVGRectElement>("rect.takt")].map((x) => Number(x.dataset.bar)));
-  expect(lineBars).toContain(5);
-  await expect(page.locator("rect.takt.inloop")).toHaveCount(lineBars.length);
-  for (const b of lineBars) await expect(page.locator(`rect.takt[data-bar="${b}"]`)).toHaveClass(/inloop/);
-  const a = Math.min(...lineBars) + 1;
-  const z = Math.max(...lineBars) + 1;
-  await expect(page.getByTestId("status")).toHaveText(a === z ? `Takt ${a} in Schleife` : `Takt ${a}–${z} in Schleife`);
-  // erneutes Tippen beginnt eine neue Auswahl
-  await page.locator('rect.takt[data-bar="0"]').click();
-  await expect(page.locator("rect.takt.inloop")).toHaveCount(0);
-  await expect(page.locator('rect.takt[data-bar="0"]')).toHaveClass(/sel/);
+  await expect(page.locator("rect.takt.picked")).toHaveCount(0);
 });
 
-test("Drehen bricht neu um, Markierung und Abschnitt bleiben", async ({ page }) => {
+test("Mitspielen: nichts vorausgewählt; ein Takt, mehrere Takte, neu wählen, Auswahl aufheben", async ({ page }) => {
+  await open(page, "#/lied/haenschen-klein");
+  const tab = page.getByRole("tab", { name: "Mitspielen" });
+  await tab.click();
+  await expect(tab).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: "Anhören" })).toHaveAttribute("aria-selected", "false");
+  // Bedienleiste des Mitspielens statt der fürs Anhören
+  await expect(page.getByRole("button", { name: "Abspielen" })).toBeHidden();
+  await expect(page.getByRole("button", { name: "Wartet auf mich" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Im Takt" })).toBeVisible();
+  await expect(page.getByRole("switch", { name: /Ich trage Kopfhörer/ })).toBeVisible();
+  // nichts vorausgewählt: ganzes Lied
+  await expect(page.locator("rect.takt.picked")).toHaveCount(0);
+  await expect(page.getByTestId("follow-sel")).toBeHidden();
+  const go = page.locator('[data-act="fstart"]');
+  await expect(go).toHaveText("Mitspielen");
+  await expect(page.getByTestId("hint")).toContainText("Ohne Auswahl spielst du das ganze Lied");
+  // ein Takt
+  await page.locator('rect.takt[data-bar="1"]').click();
+  await expect(page.locator("rect.takt.picked")).toHaveCount(1);
+  await expect(page.locator('rect.takt[data-bar="1"]')).toHaveClass(/picked/);
+  await expect(go).toHaveText("Takt 2 mitspielen");
+  await expect(page.getByTestId("follow-sel")).toContainText("Takt 2");
+  await expect(page.getByTestId("hint")).toContainText("erweitern");
+  expect(await playing(page)).toBe(false); // Tippen spielt hier nichts vor
+  // zweiter Tipp erweitert bis dorthin (auch rückwärts)
+  await page.locator('rect.takt[data-bar="3"]').click();
+  await expect(page.locator("rect.takt.picked")).toHaveCount(3);
+  await expect(go).toHaveText("Takt 2–4 mitspielen");
+  // ein weiterer Tipp beginnt neu
+  await page.locator('rect.takt[data-bar="5"]').click();
+  await expect(go).toHaveText("Takt 6 mitspielen");
+  await page.locator('rect.takt[data-bar="4"]').click();
+  await expect(go).toHaveText("Takt 5–6 mitspielen");
+  await expect(page.locator("rect.takt.picked")).toHaveCount(2);
+  // Auswahl aufheben
+  await page.getByRole("button", { name: "Auswahl aufheben" }).click();
+  await expect(page.locator("rect.takt.picked")).toHaveCount(0);
+  await expect(go).toHaveText("Mitspielen");
+  await expect(page.getByTestId("follow-sel")).toBeHidden();
+  // zurück zum Anhören: keine Auswahl zu sehen, Tippen spielt ab dort
+  await page.locator('rect.takt[data-bar="2"]').click();
+  await page.getByRole("tab", { name: "Anhören" }).click();
+  await expect(page.locator("rect.takt.picked")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Abspielen" })).toBeVisible();
+  await page.locator('rect.takt[data-bar="3"]').click();
+  expect(await playing(page)).toBe(true);
+  expect((await lied(page))!.bars[0].index).toBe(3);
+  // Wechsel zum Mitspielen hält das Vorspielen an
+  await tab.click();
+  expect(await playing(page)).toBe(false);
+});
+
+test("Liederliste: Karten klappen über die Kopfzeile auf und zu; der Zustand bleibt nach dem Neuladen", async ({ page }) => {
+  await seed(page, withStage("c2-d2"));
+  await page.goto("./#/lieder");
+  const can = page.getByTestId("can-play");
+  const own = page.getByTestId("own-songs");
+  const kinder = page.locator(".card.chap").first();
+  const head = (c: typeof can) => c.locator("button.cardhd");
+  // Standard: „Kannst du schon spielen“ offen; „Eigene Lieder“ (nur Hinweis und Knopf) offen; Kapitel zu
+  await expect(head(can)).toHaveAttribute("aria-expanded", "true");
+  await expect(can.locator('a[data-song="haenschen-klein"]')).toBeVisible();
+  await expect(head(own)).toHaveAttribute("aria-expanded", "true");
+  await expect(own.getByRole("link", { name: "Lied hinzufügen" })).toBeVisible();
+  await expect(head(kinder)).toHaveAttribute("aria-expanded", "false");
+  await expect(kinder.locator('a[data-song="alle-meine-entchen"]')).toBeHidden();
+  // Tippfläche der Kopfzeile mindestens 48 px hoch
+  expect((await head(kinder).boundingBox())!.height).toBeGreaterThanOrEqual(48);
+  // aufklappen, zuklappen
+  await head(kinder).click();
+  await expect(head(kinder)).toHaveAttribute("aria-expanded", "true");
+  await expect(kinder.locator('a[data-song="alle-meine-entchen"]')).toBeVisible();
+  await head(can).click();
+  await expect(head(can)).toHaveAttribute("aria-expanded", "false");
+  await expect(can.locator('a[data-song="haenschen-klein"]')).toBeHidden();
+  // nach dem Neuladen gleich; nicht im Datenspeicher (keine Sicherung), sondern als Bequemlichkeit je Gerät
+  await page.reload();
+  await expect(head(can)).toHaveAttribute("aria-expanded", "false");
+  await expect(can.locator('a[data-song="haenschen-klein"]')).toBeHidden();
+  await expect(head(kinder)).toHaveAttribute("aria-expanded", "true");
+  await expect(kinder.locator('a[data-song="alle-meine-entchen"]')).toBeVisible();
+  expect(JSON.stringify(await page.evaluate(() => JSON.parse(localStorage.getItem("floetentrainer")!)))).not.toContain("cardOpen");
+  expect(await page.evaluate(() => localStorage.getItem("floetentrainer-liederliste"))).toContain("Kinder");
+  // ein kaputter gemerkter Zustand stört nicht
+  await page.evaluate(() => localStorage.setItem("floetentrainer-liederliste", "{kaputt"));
+  await page.reload();
+  await expect(head(can)).toHaveAttribute("aria-expanded", "true");
+});
+
+test("Liederliste: ist „Kannst du schon spielen“ leer, ist das erste Kapitel offen", async ({ page }) => {
+  await seed(page, withStage("erste-toene"));
+  await page.goto("./#/lieder");
+  await expect(page.getByTestId("can-play")).toContainText("Noch keins");
+  await expect(page.locator(".card.chap").first().locator("button.cardhd")).toHaveAttribute("aria-expanded", "true");
+  await expect(page.locator(".card.chap").nth(1).locator("button.cardhd")).toHaveAttribute("aria-expanded", "false");
+});
+
+test("Drehen bricht neu um, Markierung und Auswahl bleiben", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
   await open(page, "#/lied/jingle-bells");
   const sys = page.locator("main.songpage");
   const portrait = Number(await sys.getAttribute("data-systems"));
-  await page.locator('rect.takt[data-bar="2"]').click();
-  await page.locator('rect.takt[data-bar="5"]').click();
-  await page.getByRole("button", { name: "Abspielen" }).click();
+  await page.locator('rect.takt[data-bar="2"]').click(); // ab Takt 3
   await page.clock.runFor(4500);
   const ids = await curIds(page);
   expect(ids.length).toBeGreaterThan(0);
@@ -405,12 +501,18 @@ test("Drehen bricht neu um, Markierung und Abschnitt bleiben", async ({ page }) 
   await expect.poll(() => page.locator(".score svg.sys").first().getAttribute("width")).not.toBe(w0);
   expect(Number(await sys.getAttribute("data-systems"))).not.toBe(portrait);
   expect(await curIds(page)).toEqual(ids);
-  await expect(page.locator("rect.takt.inloop")).toHaveCount(4);
+  await expect(page.locator('rect.takt[data-bar="2"]')).toHaveClass(/from/);
   expect(await playing(page)).toBe(true);
-  // Querformat: Griffbild rechts neben den Noten
-  const fl = (await page.locator(".pfl").boundingBox())!;
+  // Querformat: Umschalter und Bedienleiste rechts neben den Noten
   const sc = (await page.locator(".scorebox").boundingBox())!;
-  expect(fl.x).toBeGreaterThan(sc.x + sc.width);
+  for (const sel of [".modes", ".pin"]) expect((await page.locator(sel).boundingBox())!.x).toBeGreaterThan(sc.x + sc.width);
+  // Auswahl beim Mitspielen bleibt beim Zurückdrehen
+  await page.getByRole("tab", { name: "Mitspielen" }).click();
+  await page.locator('rect.takt[data-bar="4"]').click();
+  await page.locator('rect.takt[data-bar="5"]').click();
+  await page.setViewportSize({ width: 360, height: 740 });
+  await expect(page.locator("rect.takt.picked")).toHaveCount(2);
+  await expect(page.locator('[data-act="fstart"]')).toHaveText("Takt 5–6 mitspielen");
 });
 
 test("Verlassen, Hintergrund und Ende stoppen die Wiedergabe", async ({ page }) => {
@@ -445,23 +547,4 @@ test("Verlassen, Hintergrund und Ende stoppen die Wiedergabe", async ({ page }) 
   const n = (await tones(page)).length;
   await page.clock.runFor(3000);
   expect((await tones(page)).length).toBe(n);
-});
-
-test("Neue Auswahl während der Schleife, dann „Auswahl aufheben“: die alte Schleife endet auch", async ({ page }) => {
-  await open(page, "#/lied/haenschen-klein");
-  await page.locator('rect.takt[data-bar="1"]').click();
-  await page.locator('rect.takt[data-bar="1"]').click();
-  await page.getByRole("button", { name: "Abspielen" }).click();
-  await page.clock.runFor(4 * 625 + 1000);
-  const tl = (await lied(page))!;
-  expect(tl.bars.map((b) => b.index)).toEqual([1]);
-  // neuer Anfangstakt: die alte Schleife läuft weiter, bis der Endtakt feststeht …
-  await page.locator('rect.takt[data-bar="3"]').click();
-  await expect(page.getByTestId("status")).toContainText("Ab Takt 4");
-  expect(await playing(page)).toBe(true);
-  // … oder bis die Auswahl aufgehoben wird: dann wird der laufende Durchgang zu Ende gespielt
-  await page.getByRole("button", { name: "Auswahl aufheben" }).click();
-  await page.clock.runFor(tl.total * 625 + 800);
-  expect(await playing(page)).toBe(false);
-  await expect(page.getByRole("button", { name: "Abspielen" })).toBeVisible();
 });

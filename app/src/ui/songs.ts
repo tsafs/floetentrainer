@@ -13,6 +13,7 @@
 // - Mitspielen (./song-follow.ts): Antippen wählt einen Takt, ein zweiter Tipp erweitert die Auswahl bis
 //   dorthin, ein weiterer beginnt neu. Ohne Auswahl gilt das ganze Lied; nichts wird vorausgewählt.
 // Wischen (Scrollen) tippt nichts an.
+// Kein Griffbild auf der Liedseite (nur der kleine Name der klingenden Note), damit sie Noten liest.
 // Mitlaufen: Die klingende Note ist markiert, ein senkrechter Balken läuft gleichmäßig mit
 // (./playhead.ts); die Seite scrollt sanft mit, sobald die aktuelle Zeile aus dem gut sichtbaren
 // Bereich läuft. Scrollt sie selbst, hält das Mitscrollen ein paar Sekunden still.
@@ -20,9 +21,7 @@
 import { keepAwake } from "../audio/mic";
 import { songPlayer, type PlayerPosition } from "../audio/song-player";
 import { GLYPHS } from "../music/bravura";
-import { fluteSvg } from "../music/flute";
-import { nameHtml, nameText } from "../music/names";
-import { chartNoteByMidi } from "../music/notes";
+import { nameHtml } from "../music/names";
 import { renderScore, type Score } from "../songs/engrave";
 import { chapters, SONGS, songById } from "../songs/library";
 import { ownEntries, ownEntryById } from "../songs/own";
@@ -173,7 +172,7 @@ export const songListView: View = (root, ctx) => {
     else ownRows.push(songRow(e.song, missingHtml(p.missing)));
   }
   const ownHelp = !own.length
-    ? "Lieder aus einer ABC-Datei, zum Beispiel von thesession.org oder abcnotation.com."
+    ? "Noch keins – viele Volkslieder gibt es auch bei abcnotation.com."
     : !ownRows.length
       ? "Deine eigenen Lieder kannst du alle schon spielen – sie stehen oben."
       : "";
@@ -334,7 +333,6 @@ export const songView: View = (root, ctx) => {
   ${ownEntry ? `<section class="ownbox" data-testid="own-info"></section>` : ""}
   <div class="player" role="region" aria-label="Bedienung">
     <div class="pin">
-      <div class="pfl" data-testid="flute"></div>
       <div class="pinfo">
         <span class="pname" data-testid="note-name" aria-live="off"></span>
         <span class="pcount" data-testid="count" hidden></span>
@@ -354,7 +352,6 @@ export const songView: View = (root, ctx) => {
   const hint = main.querySelector(".hint") as HTMLElement;
   const player = main.querySelector(".player") as HTMLElement;
   const modeTabs = [...main.querySelectorAll<HTMLButtonElement>(".modes button")];
-  const fl = main.querySelector(".pfl") as HTMLElement;
   const pname = main.querySelector(".pname") as HTMLElement;
   const pcount = main.querySelector(".pcount") as HTMLElement;
   const pstat = main.querySelector(".pstat") as HTMLElement;
@@ -435,21 +432,14 @@ export const songView: View = (root, ctx) => {
     for (const i of cur) score?.noteEl(i)?.classList.add("cur");
   };
 
-  // ------------------------------------------------------------ Griffbild und Name
+  // ------------------------------------------------------------ Name der Note
+  // Ein Griffbild zeigt die Liedseite bewusst nicht (Nachsteuerung vom 14.11.2026): beim Anhören und
+  // Mitspielen soll sie die Noten lesen; der kleine Name der klingenden Note genügt.
   const showNote = (n: NoteEvent | undefined) => {
     const midi = n ? n.pitch.midi : null;
     if (midi === shownMidi) return;
     shownMidi = midi;
-    if (!n) {
-      fl.innerHTML = "";
-      fl.classList.add("none");
-      pname.innerHTML = "";
-      return;
-    }
-    const chart = chartNoteByMidi(n.pitch.midi);
-    fl.classList.toggle("none", !chart);
-    fl.innerHTML = chart ? fluteSvg(chart.fingering, `Griffbild ${nameText(n.pitch.id)}`) : "";
-    pname.innerHTML = nameHtml(n.pitch.id);
+    pname.innerHTML = n ? nameHtml(n.pitch.id) : "";
   };
   /** vor dem Start: erste Note des Lieds */
   const restingNote = () => song.notes[0];
