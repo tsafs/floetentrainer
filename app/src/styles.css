@@ -1222,6 +1222,14 @@ svg.acc {
   .slot {
     align-content: center;
   }
+  /* Spielen: über „Ich höre“ ist hier zu wenig Platz – das Feld deckt die ganze Antwortspalte */
+  .anchor {
+    position: static;
+  }
+  .anchor .slot {
+    bottom: 0;
+    min-height: 100%;
+  }
   .btns {
     grid-template-columns: 1fr 1fr;
   }
