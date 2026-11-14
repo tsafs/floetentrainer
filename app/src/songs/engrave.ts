@@ -4,7 +4,8 @@
 //
 // Haken für die Oberfläche (Gestaltung in styles.css, Abschnitt „Notensatz der Lieder“):
 // - jede Note und Pause ist eine Gruppe <g class="n" data-id> bzw. <g class="r" data-id>;
-//   Klasse "cur" färbt die gerade klingende Note (Kopf, Hals, Fähnchen, Vorzeichen, Punkt).
+//   Klasse "cur" färbt die gerade klingende Note (Kopf, Hals, Fähnchen, Vorzeichen, Punkt); der
+//   Notenkopf selbst ist <path class="h"> (für die zarte Hinterlegung der klingenden Note).
 // - jeder Takt hat ein unsichtbares Rechteck <rect class="takt" data-bar> über die ganze Zeilenhöhe samt
 //   Liedtext zum Antippen; Klassen "inloop" (Takt im gewählten Abschnitt) und "sel" (gerade angetippt)
 //   hinterlegen den Takt zart.
@@ -90,6 +91,10 @@ export interface EngravedScore {
     /** Breite und Höhe in CSS-Pixeln */
     width: number;
     height: number;
+    /** CSS-Pixel je Zwischenraum in dieser Zeile (kleiner, wenn die Zeile verkleinert ist) */
+    unit: number;
+    /** oberer Rand des SVG in Zwischenräumen (die unterste Notenlinie liegt bei 0, die oberste bei −4) */
+    yTop: number;
   }[];
 }
 
@@ -280,7 +285,7 @@ export function engraveScore(song: Song, opts: { width: number; sp?: number }): 
         ext(k, y + a.y0, y + a.y1);
       }
       const cx = (hg.x0 + hg.x1) / 2;
-      p += `<path d="${hg.d}" transform="translate(${r(x)} ${r(y)}) scale(${HEAD_SCALE}) translate(${r(-cx)} 0)"/>`;
+      p += `<path class="h" d="${hg.d}" transform="translate(${r(x)} ${r(y)}) scale(${HEAD_SCALE}) translate(${r(-cx)} 0)"/>`;
       ext(k, y - 0.5, y + 0.5);
       if (e.dots) p += glyph(GLYPHS.dot, x + hh + DOT_GAP, Y(pos % 2 ? pos : pos + 1));
       const st = stems.get(e.id)!;
@@ -590,12 +595,23 @@ export function engraveScore(song: Song, opts: { width: number; sp?: number }): 
       hits +
       out[k].join("") +
       `</svg>`;
-    return { bars: sy.bars.map((b) => b.index), svg, width: wPx, height: hPx };
+    return { bars: sy.bars.map((b) => b.index), svg, width: wPx, height: hPx, unit: sp * Math.min(1, sy.scale), yTop };
   });
   return { layout: L, systems: result };
 }
 
 // ---------------------------------------------------------------- DOM
+
+/** Lage eines Takts in CSS-Pixeln, bezogen auf das SVG seiner Zeile (für den Abspielbalken) */
+export interface BarGeom {
+  /** Zeile (Index in Score.systems) */
+  sys: number;
+  /** linker und rechter Taktstrich */
+  x0: number;
+  x1: number;
+  /** Mitte jedes Ereignisses (Notenkopf bzw. Pause), in der Reihenfolge von Bar.events */
+  xs: number[];
+}
 
 /** Notenbild auf der Seite, mit Haken für Markierung, Mitscrollen und Taktauswahl */
 export interface Score {
@@ -609,6 +625,10 @@ export interface Score {
   barEl(index: number): SVGRectElement | undefined;
   /** Zeile (Index in systems), in der ein Takt steht */
   systemOfBar(index: number): number;
+  /** Lage eines Takts (Index in Song.bars) in Pixeln, für den Abspielbalken */
+  barGeom(index: number): BarGeom | undefined;
+  /** oberste und unterste Notenlinie einer Zeile in Pixeln, bezogen auf ihr SVG, und ein Zwischenraum dort */
+  staffPx(sys: number): { top: number; bottom: number; unit: number };
   /** ein Zwischenraum in CSS-Pixeln */
   sp: number;
 }
@@ -630,12 +650,22 @@ export function renderScore(song: Song, opts: { width: number; sp?: number }): S
   el.querySelectorAll<SVGRectElement>("rect[data-bar]").forEach((b) => barRects.set(Number(b.dataset.bar), b));
   const sysOf = new Map<number, number>();
   eng.systems.forEach((s, k) => s.bars.forEach((b) => sysOf.set(b, k)));
+  const geom = new Map<number, BarGeom>();
+  eng.layout.systems.forEach((sy, k) => {
+    const u = eng.systems[k].unit;
+    for (const bl of sy.bars) geom.set(bl.index, { sys: k, x0: bl.x0 * u, x1: bl.x1 * u, xs: bl.xs.map((x) => x * u) });
+  });
   return {
     el,
     systems: eng.systems.map((s, k) => ({ el: svgs[k], bars: s.bars })),
     noteEl: (id) => notes.get(id),
     barEl: (i) => barRects.get(i),
     systemOfBar: (i) => sysOf.get(i) ?? -1,
+    barGeom: (i) => geom.get(i),
+    staffPx: (k) => {
+      const { unit, yTop } = eng.systems[k];
+      return { top: (-4 - yTop) * unit, bottom: -yTop * unit, unit };
+    },
     sp: eng.layout.metrics.sp,
   };
 }

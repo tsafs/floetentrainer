@@ -1,33 +1,43 @@
 // Flötenstimme und Metronom-Klick, im Browser mit Web Audio erzeugt.
 //
-// Ein Ton: ein Oszillator mit wenigen, leisen Obertönen (PeriodicWave), weicher Einsatz mit einem
-// kleinen Anschleifen der Tonhöhe, dazu ein Hauch gefiltertes Rauschen (Anblasgeräusch), das im
-// Einsatz etwas deutlicher ist. Ausklingen mit setTargetAtTime, damit nichts knackst.
+// Ein Ton: ein Oszillator mit wenigen, leisen Obertönen (PeriodicWave), kurzer Einsatz (ATTACK, so dass
+// der Ton „auf dem Schlag“ gehört wird und nicht hinter dem Klick) mit einem kleinen, schnellen
+// Anschleifen der Tonhöhe, dazu ein Hauch gefiltertes Rauschen (Anblasgeräusch), das im Einsatz kurz
+// deutlicher ist – wie das „d“ der Zunge beim Absetzen. Ausklingen: von der aktuellen Lautstärke linear
+// in RELEASE Sekunden genau auf 0, erst danach hält der Knoten an. (Früher klang der Ton mit
+// setTargetAtTime aus und wurde nach sechs Zeitkonstanten gestoppt – bei noch etwa 0,1 % Pegel. Dieser
+// kleine Sprung am Ende jedes Tons war im Offline-Rendern als Knackser an jedem Tonende zu sehen.)
 // Gebundene Töne (Bindebogen): derselbe Klang läuft weiter, nur die Tonhöhe gleitet in GLIDE
 // Sekunden zur neuen (Voice.glide) – kein neuer Einsatz, kein neues Anblasgeräusch.
-// Ein Klick: ein sehr kurzer Sinus-Pieks, die betonte Eins lauter und höher.
+// Ein Klick: ein sehr kurzer Sinus-Pieks, die betonte Eins lauter und höher; endet ebenfalls auf 0.
 //
 // Hinweis: Die Attrappen (tests/e2e/fake-audio.ts, tests/unit/audio-fake.ts) erkennen Flötentöne am
 // Wellentyp "custom" und Klicks am Typ "sine"; einen gebundenen Tonwechsel an setValueAtTime gefolgt
-// von exponentialRampToValueAtTime auf osc.frequency. Bei Änderungen dort mitziehen.
+// von exponentialRampToValueAtTime auf osc.frequency; das Ausklingen an setValueAtTime gefolgt von
+// linearRampToValueAtTime auf 0 an der Hüllkurve. Bei Änderungen dort mitziehen.
 
 import { soundingFreq } from "../music/notes";
 
 /** Lautstärke eines Tons (Spitze), mehrere Töne überlappen höchstens kurz beim Übergang */
-const PEAK = 0.3;
+const PEAK = 0.5;
 /** Haltepegel relativ zur Spitze */
 const SUSTAIN = 0.82;
-/** Einschwingzeit in s (weicher Einsatz) */
-export const ATTACK = 0.035;
-/** Zeitkonstante des Ausklingens in s */
-const RELEASE_TAU = 0.03;
-/** so lange nach dem Tonende laufen die Knoten noch (Ausklingen) */
-export const RELEASE_TAIL = RELEASE_TAU * 6;
-/** Anblasgeräusch: im Einsatz und danach (relativ zu 1) */
-const NOISE_ATTACK = 0.022;
-const NOISE_SUSTAIN = 0.004;
-/** Anschleifen: Beginn so viele Cent zu tief */
-const SCOOP_CENTS = -14;
+/** Einschwingzeit in s: kurz, damit der Ton auf dem Schlag kommt, aber ohne Knacks */
+export const ATTACK = 0.012;
+/** Zeitkonstante, mit der der Ton nach dem Einsatz auf den Haltepegel sinkt */
+const DECAY_TAU = 0.1;
+/** Ausklingen in s (linear auf 0) */
+export const RELEASE = 0.03;
+/** so lange nach dem Beginn des Ausklingens laufen die Knoten noch */
+export const RELEASE_TAIL = RELEASE + 0.01;
+/** Anblasgeräusch: Spitze kurz nach dem Einsatz, Abklingen, danach (relativ zu 1) */
+const NOISE_ATTACK = 0.045;
+const NOISE_PEAK_AT = 0.004;
+const NOISE_TAU = 0.02;
+const NOISE_SUSTAIN = 0.0025;
+/** Anschleifen: Beginn so viele Cent zu tief, in SCOOP_TIME s auf der Höhe */
+const SCOOP_CENTS = -6;
+const SCOOP_TIME = 0.02;
 /** Gleiten der Tonhöhe beim gebundenen Tonwechsel in s: schnell, aber ohne Knacken */
 export const GLIDE = 0.02;
 /** Obertöne (Amplituden ab Grundton), wenig wie bei der Blockflöte */
@@ -35,8 +45,8 @@ const HARMONICS = [1, 0.1, 0.06, 0.02, 0.01];
 
 const CLICK_FREQ = 1250;
 const CLICK_ACCENT_FREQ = 1900;
-const CLICK_GAIN = 0.07;
-const CLICK_ACCENT_GAIN = 0.13;
+const CLICK_GAIN = 0.13;
+const CLICK_ACCENT_GAIN = 0.24;
 const CLICK_LEN = 0.04;
 
 /** Ein klingender (oder schon eingeplanter) Ton. */
@@ -76,7 +86,7 @@ function sharedFor(ctx: BaseAudioContext): Shared {
     const imag = new Float32Array(HARMONICS.length + 1);
     HARMONICS.forEach((a, i) => (imag[i + 1] = a));
     const wave = ctx.createPeriodicWave(real, imag);
-    const len = Math.max(1, Math.round(ctx.sampleRate));
+    const len = Math.max(1, Math.round(ctx.sampleRate * 2));
     const noise = ctx.createBuffer(1, len, ctx.sampleRate);
     const data = noise.getChannelData(0);
     for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
@@ -109,31 +119,35 @@ export class FluteSynth {
     osc.setPeriodicWave(wave);
     osc.frequency.value = freq;
     osc.detune.setValueAtTime(SCOOP_CENTS, at);
-    osc.detune.linearRampToValueAtTime(0, at + ATTACK * 1.4);
+    osc.detune.linearRampToValueAtTime(0, at + SCOOP_TIME);
     const env = ctx.createGain();
     env.gain.value = 0;
     env.gain.setValueAtTime(0, at);
     env.gain.linearRampToValueAtTime(PEAK, attackEnd);
-    env.gain.setTargetAtTime(PEAK * SUSTAIN, attackEnd, 0.12);
+    env.gain.setTargetAtTime(PEAK * SUSTAIN, attackEnd, DECAY_TAU);
     osc.connect(env).connect(this.out);
+    /** Lautstärke der Hüllkurve zur Zeit t (nach dem Einsatz, vor dem Ausklingen) */
+    const level = (t: number) => PEAK * SUSTAIN + PEAK * (1 - SUSTAIN) * Math.exp(-(t - attackEnd) / DECAY_TAU);
 
-    // Anblasgeräusch: Rauschen, um die Tonhöhe herum gefiltert, sehr leise
+    // Anblasgeräusch: Rauschen, um die Tonhöhe herum gefiltert, sehr leise; im Einsatz kurz deutlicher
     const src = ctx.createBufferSource();
     src.buffer = noise;
     src.loop = true;
     const band = ctx.createBiquadFilter();
     band.type = "bandpass";
     band.frequency.value = Math.min(freq * 2, 9000);
-    band.Q.value = 0.9;
+    band.Q.value = 1.2;
     const ng = ctx.createGain();
+    const noisePeak = at + NOISE_PEAK_AT;
     ng.gain.value = 0;
     ng.gain.setValueAtTime(0, at);
-    ng.gain.linearRampToValueAtTime(NOISE_ATTACK, at + ATTACK * 0.6);
-    ng.gain.setTargetAtTime(NOISE_SUSTAIN, at + ATTACK * 0.6, 0.05);
+    ng.gain.linearRampToValueAtTime(NOISE_ATTACK, noisePeak);
+    ng.gain.setTargetAtTime(NOISE_SUSTAIN, noisePeak, NOISE_TAU);
+    const noiseLevel = (t: number) => NOISE_SUSTAIN + (NOISE_ATTACK - NOISE_SUSTAIN) * Math.exp(-(t - noisePeak) / NOISE_TAU);
     src.connect(band).connect(ng).connect(this.out);
 
     osc.start(at);
-    src.start(at, Math.random() * 0.9);
+    src.start(at, Math.random() * 1.8);
 
     let released = false;
     let stopAt = Infinity;
@@ -164,8 +178,11 @@ export class FluteSynth {
         if (released || stopAt < Infinity) return;
         released = true;
         const u = Math.max(t, attackEnd + 0.005);
-        env.gain.setTargetAtTime(0, u, RELEASE_TAU);
-        ng.gain.setTargetAtTime(0, u, RELEASE_TAU * 0.6);
+        // vom aktuellen Pegel aus (stetig) linear genau auf 0, dann erst anhalten: kein Sprung am Ende
+        env.gain.setValueAtTime(level(u), u);
+        env.gain.linearRampToValueAtTime(0, u + RELEASE);
+        ng.gain.setValueAtTime(noiseLevel(u), u);
+        ng.gain.linearRampToValueAtTime(0, u + RELEASE * 0.7);
         stop(u + RELEASE_TAIL);
       },
       cut(t: number) {
@@ -184,7 +201,8 @@ export class FluteSynth {
     g.gain.value = 0;
     g.gain.setValueAtTime(0, at);
     g.gain.linearRampToValueAtTime(accent ? CLICK_ACCENT_GAIN : CLICK_GAIN, at + 0.0015);
-    g.gain.exponentialRampToValueAtTime(0.0003, at + CLICK_LEN);
+    g.gain.exponentialRampToValueAtTime(0.0005, at + CLICK_LEN);
+    g.gain.linearRampToValueAtTime(0, at + CLICK_LEN + 0.004); // genau auf 0 vor dem Anhalten
     osc.connect(g).connect(this.out);
     osc.start(at);
     osc.stop(at + CLICK_LEN + 0.01);

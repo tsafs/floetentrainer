@@ -7,7 +7,12 @@
 //   Während `suspend()` steht die Uhr wie beim echten Kontext.
 // - Jeder gestartete Oszillator und jede Rauschquelle wird in `window.__audioLog` protokolliert:
 //   { kind: "tone" | "click" | "noise", freq, start, stop } (Zeiten auf der vorgetäuschten Uhr).
-//   `stop` ist das Ende des Knotens: bei Tönen Tonende + Ausklingen (RELEASE_TAIL = 0,18 s).
+//   `stop` ist das Ende des Knotens: bei Tönen Tonende + Ausklingen (RELEASE_TAIL = 0,04 s).
+// - getOutputTimestamp passt zur vorgetäuschten Uhr: contextTime = currentTime minus outputLatency und
+//   baseLatency (beide hier 0; ein Test kann outputLatency in einer Unterklasse überschreiben),
+//   performanceTime = performance.now().
+// - Begrenzer (DynamicsCompressorNode) und alle übrigen Knoten sind echte Knoten; angelegte Begrenzer
+//   stehen mit ihren Einstellungen in `window.__audioLimiters`.
 //   Flötentöne erkennt sie an der eigenen Wellenform ("custom"), Klicks am Sinus (siehe flute-synth.ts).
 // - Gebundene Töne (Bindebogen) laufen auf demselben Oszillator weiter, nur die Tonhöhe gleitet
 //   (setValueAtTime + exponentialRampToValueAtTime auf `frequency`, siehe Voice.glide). Jeder solche
@@ -35,6 +40,7 @@ export const FAKE_AUDIO = (opts?: { clock?: "manual" | "performance" }) => {
   w.__RealAudioContext = Real;
   const log: Entry[] = [];
   w.__audioLog = log;
+  w.__audioLimiters = [];
   const manual = opts?.clock === "manual";
   let manualTime = 0;
   const clock = () => (manual ? manualTime : performance.now() / 1000);
@@ -121,6 +127,15 @@ export const FAKE_AUDIO = (opts?: { clock?: "manual" | "performance" }) => {
       const s = super.createBufferSource();
       track(s as Src, () => "noise", () => null);
       return s;
+    }
+    createDynamicsCompressor() {
+      const c = super.createDynamicsCompressor();
+      (w.__audioLimiters as DynamicsCompressorNode[]).push(c);
+      return c;
+    }
+    getOutputTimestamp(): AudioTimestamp {
+      const t = this.currentTime - (this.outputLatency || 0) - (this.baseLatency || 0);
+      return { contextTime: Math.max(0, t), performanceTime: performance.now() };
     }
   }
   // currentTime & Co. sind im echten Kontext Getter auf dem Prototyp; hier überdecken

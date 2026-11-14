@@ -10,11 +10,23 @@
 // Die Umrechnung in Sekunden ist stückweise linear (Anker); eine Tempoänderung setzt einen neuen
 // Anker an der Stelle, bis zu der schon eingeplant ist – so springt nichts.
 //
+// Artikulation: Normale Noten werden abgesetzt wie mit der Zunge gespielt – jede Note setzt neu ein,
+// und vor dem nächsten Ton liegt eine kurze Lücke (gapSeconds: ARTIC_SHARE der Dauer, zwischen
+// ARTIC_MIN und ARTIC_MAX). Am Atemzeichen ist die Lücke größer. Vor einer Pause und am Ende klingt
+// der Ton voll aus.
 // Bindebogen (Tone.slurToNext): Der gebundene Ton bekommt kein „off“, der nächste ein „on“ mit
 // legato – dieselbe Stimme läuft weiter und gleitet zur neuen Höhe (Voice.glide). Bei gleicher Höhe
-// unter dem Bogen wird wie bei jeder Tonwiederholung kurz getrennt und neu angestoßen.
+// unter dem Bogen wird wie bei jeder Tonwiederholung kurz abgesetzt und neu angestoßen.
 //
-// Positionsmeldungen für die Oberfläche kommen aus requestAnimationFrame, abgeleitet aus currentTime.
+// Ausgang: Klicks und Töne laufen über denselben Regler je Abspielen (bus) und einen gemeinsamen
+// sanften Begrenzer (DynamicsCompressorNode als Limiter), damit schnelle Noten mit Klicks nicht
+// übersteuern. Klicks und Töne haben also dieselbe Zeitbasis und denselben Weg zum Lautsprecher.
+//
+// Positionsmeldungen für die Oberfläche kommen aus requestAnimationFrame. Die Stelle, die gerade zu
+// hören ist, kommt aus AudioContext.getOutputTimestamp() (zusammengehörige Audio- und
+// Bildschirm-Uhrzeit, also samt aller Ausgabe-Verzögerung), mit Rückfall auf currentTime minus
+// baseLatency und outputLatency (outputClock). Dazu kommt, dass ein in requestAnimationFrame
+// gezeichnetes Bild erst etwa ein Bild später auf dem Schirm steht (FRAME_LEAD).
 // AudioContext und Zeitgeber lassen sich für Tests austauschen (PlayerEnv).
 
 import type { Timeline } from "../songs/timeline";
@@ -31,14 +43,30 @@ export const START_DELAY = 0.08;
 /** Lücke am Atemzeichen (s), höchstens 40 % des Tons */
 export const BREATH_GAP = 0.18;
 export const BREATH_MAX_SHARE = 0.4;
-/** Trennung zwischen Tonwiederholungen (s), höchstens 30 % des Tons */
-export const REPEAT_GAP = 0.06;
-export const REPEAT_MAX_SHARE = 0.3;
+/** Absetzen (normale Noten): Lücke vor dem nächsten Ton als Anteil der Dauer, mit Unter- und Obergrenze (s) */
+export const ARTIC_SHARE = 0.12;
+export const ARTIC_MIN = 0.035;
+export const ARTIC_MAX = 0.09;
+/** bei sehr kurzen Noten höchstens dieser Anteil */
+export const ARTIC_MAX_SHARE = 0.4;
 const MAX_GAP = BREATH_GAP;
 /** Ausblenden beim Stopp (s) */
 export const FADE = 0.04;
-/** Lautstärke am Ausgang */
-const OUT_GAIN = 0.9;
+/** Lautstärke am Ausgang (vor dem Begrenzer) */
+export const OUT_GAIN = 1.0;
+/**
+ * Begrenzer am Ausgang: setzt erst kurz unter Vollaussteuerung ein (einzelne Töne bleiben unberührt),
+ * schnell im Ansprechen, sanft im Loslassen. Chromium/WebKit/Gecko verstärken mit einem Compressor
+ * zusätzlich automatisch (Ausgleich nach Schwelle und Verhältnis); die Pegel sind darum offline
+ * nachgemessen (Spitze unter 0,95).
+ */
+export const LIMITER = { threshold: -9, knee: 6, ratio: 12, attack: 0.002, release: 0.15 };
+/** Vorlauf des Compressors (in allen Browsern fest 6 ms): um so viel später ist alles zu hören */
+export const LIMITER_DELAY = 0.006;
+/** Ein in requestAnimationFrame gezeichnetes Bild steht etwa so viel später auf dem Schirm (s) */
+export const FRAME_LEAD = 0.02;
+/** Ausgabe-Verzögerung (s), wenn der Browser weder getOutputTimestamp noch outputLatency liefert */
+export const OUTPUT_FALLBACK = 0.03;
 const EPS = 1e-6;
 
 /** Zeitgeber, austauschbar für Tests. Beide geben eine Abbruch-Funktion zurück. */
@@ -47,6 +75,8 @@ export interface PlayerTimers {
   every(ms: number, fn: () => void): () => void;
   /** fn einmal beim nächsten Bild aufrufen (requestAnimationFrame) */
   frame(fn: () => void): () => void;
+  /** Bildschirm-Uhr in ms (Standard performance.now), passend zu getOutputTimestamp().performanceTime */
+  now?(): number;
 }
 
 export interface PlayerEnv {
@@ -88,11 +118,17 @@ export interface PlayOptions {
   melody?: boolean | number;
   /** wird aufgerufen, wenn sich Ton, Takt, Zählzeit oder Durchgang ändern */
   onPosition?: (p: PlayerPosition) => void;
+  /**
+   * in jedem Bild (requestAnimationFrame) mit der Stelle, die zu hören ist, wenn das Bild auf dem
+   * Schirm steht – für den mitlaufenden Balken (quarter ändert sich stetig). Kommt nach onPosition.
+   */
+  onFrame?: (p: PlayerPosition) => void;
   /** am Ende (nicht bei Schleife und nicht nach stop) */
   onEnd?: () => void;
 }
 
-type Gap = "none" | "repeat" | "breath";
+/** Lücke vor dem Tonende: keine (vor Pause/Ende), Absetzen (nächster Ton schließt an), Atemzeichen */
+type Gap = "none" | "artic" | "breath";
 
 /** Ereignis in einem Abschnitt (Einzähltakt oder Durchgang), g relativ zum Abschnittsbeginn */
 type Ev =
@@ -112,7 +148,43 @@ function defaultContext(): AudioContext {
   const w = window as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext };
   const Ctx = w.AudioContext ?? w.webkitAudioContext;
   if (!Ctx) throw new Error("Web Audio wird nicht unterstützt");
-  return new Ctx();
+  // „playback“: größere Puffer. Für das Vorspielen zählt keine kurze Reaktionszeit (alles ist im
+  // Voraus eingeplant, die Markierung rechnet die Verzögerung heraus), aber Aussetzer im Puffer
+  // (Knacksen) auf langsameren Handys werden seltener.
+  try {
+    return new Ctx({ latencyHint: "playback" });
+  } catch {
+    return new Ctx();
+  }
+}
+
+type ClockCtx = Pick<AudioContext, "currentTime"> &
+  Partial<Pick<AudioContext, "outputLatency" | "baseLatency" | "getOutputTimestamp">>;
+
+/**
+ * Zusammengehörige Uhrzeiten: Die Audiozeit `audio` (Uhr des AudioContext) ist zur Zeit `perf`
+ * (performance.now, ms) aus dem Lautsprecher zu hören. Aus getOutputTimestamp, wenn der Browser es
+ * liefert (enthält jede Ausgabe-Verzögerung, auch Bluetooth, und springt nicht mit den Audio-Blöcken
+ * wie currentTime), sonst aus currentTime minus baseLatency und outputLatency. Der Vorlauf des
+ * Begrenzers am Ausgang (LIMITER_DELAY) ist eingerechnet.
+ */
+export function outputClock(ctx: ClockCtx, perf = performance.now()): { audio: number; perf: number } {
+  const ts = typeof ctx.getOutputTimestamp === "function" ? ctx.getOutputTimestamp() : null;
+  const ct = ts?.contextTime;
+  const pt = ts?.performanceTime;
+  if (ct != null && pt != null && pt > 0 && ct >= 0) {
+    const audio = ct + (perf - pt) / 1000;
+    // Plausibel? (zu hören ist nie, was noch nicht berechnet ist, und nicht mehr als 1 s zurück)
+    if (audio <= ctx.currentTime + 0.005 && audio > ctx.currentTime - 1) return { audio: audio - LIMITER_DELAY, perf };
+  }
+  const out = (ctx.outputLatency ?? 0) > 0 ? ctx.outputLatency! : OUTPUT_FALLBACK;
+  return { audio: ctx.currentTime - (ctx.baseLatency || 0) - out - LIMITER_DELAY, perf };
+}
+
+/** Zeitpunkt (performance.now, ms), zu dem die Audiozeit t zu hören ist */
+export function heardAtPerf(ctx: ClockCtx, t: number, perf = performance.now()): number {
+  const c = outputClock(ctx, perf);
+  return c.perf + (t - c.audio) * 1000;
 }
 
 export const defaultTimers: PlayerTimers = {
@@ -133,7 +205,7 @@ export const defaultTimers: PlayerTimers = {
 /** Lücke vor dem Tonende in Sekunden, abhängig von der klingenden Dauer. */
 export function gapSeconds(gap: Gap, durSec: number): number {
   if (gap === "breath") return Math.min(BREATH_GAP, BREATH_MAX_SHARE * durSec);
-  if (gap === "repeat") return Math.min(REPEAT_GAP, REPEAT_MAX_SHARE * durSec);
+  if (gap === "artic") return Math.min(Math.max(ARTIC_MIN, Math.min(ARTIC_MAX, ARTIC_SHARE * durSec)), ARTIC_MAX_SHARE * durSec);
   return 0;
 }
 
@@ -157,7 +229,7 @@ function passEvents(tl: Timeline, wrap: boolean): Ev[] {
     const slur = !!t.slurToNext && !t.breathAfter && j + 1 < idx.length && adjacent && next!.midi !== t.midi;
     let gap: Gap = "none";
     if (t.breathAfter) gap = "breath";
-    else if (adjacent && next!.midi === t.midi) gap = "repeat";
+    else if (adjacent) gap = "artic"; // abgesetzt (auch Tonwiederholung unter dem Bogen)
     evs.push({ kind: "on", g: t.start, id: j, midi: t.midi, legato });
     if (!slur) evs.push({ kind: "off", g: end, id: j, gap });
     legato = slur;
@@ -238,6 +310,8 @@ interface Run {
 
 export class SongPlayer {
   private ctx: AudioContext | null = null;
+  /** Begrenzer am Ausgang (einer je AudioContext) */
+  private limiter: AudioNode | null = null;
   private readonly createContext: () => AudioContext;
   private readonly timers: PlayerTimers;
   private run: Run | null = null;
@@ -310,7 +384,7 @@ export class SongPlayer {
     const withCount = (opts.countIn ?? true) && tl.countIn.length > 0;
     const bus = ctx.createGain();
     bus.gain.value = OUT_GAIN;
-    bus.connect(ctx.destination);
+    bus.connect(this.output(ctx));
     const melody = opts.melody ?? true;
     let toneSynth: FluteSynth | null = null;
     if (melody === true) toneSynth = new FluteSynth(ctx, bus);
@@ -355,6 +429,7 @@ export class SongPlayer {
     this.tick();
     const frame = () => {
       if (this.run !== run) return;
+      // (report kann über onPosition/onFrame ein neues play oder stop auslösen)
       this.report(run);
       if (this.run === run) run.cancelFrame = this.timers.frame(frame);
     };
@@ -431,6 +506,21 @@ export class SongPlayer {
 
   // ------------------------------------------------------------ intern
 
+  /** Eingang des Begrenzers am Ausgang (beim ersten Mal angelegt) */
+  private output(ctx: AudioContext): AudioNode {
+    if (!this.limiter) {
+      const lim = ctx.createDynamicsCompressor();
+      lim.threshold.value = LIMITER.threshold;
+      lim.knee.value = LIMITER.knee;
+      lim.ratio.value = LIMITER.ratio;
+      lim.attack.value = LIMITER.attack;
+      lim.release.value = LIMITER.release;
+      lim.connect(ctx.destination);
+      this.limiter = lim;
+    }
+    return this.limiter;
+  }
+
   private ensureTick(): void {
     if (!this.cancelTick) this.cancelTick = this.timers.every(TICK_MS, () => this.tick());
   }
@@ -500,7 +590,8 @@ export class SongPlayer {
     // Aufräumen: Verklungenes vergessen
     run.live = run.live.filter((l) => l.until > now);
     run.clicks = run.clicks.filter((c) => c.click.start > now - 1);
-    const k = lastAtOrBefore(run.anchors, now, (a) => a.t);
+    // (Anker erst lange nach dem Hören vergessen: die Markierung fragt nach Zeiten vor currentTime)
+    const k = lastAtOrBefore(run.anchors, now - 2, (a) => a.t);
     if (k > 0) run.anchors.splice(0, k);
   }
 
@@ -551,10 +642,10 @@ export class SongPlayer {
     run.opts.onEnd?.();
   }
 
-  /** Zeit, zu der man gerade hört (Ausgabeverzögerung abgezogen) */
+  /** Audiozeit, die zu hören ist, wenn das gerade gezeichnete Bild auf dem Schirm steht */
   private listenTime(): number {
-    const ctx = this.ctx!;
-    return ctx.currentTime - (ctx.outputLatency || 0);
+    const c = outputClock(this.ctx!, this.timers.now?.() ?? performance.now());
+    return c.audio + FRAME_LEAD;
   }
 
   private positionAt(run: Run, t: number): PlayerPosition {
@@ -579,12 +670,14 @@ export class SongPlayer {
 
   private report(run: Run): void {
     const t = this.listenTime();
-    if (run.last === null && this.gAt(run, t) < 0) return; // noch nicht angefangen
     const p = this.positionAt(run, t);
     const l = run.last;
-    if (l && l.tone === p.tone && l.bar === p.bar && l.countIn === p.countIn && l.pass === p.pass) return;
-    run.last = p;
-    run.opts.onPosition?.(p);
+    const started = l !== null || this.gAt(run, t) >= 0;
+    if (started && !(l && l.tone === p.tone && l.bar === p.bar && l.countIn === p.countIn && l.pass === p.pass)) {
+      run.last = p;
+      run.opts.onPosition?.(p);
+    }
+    if (this.run === run) run.opts.onFrame?.(p);
   }
 }
 
