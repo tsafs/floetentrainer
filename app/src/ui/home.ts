@@ -4,7 +4,7 @@ import { mic } from "../audio/mic";
 import { maxLevel, unlockedNotes, type Track } from "../music/levels";
 import { nameHtml } from "../music/names";
 import { dueCount } from "../srs/leitner";
-import { isWeak, level, noteAccuracy, streak, weekDots } from "../srs/progress";
+import { isWeak, level, levelCap, noteAccuracy, streak, weekDots } from "../srs/progress";
 import { hasWork, Session } from "../srs/session";
 import { plural, type Ctx, type View } from "./common";
 
@@ -25,7 +25,12 @@ function buttonText(ctx: Ctx, track: Track): { label: string; sub: string } {
   const due = dueCount(ctx.data, track, today);
   const work = hasWork(ctx.data, track, today);
   const verb = track === "lesen" ? "Üben" : "Spielen";
-  if (!work) return { label: `Trotzdem ${verb.toLowerCase()}`, sub: "Für heute alles erledigt" };
+  if (!work) {
+    // Nichts fällig, nichts neu: Weiterüben zählt trotzdem für die Trefferquote und damit für die nächste Stufe.
+    const lv = level(ctx.data, track);
+    const sub = lv < levelCap(ctx.data, track) ? `Fälliges erledigt · zählt für Stufe ${lv + 1}` : "Fälliges erledigt · freies Üben";
+    return { label: `Weiter ${verb.toLowerCase()}`, sub };
+  }
   const mins = ctx.data.settings.sessionMinutes;
   if (due > 0) return { label: verb, sub: `${plural(due, "Karte", "Karten")} fällig · etwa ${mins} Minuten` };
   return { label: verb, sub: track === "lesen" ? "Neue Töne warten" : "Neue Töne · mit Flöte und Mikrofon" };

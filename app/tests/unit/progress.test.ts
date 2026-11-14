@@ -50,20 +50,19 @@ describe("Trefferquote", () => {
 });
 
 describe("Freischalten", () => {
-  it("10 Antworten, 90 %, 2 Tage", () => {
+  it("10 Antworten, 90 %", () => {
     expect(noteMastered(answers(10, 1, [Y, TODAY]), 0)).toBe(true); // 9 von 10
     expect(noteMastered(answers(20, 2, [Y, TODAY]), 0)).toBe(true); // 18 von 20
     expect(noteMastered(answers(20, 3, [Y, TODAY]), 0)).toBe(false); // 17 von 20
     expect(noteMastered(answers(9, 0, [Y, TODAY]), 0)).toBe(false); // zu wenige
     expect(noteMastered(answers(10, 2, [Y, TODAY]), 0)).toBe(false); // 80 %
   });
-  it("2-Tage-Bedingung: alles an einem Tag reicht nicht", () => {
-    expect(noteMastered(answers(20, 0, [TODAY]), 0)).toBe(false);
-    expect(noteMastered(answers(20, 0, [Y, TODAY]), 0)).toBe(true);
-  });
-  it("2-Tage-Bedingung gilt nur für die letzten 20", () => {
+  it("alles an einem Tag reicht: fleißiges Üben wird nicht ausgebremst", () => {
+    expect(noteMastered(answers(10, 1, [TODAY]), 0)).toBe(true);
+    expect(noteMastered(answers(20, 0, [TODAY]), 0)).toBe(true);
+    // viele Antworten heute verdrängen die von gestern – das darf nicht schaden
     const l = [...answers(1, 0, [Y]), ...answers(20, 0, [TODAY], 5000)];
-    expect(noteMastered(l, 0)).toBe(false);
+    expect(noteMastered(l, 0)).toBe(true);
   });
   it("jeder freigeschaltete Ton muss es erfüllen", () => {
     const d = defaultData();

@@ -6,7 +6,6 @@ import { addDays, mondayOf } from "../store/dates";
 
 export const UNLOCK_MIN_ANSWERS = 10;
 export const UNLOCK_RATIO = 0.9;
-export const UNLOCK_MIN_DAYS = 2;
 export const WEAK_MIN_ANSWERS = 5;
 export const WEAK_RATIO = 0.8;
 
@@ -46,9 +45,10 @@ export function recordAnswer(data: AppData, track: Track, note: string, ok: bool
 export function noteMastered(list: Answer[] | undefined, countFrom: number): boolean {
   const l = (list ?? []).slice(-HISTORY_LEN).filter((a) => a[2] >= countFrom);
   if (l.length < UNLOCK_MIN_ANSWERS) return false;
+  // Keine Bedingung an die Zahl der Tage: Wer an einem Tag viel übt, soll weiterkommen.
+  // Dass die Töne auch am nächsten Tag sitzen, prüfen die fälligen Karten (Leitner).
   const correct = l.filter((a) => a[0] === 1).length;
-  if (correct / l.length < UNLOCK_RATIO - 1e-9) return false;
-  return new Set(l.map((a) => a[1])).size >= UNLOCK_MIN_DAYS;
+  return correct / l.length >= UNLOCK_RATIO - 1e-9;
 }
 
 export function level(data: AppData, track: Track): number {
