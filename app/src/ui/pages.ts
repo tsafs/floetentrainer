@@ -7,7 +7,7 @@ import { joinNames, nameHtml, nameText } from "../music/names";
 import { CHART, NOTES } from "../music/notes";
 import { staffRange, staffSvg } from "../music/staff";
 import { isWeak, level, noteAccuracy } from "../srs/progress";
-import { topbar, type View } from "./common";
+import { pressGuard, topbar, type View } from "./common";
 
 export const summaryView: View = (root, ctx) => {
   const r = ctx.lastResult;
@@ -37,7 +37,11 @@ export const summaryView: View = (root, ctx) => {
   <div class="spacer"></div>
   <button class="big" data-act="home">Zur Startseite</button>
 </main>`;
-  root.querySelector('[data-act="home"]')!.addEventListener("click", () => {
+  // Ein Tipp, der noch auf der letzten Karte begann, soll die Ergebnisse nicht gleich wegklicken
+  const pressedHere = pressGuard(root.querySelector("main")!);
+  const home = root.querySelector('[data-act="home"]')!;
+  home.addEventListener("click", (e) => {
+    if (!pressedHere(e, home)) return;
     ctx.lastResult = null;
     ctx.go("#/");
   });

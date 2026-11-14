@@ -12,7 +12,7 @@ import { choiceCount, makeChoices } from "../srs/choices";
 import { errorHint, GRIP_TIPS, introSentence } from "../srs/hints";
 import type { Session, Step } from "../srs/session";
 import { activeFlute, cardKey } from "../store/data";
-import { ICON_CHECK, ICON_X, type View } from "./common";
+import { ICON_CHECK, ICON_X, pressGuard, type View } from "./common";
 
 const QUESTION: Record<Kind, string> = {
   name: "Wie heißt diese Note?",
@@ -120,20 +120,6 @@ export const practiceView: View = (root, ctx) => {
     );
   }
 
-  /**
-   * Klicks auf Knöpfe nur zählen, wenn auch der Druck auf diesem Knopf begann. Sonst landet ein Tipp,
-   * der noch auf der alten Karte anfing (z. B. „Richtig“ wegtippen, während sie gerade von selbst
-   * weitergeht), als Antwort auf dem Knopf, der auf der neuen Karte an derselben Stelle liegt.
-   * Tastatur (Enter/Leertaste, detail = 0) geht immer.
-   */
-  function pressGuard(main: HTMLElement): (e: MouseEvent, el: Element) => boolean {
-    let pressed: Element | null = null;
-    main.addEventListener("pointerdown", (e) => {
-      pressed = (e.target as Element).closest("button");
-    });
-    return (e, el) => e.detail === 0 || pressed === el;
-  }
-
   function bindCommon(main: HTMLElement) {
     main.querySelector('[data-act="close"]')!.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -193,7 +179,7 @@ export const practiceView: View = (root, ctx) => {
     const ok = main.querySelector('[data-act="intro-ok"]')!;
     ok.addEventListener("click", (e) => {
       e.stopPropagation();
-      if (!pressedHere(e as MouseEvent, ok)) return;
+      if (!pressedHere(e, ok)) return;
       done();
     });
     if (playing) {
@@ -285,6 +271,8 @@ export const practiceView: View = (root, ctx) => {
       const go = slot.querySelector<HTMLButtonElement>('[data-act="next"]');
       go?.addEventListener("click", (e) => {
         e.stopPropagation();
+        // beim Spielen erscheint das Feld ohne Tippen (falscher Ton gehört): liegender Finger zählt nicht
+        if (!pressedHere(e, go)) return;
         advance();
       });
       // die Antwortknöpfe sind jetzt verdeckt: Fokus auf „Weiter“, damit er nicht verloren geht
@@ -328,7 +316,7 @@ export const practiceView: View = (root, ctx) => {
     const idkBtn = main.querySelector('[data-act="idk"]')!;
     idkBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      if (phase !== "ask" || !pressedHere(e as MouseEvent, idkBtn)) return;
+      if (phase !== "ask" || !pressedHere(e, idkBtn)) return;
       s.answer(false);
       markButtons(null);
       setPhase("err");

@@ -1,5 +1,5 @@
 // Übungsabläufe im Browser.
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { sampleData } from "./seed";
 import { answer, info, next, seed, skipIntros, stored, waitNext } from "./util";
 
@@ -155,7 +155,20 @@ test.describe("Üben", () => {
 test.describe("Tippen am Kartenwechsel", () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 412, height: 839 } });
 
+  /** Finger an pt aufsetzen; erst abheben, wenn der automatische Wechsel (1,8 s, Playwright-Uhr) durch ist. */
+  async function touchAcrossSwitch(page: Page, pt: { x: number; y: number }, s: string) {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [pt] });
+    await page.clock.runFor(1800);
+    await waitNext(page, s);
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await page.clock.runFor(300);
+  }
+
+  const center = (b: { x: number; y: number; width: number; height: number }) => ({ x: b.x + b.width / 2, y: b.y + b.height / 2 });
+
   test("Tipp, der auf der alten Karte beginnt, zählt nicht als Antwort auf der neuen", async ({ page }) => {
+    await page.clock.install();
     await seed(page, sampleData());
     await page.goto("./");
     await page.getByRole("button", { name: /Üben/ }).click();
@@ -164,19 +177,77 @@ test.describe("Tippen am Kartenwechsel", () => {
     const m = page.locator(`main[data-seq="${i.seq}"]`);
     await m.locator(`.btns button[data-choice="${i.note}"]`).tap();
     await expect(page.getByTestId("panel")).toContainText("Richtig");
-    // Finger setzt auf, während „Richtig“ noch steht, und hebt erst ab, wenn die nächste Karte da ist –
     // genau dort, wo auf der neuen Karte ein Antwortknopf liegt
-    const box = (await m.locator(".btns button").first().boundingBox())!;
-    const pt = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-    const cdp = await page.context().newCDPSession(page);
-    await page.waitForTimeout(1500);
-    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [pt] });
-    await waitNext(page, i.seq);
-    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-    await page.waitForTimeout(300);
-    await skipIntros(page);
+    const pt = center((await m.locator(".btns button").first().boundingBox())!);
+    await touchAcrossSwitch(page, pt, i.seq);
+    const j = await info(page);
+    expect(j.step).toBe("card"); // sonst wäre die Prüfung unten trivial
     await expect(page.locator("main")).toHaveClass(/\bask\b/);
     await expect(page.locator(".btns button:disabled")).toHaveCount(0);
+  });
+
+  test("nach „Richtig“ schaltet ein Tipp auf die gesperrten Antworten sofort weiter", async ({ page }) => {
+    await page.clock.install();
+    await seed(page, sampleData());
+    await page.goto("./");
+    await page.getByRole("button", { name: /Üben/ }).click();
+    await skipIntros(page);
+    const i = await info(page);
+    const m = page.locator(`main[data-seq="${i.seq}"]`);
+    // Uhr anhalten: weiter geht es nur durch den Tipp, nicht durch den 1,8-s-Timer
+    // (Ziel mit Puffer in der Zukunft, sonst ist es unter Last schon vorbei; vor dem Antworten läuft kein Timer)
+    await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 2000);
+    await m.locator(`.btns button[data-choice="${i.note}"]`).tap();
+    await expect(page.getByTestId("panel")).toContainText("Richtig");
+    const pt = center((await m.locator(`.btns button:not([data-choice="${i.note}"])`).first().boundingBox())!);
+    await page.touchscreen.tap(pt.x, pt.y);
+    await waitNext(page, i.seq);
+  });
+
+  test("Enter auf einem Antwortknopf zählt weiterhin", async ({ page }) => {
+    await seed(page, sampleData());
+    await page.goto("./");
+    await page.getByRole("button", { name: /Üben/ }).click();
+    await skipIntros(page);
+    const i = await info(page);
+    const b = page.locator(`main[data-seq="${i.seq}"] .btns button[data-choice="${i.note}"]`);
+    await b.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByTestId("panel")).toContainText("Richtig");
+  });
+
+  test("Tipp von der letzten Karte klickt die Ergebnisse nicht weg", async ({ page }) => {
+    await page.clock.install();
+    await seed(page, { ...sampleData(), settings: { sessionCards: 5 } });
+    await page.goto("./");
+    await page.getByRole("button", { name: /Üben/ }).click();
+    for (let k = 0; k < 5; k++) {
+      await skipIntros(page);
+      const i = await info(page);
+      const m = page.locator(`main[data-seq="${i.seq}"]`);
+      await m.locator(`.btns button[data-choice="${i.note}"]`).tap();
+      await expect(page.getByTestId("panel")).toContainText("Richtig");
+      if (k < 4) {
+        await page.clock.runFor(1800);
+        await waitNext(page, i.seq);
+        continue;
+      }
+      // letzte Karte: Finger liegt dort, wo auf der Ergebnisseite „Zur Startseite“ erscheint
+      await page.clock.runFor(1);
+      const cdp = await page.context().newCDPSession(page);
+      const vp = page.viewportSize()!;
+      const pt = { x: vp.width / 2, y: vp.height - 60 };
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [pt] });
+      await page.clock.runFor(1800);
+      const home = page.getByRole("button", { name: "Zur Startseite" });
+      await expect(home).toBeVisible();
+      const hb = (await home.boundingBox())!;
+      expect(pt.y).toBeGreaterThan(hb.y);
+      expect(pt.y).toBeLessThan(hb.y + hb.height);
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      await page.clock.runFor(300);
+      await expect(page.getByTestId("score")).toHaveText("5 von 5");
+    }
   });
 });
 
