@@ -159,7 +159,8 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
         11 Perioden im Fenster. Fehler höchstens wenige Cent (bei starkem Rauschen bis 7 statt 6),
         Klarheit eines Flötentons weiter über 0,97. Die Klarheit fällt bei beiden Fenstern erst bei sehr
         starkem Rauschen unter 0,9, an derselben Stelle – die Schwelle 0,9 bleibt.
-      - Messabstand und Verzögerungsausgleich im Takt (50 ms) bleiben. Der Messwert liegt jetzt etwa
+      - Messabstand und Verzögerungsausgleich im Takt (damals 50 ms, seit 14.11.2026 120 ms bzw. am Gerät
+        abgeglichen, siehe `docs/app-lieder.md`) bleiben. Der Messwert liegt jetzt etwa
         10 ms weniger zurück; das liegt in der Spanne, die der Takt-Modus verträgt.
     - Nur Frequenzen zwischen etwa 480 und 2300 Hz gelten.
     - Ein Oktavfehler, also derselbe Ton eine Oktave daneben, wird erst bei besonders hoher Klarheit
@@ -208,6 +209,19 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
         später an (25 bzw. 50 ms). Haltedauer, neuer Einsatz, Nachklang-Schutz und der
         Verzögerungsausgleich im Takt bleiben dadurch unverändert. Lautstärke und Stille gehen
         ungeglättet durch.
+  - **Flötenprofil** (seit 14.11.2026, Befund am Gerät: günstige Flöte etwa 30 Cent zu tief, die
+    Stimmton-Einstellung half nur bedingt – 437 Hz „zu hoch“, 436 „zu tief“, weil die Töne einzeln
+    verschieden abweichen): Je Flöte wird je Ton gespeichert, wie weit er vom Stimmton abweicht („Flöte
+    einstellen“, siehe 6.; beim Mitspielen langsam nachgeführt). In der Spielen-Übung wird die Abweichung
+    des gesuchten Tons herausgerechnet: Die Toleranz (±40 Cent) gilt relativ zu diesem Wert, und „Ich höre
+    a¹ ±0 Cent“ heißt „genau wie a¹ auf deiner Flöte“. Der gehörte Ton ist der nächste Ton *dieser* Flöte
+    (`correctPitch` in `app/src/audio/flute-profile.ts`). Für noch nicht gemessene Töne gilt der Median der
+    gemessenen, ohne Werte 0 (also wie bisher). Die Übung führt selbst nichts nach (zu wenige, zu kurze
+    Töne).
+  - **Mitspielen** wertet seit dem 14.11.2026 nach eigenen, großzügigeren Regeln (nächster Halbton,
+    Klarheit ab 0,85, „falsch“ erst nach 250 ms, im Takt Verzögerung 120 ms bzw. abgeglichen, Wertung nach
+    Anteil im mittleren Teil der Note oder Einsatz am Notenbeginn): siehe `docs/app-lieder.md`, Abschnitt
+    „Mitspielen robuster“. Übung und Stimmgerät behalten Toleranz, Haltedauer und Klarheit 0,9.
   - Laufend wird angezeigt, welchen Ton die App hört, mit Abweichung in Cent.
   - Einstellbar sind Toleranz, Haltedauer und Stimmton (Standard a = 440 Hz).
 - **Hinweis nach einem Fehler:** ein Satz aus festen Vorlagen. Je nach Verwechslung geht es um
@@ -246,12 +260,29 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
 - **Fortschritt:** Trefferquote je Ton, getrennt nach Lesen und Spielen. Erreichbar durch Tippen auf
   die Spuren.
 - **Stimmgerät:** freies Spielen mit laufender Anzeige der gehörten Note (auf den Linien, als Name und
-  Griffbild) und der Abweichung in Cent.
+  Griffbild) und der Abweichung in Cent. Die Abweichung ist immer die echte zum Stimmton (so sieht sie
+  ehrlich, wie ihre Flöte klingt); ist für den Ton auf der aktiven Flöte ein Wert gespeichert, steht klein
+  darunter „Deine Flöte bei a¹: −25“ (seit 14.11.2026).
 - **Grifftabelle:** alle Töne c¹–c³ mit Note, Name und Griffbild. Noch nicht freigeschaltete Töne
   (Lesen-Spur) erscheinen blass.
 - **Einstellungen:**
   - Sitzungslänge
   - Toleranz, Haltedauer und Stimmton
+  - **Flöte** (seit 14.11.2026): Liste der Flöten (Standard eine, „Meine Flöte“), eine ist aktiv; je Flöte
+    „7 Töne eingestellt“ bzw. „noch nicht eingestellt“. Großer Knopf „„Meine Flöte“ einstellen“, darunter
+    „Umbenennen“ (Eingabefeld in der Seite), „Flöte hinzufügen“ (heißt zunächst „Flöte 2“, Eingabefeld gleich
+    offen) und „Löschen“ (nur bei mehr als einer, Bestätigung in der Seite).
+  - **Flöte einstellen** (`#/floete`, einzelner Ton `#/floete/<kennung>`): geführt Ton für Ton durch die in der
+    Lesen-Spur freigeschalteten Töne, nach Tonhöhe. Notenbild und Name, „Spiel diesen Ton ruhig etwa
+    2 Sekunden.“, Balken über die stabile Phase, Ergebnis „a¹: −25 Cent“ (sofort gespeichert), nach 1,4 s der
+    nächste Ton. „Nochmal“, „Überspringen“. Gemessen wird der Median der Cent-Abweichung (relativ zum
+    Stimmton) über 1,5 s stabile Phase (die ersten 150 ms Einsatz nicht; bricht der Ton nach mindestens 1 s
+    ab, zählt es auch), nur klare, stabile Messungen, Wackler über 40 Cent vom laufenden Median nicht. Liegt
+    der Median 50 Cent oder mehr vom Zielton weg: „Das war wohl ein anderer Ton (h¹) – nochmal.“ Darunter die
+    Übersicht „Werte je Ton“; Antippen misst diesen Ton neu. Nach einem Ergebnis wartet die Messung des
+    nächsten Tons auf kurze Stille (60 ms), damit der ausklingende vorige Ton nicht als falscher gilt.
+  - Mitspielen: „Ich trage Kopfhörer“; darunter die Verzögerung im Takt je Kopfhörer-Zustand (Abgleich im
+    Mitspiel-Bereich, siehe `docs/app-lieder.md`)
   - beide Stufen von Hand
   - Sicherung herunterladen und einlesen
   - alles zurücksetzen, mit Bestätigung in der Seite selbst
@@ -338,6 +369,11 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   - In `localStorage`, mit Versionsnummer im Datenformat und Umwandlung älterer Versionen.
   - Je Ton und Spur werden nur die letzten 20 Antworten gespeichert (richtig/falsch und Tag).
   - Die Stufen werden über ihre Kennungen gespeichert.
+  - Flöten (`flutes`, `activeFlute`; je Flöte Name und Cent je Ton) kamen ohne Versionssprung dazu (lassen
+    sich neu messen) und gehen mit in die Sicherung – die Flöte zieht mit ihr um, die Tonhöhe hängt nicht
+    vom Mikrofon ab. Die abgeglichene Verzögerung im Takt (`settings.inputLatencyMs`, je Kopfhörer-Zustand)
+    gehört dagegen zum Gerät: Sie bleibt im Speicher dieses Browsers, geht nicht in die Sicherung, und beim
+    Einlesen einer Sicherung behält das Gerät seinen Wert.
   - Mit `navigator.storage.persist()` um dauerhaften Speicher bitten.
   - Bei einem Lesefehler nie still löschen. Stattdessen Meldung und Angebot, eine Sicherung einzulesen.
   - Die Sicherung ist eine JSON-Datei zum Herunterladen und Einlesen. Beim Einlesen wird sie geprüft

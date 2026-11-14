@@ -66,7 +66,7 @@ export function backupJson(data: AppData): string {
 
 /** Eingelesene Daten: Werte, die zum Gerät gehören, vom jetzigen Stand übernehmen */
 export function keepDeviceSettings(incoming: AppData, current: AppData): AppData {
-  return { ...incoming, settings: { ...incoming.settings, inputLatencyMs: current.settings.inputLatencyMs } };
+  return { ...incoming, settings: { ...incoming.settings, inputLatencyMs: { ...current.settings.inputLatencyMs } } };
 }
 
 /** Sicherung einlesen: prüfen und gegebenenfalls umwandeln. Wirft DataError mit verständlicher Meldung. */

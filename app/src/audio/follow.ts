@@ -94,7 +94,7 @@ export interface FollowConfig {
   minShare: number;
   /** Takt-Modus: mindestens so viele ms Zielton (bei sehr kurzem gewertetem Teil höchstens 80 % davon) */
   minHitMs: number;
-  /** Takt-Modus: ein Einsatz des Zieltons so nah am Notenbeginn (±) … */
+  /** Takt-Modus: ein Einsatz des Zieltons so nah am Notenbeginn (±; zu früh höchstens eine halbe, zu spät eine ganze Note) … */
   onsetWindowMs: number;
   /** … der so lange hält, macht die Note ebenfalls grün */
   onsetHoldMs: number;
@@ -116,6 +116,13 @@ export interface FollowConfig {
 
 /** Eingangs-Verzögerung (Mikrofon und Erkennung) ohne Abgleich am Gerät */
 export const DEFAULT_INPUT_LATENCY = 120;
+/**
+ * … mit Kopfhörern (noch nicht abgeglichen): 200 ms. Bluetooth-Kopfhörer mit eigenem Mikrofon (Headset)
+ * verzögern den Eingang zusätzlich um typisch 100–200 ms, und manche Browser melden ihre
+ * Ausgabe-Verzögerung zu knapp. Mit Kabel-Kopfhörern (Mikrofon des Handys) sind 200 ms um etwa 80 ms zu
+ * viel – sie erscheint dann etwas zu früh, was Einsatz-Fenster (±120 ms) und Anteilsregel gut vertragen.
+ */
+export const DEFAULT_HEADPHONE_LATENCY = 200;
 
 /**
  * Standardwerte.
@@ -134,7 +141,7 @@ export const DEFAULT_INPUT_LATENCY = 120;
  *   Note) und die letzten 20 % (Zungen-Lücke) nicht. Unklare und fehlende Frames zählen dort weder für
  *   noch gegen die Note, Stille und andere Töne schon. Getroffen, wenn der Zielton mindestens 38 % davon
  *   ausmacht und mindestens 40 ms erkannt wurde – oder wenn der Zielton höchstens 120 ms vor oder nach dem
- *   Notenbeginn einsetzt und mindestens 40 ms hält (so gehen auch Sechzehntel bis ♩ = 120, die etwas zu
+ *   Notenbeginn einsetzt (bei kurzen Noten zu früh höchstens eine halbe, zu spät eine ganze Note) und mindestens 40 ms hält (so gehen auch Sechzehntel bis ♩ = 120, die etwas zu
  *   früh oder spät kommen). Rot also nur, wenn überwiegend ein anderer Ton oder gar nichts kam.
  * - Median über 3 Frames statt 5 wie beim Üben: Schnelle Noten (Sechzehntel ≈ 125 ms) sollen erkannt
  *   werden, und ein Ausreißer kostet hier höchstens die kurze Haltedauer bzw. 25 ms erkannte Zeit.
@@ -172,12 +179,20 @@ export const DEFAULT_FOLLOW: FollowConfig = {
 export const LATENCY_MIN = 0;
 export const LATENCY_MAX = 400;
 
+/** Verzögerung für den jetzigen Kopfhörer-Schalter: abgeglichen oder Standard */
+export function inputLatency(s: Pick<Settings, "inputLatencyMs" | "headphones">): { ms: number; calibrated: boolean } {
+  const v = s.headphones ? s.inputLatencyMs.headphones : s.inputLatencyMs.speaker;
+  if (v !== null) return { ms: v, calibrated: true };
+  return { ms: s.headphones ? DEFAULT_HEADPHONE_LATENCY : DEFAULT_INPUT_LATENCY, calibrated: false };
+}
+
 /**
- * Was aus den App-Einstellungen übernommen wird: Stimmton und Eingangs-Verzögerung (abgeglichen oder
- * Standard). Toleranz und Haltedauer der Einstellungen gelten fürs Üben, nicht hier.
+ * Was aus den App-Einstellungen übernommen wird: Stimmton und Eingangs-Verzögerung (passend zum
+ * Kopfhörer-Schalter, abgeglichen oder Standard). Toleranz und Haltedauer der Einstellungen gelten fürs
+ * Üben, nicht hier.
  */
-export function followConfig(s: Pick<Settings, "tuningHz" | "inputLatencyMs">): Partial<FollowConfig> {
-  return { tuning: s.tuningHz, latencyMs: s.inputLatencyMs ?? DEFAULT_INPUT_LATENCY };
+export function followConfig(s: Pick<Settings, "tuningHz" | "inputLatencyMs" | "headphones">): Partial<FollowConfig> {
+  return { tuning: s.tuningHz, latencyMs: inputLatency(s).ms };
 }
 
 /** Wertung einer Note im Warte-Modus */
@@ -429,6 +444,8 @@ export class WaitFollower {
   /** Zeitpunkt des letzten Treffers: nur spätere Einsätze zählen */
   private armedAt = -Infinity;
   private cents: number[] = [];
+  /** zuletzt getroffener Zielton (für das Nachführen, solange sie ihn weiterhält) */
+  private lastTarget: number | null = null;
 
   constructor(
     readonly tl: Timeline,
@@ -466,9 +483,14 @@ export class WaitFollower {
     const info: JudgedFrame = { t: f.t, freq: f.freq, filled: f.filled, midi: hp.midi, cents: Math.round(hp.cents), note };
     const report = (cls: JudgedFrame["cls"]) => this.opts.onFrame?.({ ...info, cls });
     if (this.done || seg.start <= this.armedAt) {
-      // Nachklang der vorigen Note bzw. Ton ohne neuen Einsatz
+      // Nachklang der vorigen Note bzw. Ton ohne neuen Einsatz. Hält sie die eben getroffene Note weiter,
+      // sind das gute Messungen dieses Tons fürs Nachführen.
       this.inTolStart = null;
       report("alt");
+      const lt = this.lastTarget;
+      if (lt !== null && !f.filled && Math.abs((m - lt) * 100 - this.tuning.offsetOf(lt)) < cfg.toleranceCents) {
+        this.tuning.observe(lt, (m - lt) * 100);
+      }
       return heard;
     }
     const target = this.tl.tones[this.index].midi;
@@ -512,6 +534,7 @@ export class WaitFollower {
     if (this.cents.length) result.cents = Math.round(this.cents.reduce((a, b) => a + b, 0) / this.cents.length);
     const i = this.index;
     this.results[i] = result;
+    this.lastTarget = this.tl.tones[i].midi;
     this.armedAt = t;
     this.inTolStart = null;
     this.wrongMidi = null;
@@ -812,7 +835,12 @@ export class BeatFollower {
       const n = tones[i];
       const d = r.start - this.anchorTimeOf(this.pass * this.L + n.start);
       if (d < -cfg.onsetWindowMs) break;
-      if (n.midi !== midi || this.cur.acc[i].onset !== null || Math.abs(d) > cfg.onsetWindowMs) continue;
+      // zu früh bei kurzen Noten höchstens eine halbe Note (sonst gälte ein eine Sechzehntel zu früh
+      // gespielter Ton für die nächste Note); zu spät bis onsetWindowMs, höchstens eine ganze Note – der
+      // erste klare Frame kommt wegen des unklaren Einsatzes („Chiff“) ohnehin etwas später
+      const durMs = n.dur * this.msPerQ;
+      const win = d < 0 ? Math.min(cfg.onsetWindowMs, 0.5 * durMs) : Math.min(cfg.onsetWindowMs, durMs);
+      if (n.midi !== midi || this.cur.acc[i].onset !== null || Math.abs(d) > win) continue;
       if (Math.abs(d) < Math.abs(bestD)) {
         best = i;
         bestD = d;

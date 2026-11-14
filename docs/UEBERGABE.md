@@ -76,5 +76,18 @@ Silben, Atemzeichen, Seitenumbrüche.
      `floetentrainer-liederliste`). Tests `follow.test.ts`, `app/tests/e2e/follow.spec.ts` (echtes Audio in
      Echtzeit, Mikrofon-Attrappe plant Töne auf der Audio-Uhr), `songs.spec.ts`, Bildschirmfotos
      `*-l2…l6-*.png`, `*-f1…f6-*.png`.
-     Verzögerung: fest 50 ms für Mikrofon und Erkennung, dazu die vom Browser gemeldete Ausgabe-Verzögerung
-     (wie bei der Markierung; ohne Meldung 30 ms). Offen: Abgleich-Knopf für Kopfhörer, die zu knapp gemeldet werden.
+     **Robuster seit 14.11.2026** (Befund am Gerät: Flöte −30 Cent, „Im Takt“ fast alles rot; Regeln in
+     `docs/app-lieder.md`, „Mitspielen robuster“): nächster Halbton, Klarheit 0,85, „falsch“ im Warte-Modus erst
+     nach 250 ms und neuem Einsatz, im Takt Wertung nach Anteil im mittleren Teil oder Einsatz am Notenbeginn,
+     Verzögerung 120 ms (mit Kopfhörern 200 ms) bzw. am Gerät abgeglichen („Verzögerung abgleichen“ im
+     Mitspiel-Bereich, `app/src/audio/latency.ts`; Wert je Kopfhörer-Zustand in `settings.inputLatencyMs`, nur
+     im Browser, nicht in der Sicherung). **Flötenprofile** (`flutes`/`activeFlute` in den Daten, mit Sicherung):
+     Einstellungen → Flöte, „Flöte einstellen“ (`#/floete`, `app/src/ui/flute.ts`); angewandt im Mitspielen
+     (dort nachgeführt) und in der Spielen-Übung, Logik `app/src/audio/flute-profile.ts`.
+   - **Diagnose-Datei:** Nach jedem Mitspiel-Durchgang (und nach dem Abgleich) steht unter dem großen Knopf
+     „Diagnose speichern“. Auf dem Handy öffnet das das Teilen-Menü – die Nutzerin schickt die Datei z. B. per
+     E-Mail; sonst landet sie in „Downloads“ (`floetentrainer-diagnose-JJJJ-MM-TT-HHMM.json`). Enthält nur
+     Messwerte (Frequenz, Klarheit, Lautstärke, Einordnung je 25 ms, Ereignisse, Verzögerungen, Flötenwerte,
+     Mikrofon- und Browserangaben), keinen Ton. Auswerten: `node app/scripts/diagnose.mjs <datei>` (je Note
+     erwartet/erkannt, Cent, Einsatz-Versatz, Grund für Rot, Median-Versatz, Anteil unklarer Messungen).
+     Aufnahme `app/src/audio/diagnose.ts`. Bildschirmfotos `*-r1…r12-*.png`.

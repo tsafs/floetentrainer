@@ -1,5 +1,6 @@
 // Übungsseite: Vorstellung, Note→Name, Note→Griff, Griff→Note und Spielen.
 
+import { offsetFor } from "../audio/flute-profile";
 import { PlayJudge, type Heard, type JudgeOutput } from "../audio/judge";
 import { keepAwake, mic } from "../audio/mic";
 import { levelOf, unlockedNotes, type Kind } from "../music/levels";
@@ -10,7 +11,7 @@ import { staffRange, staffSvg, type Range } from "../music/staff";
 import { choiceCount, makeChoices } from "../srs/choices";
 import { errorHint, GRIP_TIPS, introSentence } from "../srs/hints";
 import type { Session, Step } from "../srs/session";
-import { cardKey } from "../store/data";
+import { activeFlute, cardKey } from "../store/data";
 import { ICON_CHECK, ICON_X, type View } from "./common";
 
 const QUESTION: Record<Kind, string> = {
@@ -43,11 +44,17 @@ export const practiceView: View = (root, ctx) => {
   const d = ctx.data;
   const lesenNotes = unlockedNotes("lesen", levelOf("lesen", d.stages.lesen));
   const range: Range = staffRange(lesenNotes);
-  const judge = new PlayJudge({
-    tuning: d.settings.tuningHz,
-    toleranceCents: d.settings.toleranceCents,
-    holdMs: d.settings.holdMs,
-  });
+  // Abweichungen der aktiven Flöte (Flötenprofil): Toleranz und Anzeige relativ zur Lage jedes Tons auf
+  // ihrer Flöte; ungemessene Töne: Median der gemessenen (../audio/flute-profile.ts)
+  const fluteOffsets = activeFlute(d).offsets;
+  const judge = new PlayJudge(
+    {
+      tuning: d.settings.tuningHz,
+      toleranceCents: d.settings.toleranceCents,
+      holdMs: d.settings.holdMs,
+    },
+    (midi) => offsetFor(fluteOffsets, midi),
+  );
 
   let step: Step | null = null;
   let phase: "ask" | "ok" | "err" = "ask";

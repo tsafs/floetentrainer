@@ -24,13 +24,22 @@ export interface Settings {
   /** Mitspielen: zuletzt gewählte Art */
   followMode: FollowMode;
   /**
-   * Takt-Modus: Eingangs-Verzögerung (Mikrofon und Erkennung) in ms, am Gerät abgeglichen; null =
-   * Standard (DEFAULT_INPUT_LATENCY in ../audio/follow.ts). Gehört zum Gerät, nicht zu ihr: Sie steht im
-   * Speicher dieses Browsers (also dieses Geräts), geht aber nicht mit in die Sicherung, und beim Einlesen
-   * einer Sicherung bleibt der Wert des Geräts (../store/storage.ts, ../ui/settings.ts). Ein anderes Handy
-   * hört anders verzögert; ein übertragener Wert wäre dort still falsch.
+   * Takt-Modus: Verzögerung von Mikrofon und Erkennung in ms (samt dem, was die Ausgabe-Meldung des
+   * Browsers verfehlt), am Gerät abgeglichen – getrennt ohne und mit Kopfhörern („Ich trage Kopfhörer“),
+   * weil Bluetooth-Kopfhörer Ausgabe und Mikrofon stark verzögern. null = noch nicht abgeglichen
+   * (Standard: DEFAULT_INPUT_LATENCY bzw. DEFAULT_HEADPHONE_LATENCY in ../audio/follow.ts).
+   * Gehört zum Gerät, nicht zu ihr: steht im Speicher dieses Browsers (also dieses Geräts), geht aber nicht
+   * mit in die Sicherung, und beim Einlesen einer Sicherung bleibt der Wert des Geräts
+   * (../store/storage.ts). Ein anderes Handy hört anders verzögert; ein übertragener Wert wäre dort still
+   * falsch.
    */
-  inputLatencyMs: number | null;
+  inputLatencyMs: InputLatency;
+}
+
+/** Abgeglichene Verzögerung je Zustand des Kopfhörer-Schalters (ms, null = nicht abgeglichen) */
+export interface InputLatency {
+  speaker: number | null;
+  headphones: number | null;
 }
 
 /**
@@ -153,7 +162,7 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: "auto",
   headphones: false,
   followMode: "wait",
-  inputLatencyMs: null,
+  inputLatencyMs: { speaker: null, headphones: null },
 };
 
 export const SETTING_LIMITS: Record<NumSetting, [number, number]> = {
@@ -168,7 +177,7 @@ export function defaultData(): AppData {
   return {
     version: DATA_VERSION,
     app: "floetentrainer",
-    settings: { ...DEFAULT_SETTINGS },
+    settings: { ...DEFAULT_SETTINGS, inputLatencyMs: { ...DEFAULT_SETTINGS.inputLatencyMs } },
     stages: { lesen: stagesOf("lesen")[0].id, spielen: stagesOf("spielen")[0].id },
     countFrom: { lesen: 0, spielen: 0 },
     cards: {},
@@ -279,7 +288,12 @@ export function normalizeData(raw: unknown): AppData {
     const fm = d.settings.followMode;
     if (typeof fm === "string" && (FOLLOW_MODES as string[]).includes(fm)) out.settings.followMode = fm as FollowMode;
     const lat = d.settings.inputLatencyMs;
-    if (isNum(lat)) out.settings.inputLatencyMs = Math.round(Math.max(INPUT_LATENCY_LIMITS[0], Math.min(INPUT_LATENCY_LIMITS[1], lat)));
+    if (isObj(lat)) {
+      for (const k of ["speaker", "headphones"] as const) {
+        const v = lat[k];
+        if (isNum(v)) out.settings.inputLatencyMs[k] = Math.round(Math.max(INPUT_LATENCY_LIMITS[0], Math.min(INPUT_LATENCY_LIMITS[1], v)));
+      }
+    }
   }
   // Stufen
   if (d.stages !== undefined) {
