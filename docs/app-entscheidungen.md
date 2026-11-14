@@ -148,6 +148,29 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
     - Nur Frequenzen zwischen etwa 480 und 2300 Hz gelten.
     - Ein Oktavfehler, also derselbe Ton eine Oktave daneben, wird erst bei besonders hoher Klarheit
       als falsch gewertet.
+    - Glättung (`app/src/audio/smooth.ts`, Rückmeldung vom 14.11.2026: „der Ton wackelt zu viel“):
+      Klarheit und Bereich werden weiter je Messung geprüft; unklare Messungen zählen als „kein Ton“.
+      Die gültigen Messungen gehen durch einen Median über mehrere Messungen (mittig, entfernt
+      Ausreißer wie einzelne Oktavsprünge, statt sie zu mitteln), danach je nach Anzeige durch eine
+      Zeitkonstante.
+      - Spielen-Übung: Median über 5 Messungen (≈ 125 ms), keine Zeitkonstante.
+      - Mitspielen (beide Arten): Median über 3 Messungen (≈ 75 ms), keine Zeitkonstante, damit auch
+        Sechzehntel erkannt werden.
+      - Stimmgerät: Median über 5 Messungen und Zeitkonstante 175 ms für Zeiger und Cent. Der
+        Notenname wechselt erst, wenn der neue Ton 100 ms anliegt oder mehr als 60 Cent vom
+        angezeigten abweicht. Der Zeiger gleitet zusätzlich 0,1 s nach.
+      - Neubeginn nach 50 ms ohne Ton und bei einem klaren Tonwechsel (über 70 Cent): Der Wert
+        springt sofort, Töne verschmieren nicht ineinander.
+      - Einzelne Aussetzer werden überbrückt: Eine Messung ohne gültigen Ton (unklar, zu leise oder
+        außerhalb des Bereichs, z. B. ein Oktavsprung über 2300 Hz bei d²), also eine Lücke unter
+        50 ms, zählt als der umgebende Ton, wenn davor und danach derselbe Ton klingt. Sie startet
+        weder die Haltedauer noch die Anzeige neu und unterbricht im Takt die erkannte Zeit nicht.
+        Ab 50 ms ohne Ton gilt es wie bisher als Stille bzw. neuer Einsatz. Für den neuen Einsatz
+        über einen Lautstärke-Einbruch zählt eine überbrückte Messung nicht.
+      - Die geglätteten Messungen behalten ihren Zeitpunkt und kommen nur um den halben Median
+        später an (25 bzw. 50 ms). Haltedauer, neuer Einsatz, Nachklang-Schutz und der
+        Verzögerungsausgleich im Takt bleiben dadurch unverändert. Lautstärke und Stille gehen
+        ungeglättet durch.
   - Laufend wird angezeigt, welchen Ton die App hört, mit Abweichung in Cent.
   - Einstellbar sind Toleranz, Haltedauer und Stimmton (Standard a = 440 Hz).
 - **Hinweis nach einem Fehler:** ein Satz aus festen Vorlagen. Je nach Verwechslung geht es um

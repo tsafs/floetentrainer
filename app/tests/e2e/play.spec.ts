@@ -18,6 +18,8 @@ async function setup(page: Page, data: unknown = sampleData()) {
 const main = (page: Page) => page.locator("main");
 const target = async (page: Page) => (await main(page).getAttribute("data-note"))!;
 const play = (page: Page, id: string) => page.evaluate((f) => (window as never as { __osc: { play(f: number): void } }).__osc.play(f), soundingFreq(note(id)));
+const wobble = (page: Page, cents: number) =>
+  page.evaluate((c) => (window as never as { __osc: { wobble(c: number): void } }).__osc.wobble(c), cents);
 const silence = (page: Page) => page.evaluate(() => (window as never as { __osc: { silence(): void } }).__osc.silence());
 const lastAnswer = (page: Page, id: string) =>
   page.evaluate((n) => JSON.parse(localStorage.getItem("floetentrainer")!).history.spielen[n].at(-1)[0], id);
@@ -101,6 +103,18 @@ test("Tonwechsel ohne Pause ist ein neuer Einsatz", async ({ page }) => {
   expect(await lastAnswer(page, t2)).toBe(1);
 });
 
+test("wackelnder Ton (Vibrato ±30 Cent) wird als richtig gewertet", async ({ page }) => {
+  await setup(page);
+  await startPlaying(page);
+  const t = await target(page);
+  await wobble(page, 30);
+  await page.waitForTimeout(450);
+  await play(page, t);
+  await expect(page.locator(".listen .heard")).toContainText(note(t).name);
+  await expect(page.getByTestId("panel")).toContainText("Richtig");
+  expect(await lastAnswer(page, t)).toBe(1);
+});
+
 test("„Weiß nicht“ beim Spielen: Griffbild, danach darf gespielt werden", async ({ page }) => {
   await setup(page);
   await startPlaying(page);
@@ -122,6 +136,32 @@ test("Stimmgerät zeigt die gehörte Note", async ({ page }) => {
   await expect(page.getByTestId("tuner-staff").locator("svg")).toHaveAttribute("data-note", "fis1");
   await play(page, "b1");
   await expect(page.getByTestId("tuner-name")).toHaveText("b1");
+});
+
+test("Stimmgerät: wackelnder Ton nahe der Mitte zwischen zwei Halbtönen lässt den Namen nicht flackern", async ({ page }) => {
+  await setup(page);
+  await page.getByRole("link", { name: "Stimmgerät" }).click();
+  await page.waitForFunction(() => (window as never as { __osc: unknown }).__osc !== null);
+  // fis¹ +30 Cent mit Vibrato ±35 Cent: roh reicht das bis +65 Cent, also ins g¹
+  await wobble(page, 35);
+  await page.evaluate((f) => (window as never as { __osc: { play(f: number): void } }).__osc.play(f), soundingFreq(note("fis1")) * Math.pow(2, 30 / 1200));
+  await expect(page.getByTestId("tuner-name")).toHaveText("fis1");
+  // alle Namen mitschreiben, die in den nächsten 2 s erscheinen
+  const seen = await page.evaluate(
+    () =>
+      new Promise<string[]>((done) => {
+        const el = document.querySelector('[data-testid="tuner-name"]')!;
+        const names = new Set([el.textContent ?? ""]);
+        const obs = new MutationObserver(() => names.add(el.textContent ?? ""));
+        obs.observe(el, { childList: true, subtree: true, characterData: true });
+        setTimeout(() => {
+          obs.disconnect();
+          done([...names]);
+        }, 2000);
+      }),
+  );
+  expect(seen).toEqual(["fis1"]);
+  await expect(page.getByTestId("tuner-cents")).toHaveText(/^\+[1-4]\d Cent$/);
 });
 
 test("Mikrofon verweigert: verständliche Erklärung", async ({ page }) => {

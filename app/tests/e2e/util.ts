@@ -75,10 +75,17 @@ export async function stored(page: Page) {
  * Audio-Uhr ein (ms = Zeitpunkt auf der Uhr von performance.now, null = Stille) – genauer als einzelne
  * Aufrufe aus dem Test. Läuft mit FAKE_AUDIO zusammen: Der Oszillator lebt in einem echten AudioContext
  * (window.__RealAudioContext), erscheint also nicht in __audioLog und folgt der echten Audio-Uhr.
+ * Wackelnder Ton: __osc.wobble(cent, hz) legt ein Vibrato (±cent, Sinus mit hz Schwingungen je
+ * Sekunde, Standard 5) über alles, was erklingt; wobble(0) schaltet es ab.
  * window.__micStopped wird true, sobald die App das Mikrofon wieder freigibt.
  */
 export const FAKE_MIC = () => {
-  type Osc = { play(f: number): void; silence(): void; schedule(list: [number, number | null][]): void };
+  type Osc = {
+    play(f: number): void;
+    silence(): void;
+    schedule(list: [number, number | null][]): void;
+    wobble(cents: number, rate?: number): void;
+  };
   const w = window as unknown as { __osc: Osc | null; __micStopped: boolean; __RealAudioContext?: typeof AudioContext };
   w.__osc = null;
   w.__micStopped = false;
@@ -91,6 +98,12 @@ export const FAKE_MIC = () => {
     const dest = ctx.createMediaStreamDestination();
     osc.connect(gain).connect(dest);
     osc.start();
+    // Vibrato: ein langsamer Oszillator verstimmt den Ton (detune in Cent)
+    const lfo = ctx.createOscillator();
+    const depth = ctx.createGain();
+    depth.gain.value = 0;
+    lfo.connect(depth).connect(osc.detune);
+    lfo.start();
     await ctx.resume();
     w.__micStopped = false;
     w.__osc = {
@@ -100,6 +113,10 @@ export const FAKE_MIC = () => {
       },
       silence() {
         gain.gain.setValueAtTime(0, ctx.currentTime);
+      },
+      wobble(cents, rate = 5) {
+        lfo.frequency.setValueAtTime(rate, ctx.currentTime);
+        depth.gain.setValueAtTime(cents, ctx.currentTime);
       },
       schedule(list) {
         const now = performance.now();
