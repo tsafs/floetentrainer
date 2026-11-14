@@ -53,6 +53,30 @@ export function staffRange(ids: string[]): Range {
 
 const r = (v: number) => Math.round(v * 1000) / 1000;
 
+/** Hilfslinien, Notenkopf und Vorzeichen einer Note mit Kopfmitte bei x = nx */
+function noteParts(n: Note, nx: number, headCls = ""): string[] {
+  const o: string[] = [];
+  const y = noteY(n);
+  const half = HEAD_W / 2;
+  const ledgers: number[] = [];
+  for (let q = -2; q >= n.pos; q -= 2) ledgers.push(q);
+  for (let q = 10; q <= n.pos; q += 2) ledgers.push(q);
+  for (const q of ledgers) {
+    o.push(
+      `<line class="ledger" x1="${r(nx - half - LEDGER_OVER)}" x2="${r(nx + half + LEDGER_OVER)}" y1="${-q / 2}" y2="${-q / 2}" stroke-width="${LEDGER_W}"/>`,
+    );
+  }
+  const cx = (HEAD.x0 + HEAD.x1) / 2;
+  const c = headCls ? ` class="${headCls}"` : "";
+  o.push(`<path${c} d="${HEAD.d}" transform="translate(${r(nx)} ${y}) scale(${HEAD_SCALE}) translate(${r(-cx)} 0)"/>`);
+  const a = accGlyph(n);
+  if (a) {
+    const ax = nx - half - 0.28 - (a.x1 - a.x0);
+    o.push(`<path${c} d="${a.d}" transform="translate(${r(ax)} ${y})"/>`);
+  }
+  return o;
+}
+
 export interface StaffOptions {
   /** "wide" für die Frage, "narrow" für kleine Notenzeilen (Auswahl, Tabelle) */
   variant?: "wide" | "narrow";
@@ -75,33 +99,63 @@ export function staffSvg(id: string | null, opt: StaffOptions = {}): string {
     o.push(`<line x1="0.15" x2="${width - 0.15}" y1="${-i}" y2="${-i}" stroke-width="${LINE_W}"/>`);
   }
   o.push(`<path d="${GLYPHS.clef.d}" transform="translate(0.45 ${CLEF_Y})"/>`);
-  if (id) {
-    const n = note(id);
-    const y = noteY(n);
-    const half = HEAD_W / 2;
-    const ledgers: number[] = [];
-    for (let q = -2; q >= n.pos; q -= 2) ledgers.push(q);
-    for (let q = 10; q <= n.pos; q += 2) ledgers.push(q);
-    for (const q of ledgers) {
-      o.push(
-        `<line class="ledger" x1="${r(nx - half - LEDGER_OVER)}" x2="${r(nx + half + LEDGER_OVER)}" y1="${-q / 2}" y2="${-q / 2}" stroke-width="${LEDGER_W}"/>`,
-      );
-    }
-    const cx = (HEAD.x0 + HEAD.x1) / 2;
-    o.push(
-      `<path d="${HEAD.d}" transform="translate(${r(nx)} ${y}) scale(${HEAD_SCALE}) translate(${r(-cx)} 0)"/>`,
-    );
-    const a = accGlyph(n);
-    if (a) {
-      const ax = nx - half - 0.28 - (a.x1 - a.x0);
-      o.push(`<path d="${a.d}" transform="translate(${r(ax)} ${y})"/>`);
-    }
-  }
+  if (id) o.push(noteParts(note(id), nx).join(""));
   const cls = ["staff", opt.className].filter(Boolean).join(" ");
   const label = opt.label ?? "Notenzeile";
   return (
     `<svg class="${cls}" viewBox="0 ${r(range.top)} ${width} ${r(h)}" role="img" aria-label="${label}"` +
     `${id ? ` data-note="${id}"` : ""}${opt.attrs ? " " + opt.attrs : ""}>${o.join("")}</svg>`
+  );
+}
+
+/** Abstand der Noten einer Folge und Lage der ersten (Kopfmitte) */
+const SEQ_STEP = 3.3;
+const SEQ_X0 = 5.9;
+/** Zeile für die Namen unter der Notenzeile: Höhe, Grundlinie (unter dem Bildausschnitt), Schriftgröße */
+const SEQ_LABEL_H = 2.5;
+const SEQ_LABEL_BASE = 1.85;
+const SEQ_LABEL_SIZE = 1.55;
+
+/** Mitte der Note i einer Folge (für Tests und die Oberfläche) */
+export function seqNoteX(i: number): number {
+  return SEQ_X0 + i * SEQ_STEP;
+}
+
+/** Name als SVG-Text mit eigener Hochzahl (wie .nn/.o in HTML) */
+export function nameSvgText(id: string): string {
+  const n = note(id);
+  return `${n.name}<tspan class="o" font-size="0.58em" dy="-0.72em">${n.octave}</tspan>`;
+}
+
+/**
+ * Notenzeile einer Tonfolge: alle Noten nebeneinander (ganze Notenköpfe ohne Takt und Hals), jede mit
+ * eigenem Vorzeichen, darunter eine Zeile für die Namen. Jede Note ist eine Gruppe
+ * `<g class="sn" data-i="…">` mit dem Strich für die aktuelle Note (.seqcur) und dem Namen (.sl, zu
+ * Beginn leer); die Oberfläche setzt cur/hit/miss und füllt die Namen.
+ */
+export function staffSeqSvg(ids: string[], opt: { range?: Range; label?: string; className?: string } = {}): string {
+  const base = opt.range ?? staffRange(ids);
+  const range = { top: base.top, bottom: base.bottom + SEQ_LABEL_H };
+  const width = seqNoteX(ids.length - 1) + 2.4;
+  const h = range.bottom - range.top;
+  const o: string[] = [];
+  for (let i = 0; i < 5; i++) {
+    o.push(`<line x1="0.15" x2="${r(width - 0.15)}" y1="${-i}" y2="${-i}" stroke-width="${LINE_W}"/>`);
+  }
+  o.push(`<path d="${GLYPHS.clef.d}" transform="translate(0.45 ${CLEF_Y})"/>`);
+  const ly = base.bottom + SEQ_LABEL_BASE;
+  ids.forEach((id, i) => {
+    const nx = seqNoteX(i);
+    o.push(
+      `<g class="sn" data-i="${i}" data-note="${id}">${noteParts(note(id), nx, "nh").join("")}` +
+        `<line class="seqcur" x1="${r(nx - 0.85)}" x2="${r(nx + 0.85)}" y1="${r(ly - 0.35)}" y2="${r(ly - 0.35)}" stroke-width="0.14"/>` +
+        `<text class="sl" x="${r(nx)}" y="${r(ly)}" text-anchor="middle" font-size="${SEQ_LABEL_SIZE}"></text></g>`,
+    );
+  });
+  const cls = ["staff", "seq", opt.className].filter(Boolean).join(" ");
+  return (
+    `<svg class="${cls}" viewBox="0 ${r(range.top)} ${r(width)} ${r(h)}" role="img" aria-label="${opt.label ?? "Notenzeile"}"` +
+    ` data-notes="${ids.join(" ")}">${o.join("")}</svg>`
   );
 }
 

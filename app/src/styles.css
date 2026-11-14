@@ -869,6 +869,76 @@ svg.acc {
 .prac.err .idkrow {
   visibility: hidden;
 }
+/* Tonfolge (docs/app-tonfolgen.md): eine breite Notenzeile mit allen Noten, darunter die Namen.
+   Die aktuelle Note hat einen feinen Strich darunter; getroffen/richtig grün, falsch rot. */
+.prac.kind-folge .stage .staff {
+  max-width: min(100%, 600px);
+}
+.staff.seq .seqcur {
+  stroke: var(--soft);
+  stroke-linecap: round;
+  visibility: hidden;
+}
+.staff.seq .sn.cur .seqcur {
+  visibility: visible;
+}
+.staff.seq .sl {
+  stroke: none;
+  fill: var(--ink);
+  font-weight: 500;
+}
+.staff.seq .sn.hit .nh,
+.staff.seq .sn.hit .sl {
+  fill: var(--ok);
+}
+.staff.seq .sn.miss .nh,
+.staff.seq .sn.miss .sl {
+  fill: var(--err);
+}
+.prac.kind-folge .q.warn {
+  color: var(--err);
+}
+.prac.kind-folge .q.hint {
+  color: var(--soft);
+  font-style: italic;
+}
+.btns button.tap-ok {
+  animation: tap-ok 0.35s ease-out;
+}
+.btns button.tap-err {
+  animation: tap-err 0.35s ease-out;
+}
+@keyframes tap-ok {
+  from {
+    background: var(--ok-tint);
+  }
+}
+@keyframes tap-err {
+  from {
+    background: var(--err-tint);
+  }
+}
+.panel .names {
+  font-size: 1.7rem;
+  line-height: 1.15;
+  font-weight: 500;
+  padding-top: 0.15em;
+}
+.panel .names .bad {
+  color: var(--err);
+}
+.gorow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.gorow .textbtn {
+  flex: 0 0 auto;
+}
+.okline .listenbtn {
+  margin-left: 10px;
+}
+
 .prac.ok .listen {
   border-color: var(--ok);
   box-shadow: inset 0 0 0 1.5px var(--ok);

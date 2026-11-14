@@ -17,16 +17,28 @@ function mkSession(d: AppData, track: "lesen" | "spielen" = "lesen", opts: { lim
 }
 
 /** Spielt eine Sitzung durch; answerFn entscheidet richtig/falsch. Gibt alle Schritte zurück. */
-function run(s: Session, answerFn: (step: Extract<Step, { type: "card" }>, i: number) => boolean = () => true) {
+function run(
+  s: Session,
+  answerFn: (step: Extract<Step, { type: "card" }>, i: number) => boolean = () => true,
+  folgeFn: (step: Extract<Step, { type: "folge" }>) => boolean[] = (st) => st.folge.notes.map(() => true),
+) {
   const steps: Step[] = [];
   let i = 0;
   for (let st = s.next(); st; st = s.next()) {
     steps.push(st);
     if (st.type === "intro") s.introDone(st.note);
+    else if (st.type === "folge") s.answerFolge(folgeFn(st));
     else s.answer(answerFn(st, i++));
     if (steps.length > 500) throw new Error("Endlosschleife");
   }
   return steps;
+}
+
+function firstNote(st: Step): string {
+  return st.type === "folge" ? st.folge.notes[0] : st.type === "card" ? st.item.note : st.note;
+}
+function lastNote(st: Step): string {
+  return st.type === "folge" ? st.folge.notes[st.folge.notes.length - 1] : st.type === "card" ? st.item.note : st.note;
 }
 
 function stageLesen(d: AppData, id: string) {
@@ -106,8 +118,9 @@ describe("Ablauf", () => {
       const s = mkSession(d, seed % 3 === 0 ? "spielen" : "lesen", { seed });
       const rnd = seeded(seed + 100);
       const steps = run(s, () => rnd() < 0.6);
-      const cards = steps.filter((x): x is Extract<Step, { type: "card" }> => x.type === "card");
-      for (let i = 1; i < cards.length; i++) expect(cards[i].item.note).not.toBe(cards[i - 1].item.note);
+      // auch über die Grenze Folge/Karte: letzter Ton des einen Schritts ≠ erster des nächsten
+      const asked = steps.filter((x) => x.type !== "intro");
+      for (let i = 1; i < asked.length; i++) expect(firstNote(asked[i])).not.toBe(lastNote(asked[i - 1]));
     }
   });
   it("Vorstellung vor der ersten Karte eines neuen Tons, nur einmal", () => {
@@ -197,6 +210,7 @@ describe("Ablauf", () => {
           s.introDone(st.note);
           continue;
         }
+        if (st.type !== "card") throw new Error("keine Tonfolgen bei 3 Tönen");
         cards.push({ uid: st.item.uid, retry: st.retry });
         const wrong = firstWrong === null && cards.length === 3;
         if (wrong) firstWrong = st.item.uid;
@@ -257,5 +271,180 @@ describe("Ablauf", () => {
     expect(s.unlocks.map((u) => u.notes)).toEqual([["c2", "d2"]]);
     expect(d.stages.lesen).toBe("c2-d2");
     expect(before.every((n) => ["h1", "a1", "g1"].includes(n))).toBe(true);
+  });
+});
+
+describe("Tonfolgen", () => {
+  /** Lesen auf Stufe 4 (8 Töne), alles vorgestellt, nichts fällig: „Weiter üben“ */
+  function onlyExtras(track: "lesen" | "spielen" = "lesen") {
+    const d = defaultData();
+    d.stages.lesen = "fis1";
+    d.stages.spielen = "fis1";
+    const notes = ["h1", "a1", "g1", "c2", "d2", "e1", "d1", "fis1"];
+    for (const n of notes) {
+      for (const k of track === "lesen" ? ["name", "griff", "note"] : ["spiel"]) d.cards[`${n}|${k}`] = { box: 4, day: TODAY, session: 1 };
+    }
+    d.introduced[track] = notes.slice();
+    return d;
+  }
+  it("etwa jede zweite Zusatzkarte wird eine Tonfolge, abwechselnd", () => {
+    let adjacent = 0;
+    for (let seed = 1; seed <= 100; seed++) {
+      const s = mkSession(onlyExtras(), "lesen", { seed });
+      const rnd = seeded(seed);
+      const steps = run(s, () => rnd() < 0.8, (st) => st.folge.notes.map(() => rnd() < 0.9));
+      const kinds = steps.filter((x) => !(x.type !== "intro" && x.retry)).map((x) => x.type);
+      expect(kinds).toHaveLength(20);
+      expect(kinds.filter((k) => k === "folge")).toHaveLength(10);
+      const seq = steps.filter((x) => x.type !== "intro");
+      const plain = (x: Step) => x.type === "folge" && !x.retry;
+      for (let i = 1; i < seq.length; i++) if (plain(seq[i]) && plain(seq[i - 1])) adjacent++;
+      expect(s.graded).toBe(20);
+    }
+    // kaum gehäuft: selten zwei Folgen direkt nacheinander (100 Sitzungen mit je 10 Folgen; Wiederholungen
+    // nach Fehlern kommen nach 2–3 Schritten, auch nach einer Folge)
+    expect(adjacent).toBeLessThan(50);
+  });
+  it("fällige und neue Karten bleiben Karten", () => {
+    const d = onlyExtras();
+    d.cards["h1|name"] = { box: 2, day: addDays(TODAY, -3), session: 1 };
+    const plan = buildPlan(d, "lesen", TODAY, 2, 20, seeded(1));
+    expect(plan[0]).toMatchObject({ type: "due" });
+    expect(plan[0].folge).toBeUndefined();
+    expect(plan.filter((p) => p.folge).every((p) => p.type === "extra")).toBe(true);
+  });
+  it("Spielen auch", () => {
+    const s = mkSession(onlyExtras("spielen"), "spielen");
+    const steps = run(s);
+    expect(steps.filter((x) => x.type === "folge").length).toBe(10);
+    expect(steps.every((x) => x.type !== "folge" || x.track === "spielen")).toBe(true);
+  });
+  it("unter 5 vorgestellten Tönen keine Folgen", () => {
+    const d = onlyExtras();
+    d.introduced.lesen = ["h1", "a1", "g1", "c2"];
+    const steps = run(mkSession(d));
+    expect(steps.some((x) => x.type === "folge")).toBe(false);
+  });
+  it("nur vorgestellte Töne: die neuen Töne dieser Sitzung erst nach ihrer Vorstellung", () => {
+    for (let seed = 1; seed <= 40; seed++) {
+      const d = defaultData();
+      d.stages.lesen = "fis1";
+      for (const n of ["h1", "a1", "g1", "c2", "d2"]) for (const k of ["name", "griff", "note"]) d.cards[`${n}|${k}`] = { box: 4, day: TODAY, session: 1 };
+      d.introduced.lesen = ["h1", "a1", "g1", "c2", "d2"];
+      const s = mkSession(d, "lesen", { seed });
+      const introduced = new Set(d.introduced.lesen);
+      for (let st = s.next(); st; st = s.next()) {
+        if (st.type === "intro") {
+          introduced.add(st.note);
+          s.introDone(st.note);
+        } else if (st.type === "folge") {
+          for (const n of st.folge.notes) expect(introduced.has(n)).toBe(true);
+          s.answerFolge(st.folge.notes.map(() => true));
+        } else s.answer(true);
+      }
+    }
+  });
+  it("jeder Ton höchstens einmal je Folge gewertet, richtig nur an allen Stellen; Fächer unverändert", () => {
+    const d = onlyExtras();
+    const cardsBefore = JSON.stringify(d.cards);
+    const s = mkSession(d);
+    let st = s.next();
+    while (st && st.type !== "folge") {
+      if (st.type === "intro") s.introDone(st.note);
+      else s.answer(true);
+      st = s.next();
+    }
+    expect(st?.type).toBe("folge");
+    if (st?.type !== "folge") return;
+    // Folge mit Wiederholung von Hand setzen
+    st.folge.notes = ["g1", "a1", "a1", "h1"];
+    const len = (n: string) => d.history.lesen[n]?.length ?? 0;
+    const before = { g1: len("g1"), a1: len("a1"), h1: len("h1") };
+    const graded = s.graded;
+    s.answerFolge([true, true, false, true]); // a¹ einmal falsch
+    expect(len("g1")).toBe(before.g1 + 1);
+    expect(len("a1")).toBe(before.a1 + 1);
+    expect(len("h1")).toBe(before.h1 + 1);
+    expect(d.history.lesen.a1.at(-1)![0]).toBe(0);
+    expect(d.history.lesen.g1.at(-1)![0]).toBe(1);
+    expect(s.graded).toBe(graded + 1);
+    expect(s.difficult).toContain("a1");
+    expect(s.difficult).not.toContain("g1");
+    expect(JSON.stringify(d.cards)).toBe(cardsBefore);
+  });
+  it("nach einem Fehler kommt dieselbe Folge nach 2–3 Schritten einmal wieder, ungewertet", () => {
+    for (let seed = 1; seed <= 60; seed++) {
+      const d = onlyExtras();
+      const s = mkSession(d, "lesen", { seed });
+      const seen: Step[] = [];
+      let failed: number | null = null;
+      for (let st = s.next(); st; st = s.next()) {
+        seen.push(st);
+        if (st.type === "folge") {
+          const fail = failed === null;
+          if (fail) failed = st.folge.uid;
+          s.answerFolge(st.folge.notes.map((_, i) => !(fail || (st.retry && i === 0))));
+        } else if (st.type === "card") s.answer(true);
+      }
+      const i0 = seen.findIndex((x) => x.type === "folge" && x.folge.uid === failed && !x.retry);
+      const rep = seen.filter((x) => x.type === "folge" && x.folge.uid === failed && x.retry);
+      const i1 = seen.findIndex((x) => x.type === "folge" && x.folge.uid === failed && x.retry);
+      // auch wenn die Wiederholung wieder falsch ist: höchstens einmal
+      expect(rep.length).toBeLessThanOrEqual(1);
+      if (i1 < 0) continue; // am Sitzungsende entfallen
+      expect(i1 - i0 - 1).toBeGreaterThanOrEqual(2);
+      expect(i1 - i0 - 1).toBeLessThanOrEqual(3);
+      const a = seen[i0] as Extract<Step, { type: "folge" }>;
+      const b = seen[i1] as Extract<Step, { type: "folge" }>;
+      expect(b.folge.notes).toEqual(a.folge.notes);
+    }
+  });
+  it("Wiederholung zählt nicht", () => {
+    const d = onlyExtras();
+    const s = mkSession(d, "lesen", { seed: 7 });
+    let count = 0;
+    const histLen = () => Object.values(d.history.lesen).reduce((a, l) => a + l.length, 0);
+    for (let st = s.next(); st; st = s.next()) {
+      if (st.type === "folge" && st.retry) {
+        const h = histLen();
+        const g = s.graded;
+        s.answerFolge(st.folge.notes.map(() => true));
+        expect(histLen()).toBe(h);
+        expect(s.graded).toBe(g);
+        count++;
+      } else if (st.type === "folge") s.answerFolge(st.folge.notes.map((_, i) => i !== 0));
+      else if (st.type === "card") s.answer(true);
+    }
+    expect(count).toBeGreaterThan(0);
+  });
+  it("Länge passt sich an: fehlerfrei länger, mit Fehler kürzer", () => {
+    const d = onlyExtras();
+    const s = mkSession(d, "lesen", { limitCards: 40 });
+    const lens: number[] = [];
+    for (let st = s.next(); st; st = s.next()) {
+      if (st.type === "folge") {
+        if (!st.retry) lens.push(st.folge.notes.length);
+        s.answerFolge(st.folge.notes.map(() => true));
+      } else if (st.type === "card") s.answer(true);
+    }
+    expect(lens[0]).toBe(3);
+    expect(lens[2]).toBe(4);
+    expect(Math.max(...lens)).toBe(5);
+  });
+  it("keine Folge zweimal in einer Sitzung", () => {
+    const s = mkSession(onlyExtras(), "lesen", { limitCards: 40 });
+    const keys: string[] = [];
+    run(s, () => true, (st) => {
+      if (!st.retry) keys.push(st.folge.notes.join(" "));
+      return st.folge.notes.map(() => true);
+    });
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+  it("„x von y richtig“: Folge zählt als eine Position", () => {
+    const s = mkSession(onlyExtras());
+    run(s, () => true, (st) => st.folge.notes.map((_, i) => i !== 1));
+    const r = s.result();
+    expect(r.graded).toBe(20);
+    expect(r.correct).toBe(10);
   });
 });

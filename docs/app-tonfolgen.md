@@ -134,3 +134,57 @@ wie f¹ – fis¹ – g¹.
 - `docs/app-entscheidungen.md`: Abschnitt 1 (Zusammensetzung), 3 (Trefferquote: Folgen zählen je Ton
   einmal), 4 (neue Übungsart „Tonfolge“ für Lesen und Spielen).
 - `docs/UEBERGABE.md`: kurzer Eintrag, wo was liegt und wie es getestet wird.
+
+## Umsetzung (14.11.2026)
+
+Umgesetzt wie oben beschrieben; Regeln nachgetragen in `docs/app-entscheidungen.md` (Abschnitte 1, 3, 4).
+
+- **Wo was liegt:** Erzeugen, Länge, Antwortknöpfe `app/src/srs/sequences.ts`; Zusammensetzung und Wertung
+  `app/src/srs/session.ts` (Schritt `{ type: "folge", folge: { notes, uid }, track, retry }`, Planeintrag
+  `folge: true` an jeder zweiten Zusatzkarte, Wertung `Session.answerFolge`); Notenzeile mit mehreren Noten
+  `staffSeqSvg` in `app/src/music/staff.ts` (Namen darunter als SVG-Text, damit sie genau unter ihrer Note
+  stehen); einfacher Zeitplan `toneTimeline` in `app/src/songs/timeline.ts`; Oberfläche `renderFolge` in
+  `app/src/ui/practice.ts`, Gestaltung `.staff.seq` u. a. in `app/src/styles.css`.
+- Kein neues Datenfeld, kein Versionssprung, kein Schalter in den Einstellungen.
+
+### Abweichungen und Ergänzungen (begründet)
+
+- **Platz bleibt Karte, wenn es (noch) keine Folge geben kann:** Der Plan markiert jede zweite Zusatzkarte
+  als „wird Tonfolge“; ob genug Töne vorgestellt sind, wird erst entschieden, wenn der Schritt drankommt.
+  So zählen neue Töne dieser Sitzung ab ihrer Vorstellung mit, und unter 5 Tönen bleibt der Platz die
+  Zusatzkarte (die Sitzung wird nicht kürzer).
+- **Abwechseln:** Nach einer Folge kommt möglichst eine Karte, nach einer Zusatzkarte möglichst eine Folge –
+  sonst schob eine Karte, die wegen „nie zweimal derselbe Ton“ gerade nicht passte, die Folgen nach hinten,
+  und sie häuften sich am Sitzungsende. Ausnahme: Die Wiederholung einer Folge nach einem Fehler kommt
+  nach 2–3 Schritten, auch wenn davor eine Folge stand (die Regel 2–3 geht vor).
+- **Wiederholung und „nie zweimal derselbe Ton“:** Eine neue Folge endet möglichst nicht mit dem ersten Ton
+  einer gleich fälligen Wiederholung, sonst müsste diese länger warten.
+- **Länge** ändert sich nur durch gewertete Folgen, nicht durch die Wiederholung nach einem Fehler.
+- **Lesen, falscher Tipp:** Unter der Note steht ihr richtiger Name in Rot; der getippte falsche Name steht
+  nicht noch zusätzlich dort (zwei Namen übereinander wären unruhig). Er steht im Hinweis am Ende („Du hast
+  fis¹ gewählt …“, für die erste falsche Note). Der getippte Knopf leuchtet kurz grün bzw. rötlich auf.
+- **Rückmeldung bei Fehlern:** Im rötlichen Feld steht das Griffbild der *ersten* falschen Note, die ganze
+  Folge (falsche Töne rot) und der Hinweis wie bei Karten; beim Spielen beginnt er mit „Du hast d²
+  gespielt.“, weil keine Überschrift „Du spielst …“ wie bei der Karte da ist.
+- **Spielen, Klarheit 0,9** wie bei der Spielen-Karte (das Mitspielen nimmt 0,85): Abschnitt 4 sagt, dass die
+  Übung Toleranz, Haltedauer und Klarheit 0,9 behält. Übrige Werte der Warte-Wertung (falsch erst nach
+  250 ms und neuem Einsatz usw.) wie beim Mitspielen.
+- **Spielen, Beginn der Wertung:** Es zählen nur Töne, die nach dem Erscheinen der Folge neu einsetzen (der
+  ausklingende Ton der Karte davor zählt nicht). Die 400-ms-Regel der Spielen-Karte gilt hier nicht: Sie
+  würde einen schnellen ersten Ton verschlucken.
+- **Spielen, Hinweise in der Frage-Zeile:** „Du spielst d²“ bzw. „eine Oktave zu hoch – sanfter blasen“
+  ersetzen vorübergehend die Frage (nichts verschiebt sich); nach dem nächsten Treffer steht wieder die Frage.
+- **„Anhören“** spielt die Folge mit 0,6 s je Ton im Stimmton der aktiven Flöte. Nach „Richtig“ hält es das
+  automatische Weitergehen an (sonst bliebe keine Zeit zum Zuhören); Tippen irgendwo geht weiter. Beim
+  Weitergehen verstummt es, damit das Mikrofon es nicht als Spiel der nächsten Aufgabe hört.
+- **Nur für Browser-Tests:** `window.__folgen = [["g1", "e1", "e1"], …]` gibt die nächsten Folgen fest vor.
+
+### Tests
+
+- `app/tests/unit/sequences.test.ts` (Pool, Sprunggrenze, Halbtonschritte, Wiederholungen, Länge, fester
+  Zufall, Antwortknöpfe), `app/tests/unit/session.test.ts` Abschnitt „Tonfolgen“ (Anteil, unter 5 Tönen
+  keine, je Ton einmal gewertet, Fächer unverändert, Wiederholung nach Fehler, Länge, „nie zweimal derselbe
+  Ton“ über die Grenze Folge/Karte).
+- `app/tests/e2e/folge.spec.ts`: Lesen richtig, mit Fehler und Wiederholung, „Weiß nicht“, Querformat;
+  Spielen mit Tonwiederholung (neuer Einsatz) und „Anhören“, mit Halbtonschritt und falschem Ton.
+- Bildschirmfotos `*-t1…t7-*.png` (`SHOTS=1 npx playwright test shots -g Tonfolgen`, auch `SCHEME=dark`).

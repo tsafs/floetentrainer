@@ -112,3 +112,11 @@ Silben, Atemzeichen, Seitenumbrüche.
      Mikrofon- und Browserangaben), keinen Ton. Auswerten: `node app/scripts/diagnose.mjs <datei>` (je Note
      erwartet/erkannt, Cent, Einsatz-Versatz, Grund für Rot, Median-Versatz, Anteil unklarer Messungen).
      Aufnahme `app/src/audio/diagnose.ts`. Bildschirmfotos `*-r1…r12-*.png`.
+4. **Tonfolgen in den Sitzungen** (`docs/app-tonfolgen.md`, umgesetzt am 14.11.2026): Etwa jede zweite
+   Zusatzkarte ist eine Folge von 2–6 Tönen zum Lesen bzw. Spielen, sobald in der Spur 5 Töne vorgestellt
+   sind. Erzeugen `app/src/srs/sequences.ts`, Ablauf und Wertung `app/src/srs/session.ts`
+   (`answerFolge`: je Ton einmal, keine Fächer), Notenzeile `staffSeqSvg` in `app/src/music/staff.ts`,
+   Oberfläche `renderFolge` in `app/src/ui/practice.ts` (Spielen mit `WaitFollower`). Tests
+   `sequences.test.ts`, `session.test.ts` („Tonfolgen“), `app/tests/e2e/folge.spec.ts`; feste Folgen für
+   Browser-Tests über `window.__folgen`. Bildschirmfotos `*-t1…t7-*.png`. Abweichungen vom Plan am Ende von
+   `docs/app-tonfolgen.md`.

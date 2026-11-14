@@ -1,14 +1,18 @@
 // Übungsseite: Vorstellung, Note→Name, Note→Griff, Griff→Note und Spielen.
 
-import { offsetFor } from "../audio/flute-profile";
-import { PlayJudge, type Heard, type JudgeOutput } from "../audio/judge";
+import { LiveTuning, offsetFor } from "../audio/flute-profile";
+import { WaitFollower } from "../audio/follow";
+import { DEFAULT_JUDGE, PlayJudge, type Frame, type Heard, type JudgeOutput } from "../audio/judge";
 import { keepAwake, mic } from "../audio/mic";
+import { songPlayer } from "../audio/song-player";
 import { levelOf, unlockedNotes, type Kind } from "../music/levels";
 import { fluteSvg } from "../music/flute";
 import { midiNameHtml, nameHtml, nameText } from "../music/names";
 import { chartNoteByMidi, note } from "../music/notes";
-import { staffRange, staffSvg, type Range } from "../music/staff";
+import { nameSvgText, staffRange, staffSeqSvg, staffSvg, type Range } from "../music/staff";
 import { choiceCount, makeChoices } from "../srs/choices";
+import { folgeChoices } from "../srs/sequences";
+import { toneTimeline } from "../songs/timeline";
 import { errorHint, GRIP_TIPS, introSentence } from "../srs/hints";
 import type { Session, Step } from "../srs/session";
 import { activeFlute, cardKey } from "../store/data";
@@ -20,6 +24,10 @@ const QUESTION: Record<Kind, string> = {
   note: "Welche Note hat diesen Griff?",
   spiel: "Spiel diese Note",
 };
+
+/** Tonfolge vorspielen („Anhören“, Ton nach einem Fehler mit Kopfhörern): Sekunden je Ton und Lautstärke */
+const FOLGE_SEC = 0.6;
+const HINT_VOL = 0.4;
 
 /** Nach „Richtig“ so lange stehen lassen, dass man die Bestätigung in Ruhe sieht (Tippen geht schneller) */
 const AUTO_NEXT_MS = 1800;
@@ -68,11 +76,17 @@ export const practiceView: View = (root, ctx) => {
   let lastHeardAt = 0;
   let unlisten: (() => void) | null = null;
   let onJudge: ((o: JudgeOutput) => void) | null = null;
+  /** Tonfolge beim Spielen: bekommt die Frames statt der Karten-Wertung */
+  let onFolgeFrame: ((f: Frame) => Heard | null) | null = null;
   let closed = false;
 
   if (playing) {
     keepAwake(true);
     unlisten = mic.listen((f) => {
+      if (onFolgeFrame) {
+        showHeard(onFolgeFrame(f), f.t);
+        return;
+      }
       const o = judge.push(f);
       showHeard(o.heard, f.t);
       onJudge?.(o);
@@ -97,11 +111,25 @@ export const practiceView: View = (root, ctx) => {
     advanceArmed = false;
     judge.stop();
     onJudge = null;
+    onFolgeFrame = null;
+    stopSound();
     step = s.next();
     if (!step) return finish();
     phase = "ask";
     if (step.type === "intro") renderIntro(step.note);
+    else if (step.type === "folge") renderFolge(step);
     else renderCard(step);
+  }
+
+  /** Vorspielen beenden (beim Weitergehen und Verlassen) */
+  function stopSound() {
+    if (songPlayer.playing) songPlayer.stop();
+    else if (songPlayer.context) songPlayer.idle();
+  }
+
+  /** Töne vorspielen (Synth, Stimmton der aktiven Flöte) */
+  function playTones(midis: number[], volume: number | true) {
+    songPlayer.play(toneTimeline(midis), { secPerQuarter: FOLGE_SEC, a4: myFlute.tuning.hz, countIn: false, melody: volume });
   }
 
   function autoAdvance() {
@@ -348,12 +376,199 @@ export const practiceView: View = (root, ctx) => {
     }
   }
 
+
+  // ------------------------------------------------------------ Tonfolgen
+  function renderFolge(st: Extract<Step, { type: "folge" }>) {
+    // Nur für Browser-Tests: feste Folgen vorgeben (window.__folgen = [["g1", "e1", "e1"], …])
+    const forced = (window as unknown as { __folgen?: string[][] }).__folgen;
+    if (forced?.length && !st.retry) st.folge.notes = forced.shift()!;
+    const notes = st.folge.notes;
+    const n = notes.length;
+    const label = st.retry ? "nochmal" : `${s.position} von ${s.total}`;
+    const question = playing ? "Spiel diese Töne nacheinander." : "Wie heißen diese Noten? Der Reihe nach.";
+    const staff = staffSeqSvg(notes, { range, label: `Noten ${notes.map(nameText).join(" ")}` });
+    let btns = "";
+    if (!playing) {
+      const choices = folgeChoices(notes, lesenNotes, Math.random);
+      btns = `<div class="btns${choices.length > 4 ? " n8" : ""}">${choices
+        .map((c) => `<button data-choice="${c}" aria-label="${nameText(c)}">${nameHtml(c)}</button>`)
+        .join("")}</div>`;
+    }
+    const idk = `<div class="idkrow" aria-live="polite"><button class="textbtn" data-act="idk">Weiß nicht</button></div>`;
+    const answer = playing
+      ? `<div class="answer"><div class="anchor"><div class="slot" aria-live="polite"></div></div>${listenBox()}${idk}</div>`
+      : `<div class="answer">${btns}${idk}<div class="slot" aria-live="polite"></div></div>`;
+    root.innerHTML = `
+<main class="screen fit prac ask kind-folge" data-step="folge" data-kind="folge" data-notes="${notes.join(" ")}" data-note="${notes[0]}" data-i="0" data-retry="${st.retry}" data-seq="${++seq}">
+  ${header(label)}
+  <div class="stage">${staff}<p class="q" aria-live="polite">${question}</p></div>
+  ${answer}
+</main>`;
+    const main = root.querySelector("main")!;
+    bindCommon(main);
+    const slot = main.querySelector(".slot")!;
+    const idkRow = main.querySelector(".idkrow")!;
+    const q = main.querySelector(".q")!;
+    /** je Note: richtig? (undefined = noch offen) und was getippt bzw. zuerst falsch gespielt wurde */
+    const ok: (boolean | undefined)[] = [];
+    const wrongAt: (string | null)[] = [];
+    let cur = 0;
+
+    const g = (k: number) => main.querySelector<SVGGElement>(`.sn[data-i="${k}"]`);
+    const setCur = (k: number) => {
+      main.querySelectorAll(".sn.cur").forEach((x) => x.classList.remove("cur"));
+      g(k)?.classList.add("cur");
+      main.dataset.i = String(k);
+      main.dataset.note = notes[k] ?? "";
+    };
+    /** Note k abhaken (bzw. als falsch markieren), darunter ihr richtiger Name */
+    const mark = (k: number, good: boolean, withName = true) => {
+      const el = g(k);
+      if (!el) return;
+      el.classList.remove("hit", "miss");
+      el.classList.add(good ? "hit" : "miss");
+      if (withName) el.querySelector(".sl")!.innerHTML = nameSvgText(notes[k]);
+    };
+    setCur(0);
+
+    const setPhase = (p: "ok" | "err") => {
+      phase = p;
+      main.classList.remove("ask");
+      main.classList.add(p);
+      main.querySelectorAll(".sn.cur").forEach((x) => x.classList.remove("cur"));
+      main.dataset.note = "";
+      main.querySelectorAll<HTMLButtonElement>(".btns button").forEach((b) => {
+        b.disabled = true;
+        b.classList.add("dim");
+      });
+    };
+    const listenBtn = playing ? `<button class="textbtn listenbtn" data-act="listen">Anhören</button>` : "";
+    const bindListen = (scope: Element) => {
+      scope.querySelector('[data-act="listen"]')?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        // nach „Richtig“: nicht von selbst weiter, solange sie zuhört (Tippen geht weiter)
+        clearTimer();
+        playTones(notes.map((x) => note(x).midi), true);
+      });
+    };
+
+    /** Folge fertig: werten und Rückmeldung */
+    const done = (head: string) => {
+      const res = notes.map((_, k) => ok[k] === true);
+      s.answerFolge(res);
+      if (res.every(Boolean)) {
+        setPhase("ok");
+        idkRow.innerHTML = `<span class="okline" data-testid="panel">${ICON_CHECK}<span>Richtig</span>${listenBtn}</span>`;
+        bindListen(idkRow);
+        autoAdvance();
+        return;
+      }
+      setPhase("err");
+      const k = res.indexOf(false);
+      const id = notes[k];
+      const names = notes.map((x, j) => `<span class="${res[j] ? "" : "bad"}">${nameHtml(x)}</span>`).join(" ");
+      const w = wrongAt[k] ?? null;
+      // beim Spielen sagt der Hinweis nicht, was sie gespielt hat (bei der Karte steht es in der Überschrift)
+      const hint = (playing && w ? `Du hast ${nameHtml(w)} gespielt. ` : "") + errorHint(id, w, playing ? "spiel" : "name");
+      slot.innerHTML =
+        `<div class="panel err" data-testid="panel"><div class="fl">${flute(id)}</div><div class="txt"><span class="head">${head}</span>` +
+        `<span class="names">${names}</span><span class="sub">${hint}</span></div></div>` +
+        `<div class="gorow">${listenBtn}<button class="go" data-act="next">Weiter</button></div>`;
+      bindListen(slot);
+      const go = slot.querySelector<HTMLButtonElement>('[data-act="next"]')!;
+      go.addEventListener("click", (e) => {
+        e.stopPropagation();
+        advance();
+      });
+      go.focus({ preventScroll: true });
+    };
+
+    main.querySelector('[data-act="idk"]')!.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (phase !== "ask") return;
+      onFolgeFrame = null;
+      for (let k = cur; k < n; k++) {
+        ok[k] = false;
+        mark(k, false);
+      }
+      done("Auflösung");
+    });
+
+    if (!playing) {
+      // Lesen: der Reihe nach tippen; falsch → die Note wird rot, ihr Name steht darunter, es geht weiter
+      main.querySelectorAll<HTMLButtonElement>(".btns button").forEach((b) =>
+        b.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (phase !== "ask" || cur >= n) return;
+          const c = b.dataset.choice!;
+          const good = c === notes[cur];
+          ok[cur] = good;
+          wrongAt[cur] = good ? null : c;
+          mark(cur, good);
+          b.classList.remove("tap-ok", "tap-err");
+          void b.offsetWidth; // Animation neu starten
+          b.classList.add(good ? "tap-ok" : "tap-err");
+          cur++;
+          if (cur < n) setCur(cur);
+          else done("Nicht ganz");
+        }),
+      );
+      return;
+    }
+
+    // Spielen: Warte-Wertung wie beim Mitspielen (neuer Einsatz für Tonwiederholungen, Übergangsklänge
+    // beim Fingerwechsel verziehen, Oktave zu hoch nur ein Hinweis); Toleranz und Haltedauer wie bei der
+    // Spielen-Karte, Stimmton und Werte der aktiven Flöte.
+    const w = new WaitFollower(toneTimeline(notes.map((x) => note(x).midi)), {
+      cfg: {
+        tuning: myFlute.tuning.hz,
+        toleranceCents: d.settings.toleranceCents,
+        holdMs: d.settings.holdMs,
+        minClarity: DEFAULT_JUDGE.minClarity,
+      },
+      tuning: new LiveTuning(fluteOffsets, {}, myFlute.tuning.known),
+      onNote: (k, r) => {
+        if (phase !== "ask") return;
+        if (ok[k] === undefined) ok[k] = r.ok;
+        mark(k, ok[k]!);
+        q.textContent = question;
+        q.classList.remove("warn", "hint");
+        cur = k + 1;
+        if (cur < n) setCur(cur);
+      },
+      onWrong: (k, midi) => {
+        if (phase !== "ask") return;
+        ok[k] = false;
+        wrongAt[k] = chartNoteByMidi(midi)?.id ?? null;
+        mark(k, false, false);
+        q.innerHTML = `Du spielst ${midiNameHtml(midi)}`;
+        q.classList.remove("hint");
+        q.classList.add("warn");
+        if (d.settings.headphones) playTones([note(notes[k]).midi], HINT_VOL);
+      },
+      onOctave: () => {
+        if (phase !== "ask" || ok[cur] === false) return;
+        q.textContent = "eine Oktave zu hoch – sanfter blasen";
+        q.classList.add("hint");
+      },
+      onPass: () => {
+        if (phase !== "ask") return;
+        onFolgeFrame = null;
+        done("Nicht ganz");
+      },
+    });
+    w.arm(performance.now());
+    onFolgeFrame = (f) => w.push(f);
+  }
+
   advance();
 
   return () => {
     closed = true;
     clearTimer();
     judge.stop();
+    onFolgeFrame = null;
+    stopSound();
     unlisten?.();
     if (playing) {
       keepAwake(false);

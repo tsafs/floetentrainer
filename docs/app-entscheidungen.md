@@ -22,13 +22,23 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   3. **Zusatzkarten**, bis die Sitzung voll ist: zufällige Karten der freigeschalteten Töne,
      schwache Töne dreifach gewichtet. Zusatzkarten zählen für die Trefferquote (Abschnitt 3),
      **verändern aber keine Fächer und Termine.**
+     **Etwa jede zweite Zusatzkarte ist eine Tonfolge** (seit 14.11.2026, `docs/app-tonfolgen.md`;
+     abwechselnd, nicht gehäuft): mehrere Töne hintereinander lesen bzw. spielen (Abschnitt 4). Sie gibt
+     es, sobald in der Spur mindestens 5 Töne vorgestellt sind; sonst bleibt der Platz eine Zusatzkarte.
+     Eine Tonfolge ist keine Leitner-Karte, zählt in „7 von 20“ und für die Kartengrenze als **eine**
+     Position und im Ergebnis als richtig, wenn alle Töne richtig waren; jeder falsche Ton kommt in
+     „Schwierig waren“. Fällige und neue Karten bleiben wie sie sind.
 - Derselbe Ton kommt nie zweimal direkt hintereinander. Sonst würde die Auflösung der einen Karte
   die Antwort der nächsten verraten.
+  Das gilt auch an der Grenze zu einer Tonfolge: Die Karte danach fragt nicht ihren letzten Ton ab, und
+  eine Folge beginnt nicht mit dem Ton der Karte davor.
 - **Fehler in der Sitzung:**
   - Eine falsch beantwortete Karte kommt nach 2–3 anderen Karten nochmal, höchstens zweimal.
   - Diese Wiederholungen zählen nicht zur Kartengrenze, nicht zur Trefferquote und ändern das Fach
     nicht.
   - Steht beim Sitzungsende noch eine Wiederholung aus, entfällt sie.
+  - Eine Tonfolge mit Fehler kommt nach 2–3 anderen Schritten **einmal** wieder (ungewertet, wie bei
+    Karten). Diese Wiederholung darf direkt nach einer anderen Folge stehen.
 - **Abbrechen mit ×:** Bereits beantwortete Karten bleiben gewertet, alles andere bleibt unverändert.
 - **Nichts fällig, nichts neu:** Der Knopf heißt dann „Weiter üben“ bzw. „Weiter spielen“, darunter
   „Fälliges erledigt · zählt für Stufe n“, auch wenn Spielen gerade an der Lesen-Stufe ansteht (die
@@ -65,6 +75,10 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
 - **Trefferquote eines Tons** in einer Spur: Anteil richtig unter seinen letzten 20 gewerteten
   Antworten. Gewertet sind normale Karten und Zusatzkarten, aber keine Wiederholungen und keine
   Vorstellungen.
+  - **Tonfolgen** (seit 14.11.2026): Jeder Ton einer Folge zählt für seine Trefferquote, aber **jeder
+    Ton höchstens einmal je Folge**. Kommt er mehrfach vor, ist er richtig, wenn er an allen Stellen
+    richtig war. Fächer und Termine bleiben unberührt (wie bei Zusatzkarten). Danach läuft die Prüfung
+    fürs Freischalten wie nach jeder Karte.
 - **Freischalten:** Die nächste Stufe einer Spur kommt automatisch, sobald *jeder* freigeschaltete Ton
   dieser Spur
   - mindestens 10 gewertete Antworten hat,
@@ -135,6 +149,30 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   - Reichen die freigeschalteten Töne nicht, kommen Töne aus späteren Stufen dazu. Diese werden selbst
     nie abgefragt.
   - Nie zwei Möglichkeiten mit demselben Griff und nie zwei Schreibweisen desselben Tons.
+- **Tonfolge** (seit 14.11.2026, Einzelheiten in `docs/app-tonfolgen.md`), in Lesen und Spielen:
+  - Töne: nur die in dieser Spur schon vorgestellten und freigeschalteten, keine anderen Schreibweisen.
+    Melodisch statt zufällig: nach Tonhöhe geordnet, meist der Nachbarton, oft eine Terz, selten ein
+    größerer Sprung (höchstens eine Quinte); Halbtonschritte bevorzugt (f¹–fis¹, h¹–c² …); in etwa jeder
+    vierten Folge eine Tonwiederholung (nie dreimal derselbe Ton); schwache Töne dreifach gewichtet; in
+    einer Sitzung keine Folge zweimal. Erzeugt in `app/src/srs/sequences.ts`.
+  - Länge: Beginn mit 3 Tönen (bei genau 5 Tönen 2 oder 3), nach zwei fehlerfreien Folgen in Reihe +1,
+    nach einer fehlerhaften −1, 2 bis 5 Töne (ab Stufe 8 bis 6). Gilt nur innerhalb der Sitzung.
+  - Oben eine breite Notenzeile mit allen Noten (ganze Notenköpfe ohne Takt und Hals), **Vorzeichen an
+    jeder Note**. Die aktuelle Note hat einen feinen Strich darunter; darunter wachsen die Namen mit.
+  - **Lesen** („Wie heißen diese Noten? Der Reihe nach.“): Namenknöpfe nach Tonhöhe, alle Töne der Folge
+    plus verwechselbare, zusammen bis zu 8, mindestens 2 nicht aus der Folge. Richtig: Note grün, Name
+    darunter, weiter. Falsch: Note rot, darunter ihr richtiger Name, weiter mit der nächsten.
+  - **Spielen** („Spiel diese Töne nacheinander.“, darunter „Ich höre“): gewertet wie das Mitspielen im
+    Warte-Modus (wartet auf jede Note, Tonwiederholung braucht einen neuen Einsatz, Übergangsklänge beim
+    Fingerwechsel zählen nicht, Oktave zu hoch nur ein Hinweis), mit Toleranz, Haltedauer und Klarheit
+    (0,9) wie bei der Spielen-Karte und Stimmton und Werten der aktiven Flöte. Falscher Ton: Note rot,
+    „Du spielst d²“, die Markierung wartet weiter auf den richtigen Ton; mit Kopfhörern erklingt kurz der
+    richtige.
+  - Nach der letzten Note wie bei Karten: ganz richtig kurz „Richtig“ und von selbst weiter, sonst ein
+    rötliches Feld mit dem Griffbild der ersten falschen Note, der Folge (falsche rot) und dem Hinweis,
+    darunter „Weiter“. Beim Spielen zusätzlich „Anhören“ (spielt die Folge einmal vor; nach „Richtig“ hält
+    es das automatische Weitergehen an).
+  - „Weiß nicht“ löst die restlichen Noten auf; sie zählen als falsch.
 - **„Weiß nicht“:** Bei jeder Übungsart gibt es einen kleinen Knopf „Weiß nicht“. Er zeigt die
   Auflösung und zählt als Fehler.
 - **Notennamen:** Deutsch (c d e f g a h, cis, es, b …), immer mit Oktavzahl.
