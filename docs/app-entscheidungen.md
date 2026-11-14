@@ -31,8 +31,9 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   - Steht beim Sitzungsende noch eine Wiederholung aus, entfällt sie.
 - **Abbrechen mit ×:** Bereits beantwortete Karten bleiben gewertet, alles andere bleibt unverändert.
 - **Nichts fällig, nichts neu:** Der Knopf heißt dann „Weiter üben“ bzw. „Weiter spielen“, darunter
-  „Fälliges erledigt · zählt für Stufe n“ (an der höchsten erlaubten Stufe „Fälliges erledigt · freies
-  Üben“). Die Sitzung besteht dann nur aus Zusatzkarten. Bis 14.11.2026 hieß er „Trotzdem üben“ mit
+  „Fälliges erledigt · zählt für Stufe n“, auch wenn Spielen gerade an der Lesen-Stufe ansteht (die
+  Antworten zählen trotzdem, und Spielen schaltet frei, sobald Lesen steigt). Auf der letzten Stufe:
+  „Fälliges erledigt · alle Stufen erreicht“. Die Sitzung besteht dann nur aus Zusatzkarten. Bis 14.11.2026 hieß er „Trotzdem üben“ mit
   „Für heute alles erledigt“; das klang, als brächte Weiterüben nichts, obwohl Zusatzkarten für die
   Trefferquote und damit fürs Freischalten zählen.
 

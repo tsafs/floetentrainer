@@ -4,7 +4,7 @@ import { mic } from "../audio/mic";
 import { maxLevel, unlockedNotes, type Track } from "../music/levels";
 import { nameHtml } from "../music/names";
 import { dueCount } from "../srs/leitner";
-import { isWeak, level, levelCap, noteAccuracy, streak, weekDots } from "../srs/progress";
+import { isWeak, level, noteAccuracy, streak, weekDots } from "../srs/progress";
 import { hasWork, Session } from "../srs/session";
 import { plural, type Ctx, type View } from "./common";
 
@@ -28,7 +28,8 @@ function buttonText(ctx: Ctx, track: Track): { label: string; sub: string } {
   if (!work) {
     // Nichts fällig, nichts neu: Weiterüben zählt trotzdem für die Trefferquote und damit für die nächste Stufe.
     const lv = level(ctx.data, track);
-    const sub = lv < levelCap(ctx.data, track) ? `Fälliges erledigt · zählt für Stufe ${lv + 1}` : "Fälliges erledigt · freies Üben";
+    // Auch Spielen an der Lesen-Grenze zählt: Steigt Lesen, schaltet Spielen sofort mit frei.
+    const sub = lv < maxLevel(track) ? `Fälliges erledigt · zählt für Stufe ${lv + 1}` : "Fälliges erledigt · alle Stufen erreicht";
     return { label: `Weiter ${verb.toLowerCase()}`, sub };
   }
   const mins = ctx.data.settings.sessionMinutes;
