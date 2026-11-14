@@ -18,8 +18,10 @@
 // - Takt-Modus: Der Abspieler zählt ein und klickt leise im Tempo, ohne Melodie (mit Kopfhörern leise
 //   mit Melodie); Markierung und Balken laufen mit, jede Note wird nach ihrem Ende grün oder rot.
 //   Im Warte-Modus steht der Balken an der Note, auf die gewartet wird.
-// Unter dem großen Knopf klein: die aktive Flöte (Link zu den Einstellungen; Tipp „Flöte einstellen“, solange
-// sie keine Werte hat, sonst z. B. „etwa 30 Cent tief, wird ausgeglichen“), im Takt-Modus die Verzögerung
+// Unter dem großen Knopf klein: die aktive Flöte (Link zu den Einstellungen) mit ihrem Stimmton (z. B.
+// „442 Hz“ bzw. ermittelt „etwa 432,5 Hz, wird ausgeglichen“; Tipp „Flöte einstellen“, solange sie keine
+// Werte hat). Alles – Wertung, Klicks, mitklingende Melodie – gilt im Stimmton der aktiven Flöte. Im
+// Takt-Modus die Verzögerung
 // mit „abgleichen“ (Abgleich-Feld .fcal, ../audio/latency.ts; je Kopfhörer-Zustand ein Wert) und nach
 // einem Durchgang „Diagnose speichern“ (../audio/diagnose.ts: nur Messwerte, kein Ton).
 // Mikrofon und AudioContext starten erst beim Tippen auf „Mitspielen“; nach dem Durchgang, beim Stopp,
@@ -27,7 +29,7 @@
 // Die Lernspuren bleiben unberührt; gespeichert werden nur Art, Kopfhörer und Tempo.
 
 import { diag, offerDiag } from "../audio/diagnose";
-import { fallbackOffset, LiveTuning } from "../audio/flute-profile";
+import { LiveTuning } from "../audio/flute-profile";
 import { BeatFollower, DEFAULT_FOLLOW, followConfig, inputLatency, LATENCY_MAX, LATENCY_MIN, WaitFollower } from "../audio/follow";
 import { CAL_CLICKS, CAL_COUNT_IN, CAL_SPQ, DEFAULT_LATENCY, latencyFromOnsets, OnsetDetector } from "../audio/latency";
 import { keepAwake, mic } from "../audio/mic";
@@ -36,7 +38,8 @@ import { midiNameHtml, nameHtml } from "../music/names";
 import type { NoteEvent, Song } from "../songs/model";
 import { clampPercent, secPerQuarter, TEMPO_MAX, TEMPO_MIN } from "../songs/tempo";
 import { sectionTimeline, type Timeline } from "../songs/timeline";
-import { activeFlute, type FollowMode } from "../store/data";
+import { A4, centsBetween, recenter, tuningShort } from "../music/tuning";
+import { activeFlute, tuningHz, type FollowMode } from "../store/data";
 import { esc, type Ctx } from "./common";
 
 /** Lautstärke der mitlaufenden Melodie (Takt-Modus mit Kopfhörern) relativ zum Vorspielen */
@@ -53,7 +56,7 @@ const PREVIEW_SEC = 0.7;
 const TEMPO_STEP = 5;
 /** Schritt des feinen Schiebers der Verzögerung (ms) */
 const LATENCY_STEP = 10;
-/** Abweichung der Flöte (Median ihrer Werte), ab der der Hinweis „etwa … Cent tief“ erscheint */
+/** Abstand eines ermittelten Stimmtons von 440 Hz (Cent), ab dem „wird ausgeglichen“ dabeisteht */
 const FLUTE_NOTE_CENTS = 8;
 
 const ICON_PLAY_SM = `<svg width="18" height="18" viewBox="0 0 26 26" aria-hidden="true"><path d="M8.5 5.2v15.6L21 13z"/></svg>`;
@@ -326,16 +329,15 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
   /** Zeilen unter dem großen Knopf: Flöte, Verzögerung (Takt-Modus), Diagnose */
   const renderMeta = () => {
     const fl = activeFlute(ctx.data);
-    const vals = Object.values(fl.offsets);
     const name = `<a href="#/einstellungen" data-testid="flute-name">${esc(fl.name)}</a>`;
-    if (!vals.length) {
-      fluteLine.innerHTML = `Flöte: ${name} · Tipp: <a href="#/floete">Flöte einstellen</a>, dann wird genauer gewertet.`;
+    const hz = tuningShort(fl);
+    const tip = `Tipp: <a href="#/floete">Flöte einstellen</a>, dann wird genauer gewertet.`;
+    if (!Object.keys(fl.offsets).length) {
+      fluteLine.innerHTML = `Flöte: ${name}${hz ? ` · ${hz}` : ""} · ${tip}`;
+    } else if (!fl.tuning.known && Math.abs(centsBetween(fl.tuning.hz, A4)) >= FLUTE_NOTE_CENTS) {
+      fluteLine.innerHTML = `Flöte: ${name} · ${hz}, wird ausgeglichen`;
     } else {
-      const med = Math.round(fallbackOffset(fl.offsets) / 5) * 5;
-      fluteLine.innerHTML =
-        Math.abs(med) >= FLUTE_NOTE_CENTS
-          ? `Flöte: ${name} · etwa ${Math.abs(med)} Cent ${med < 0 ? "tief" : "hoch"}, wird ausgeglichen`
-          : `Flöte: ${name} · eingestellt`;
+      fluteLine.innerHTML = `Flöte: ${name} · ${hz}, eingestellt`;
     }
     const lat = inputLatency(settings);
     latLine.hidden = mode !== "beat";
@@ -431,7 +433,8 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
 
   /** Abweichungen der aktiven Flöte für einen Durchgang (werden darin nachgeführt) */
   const startTuning = (r: NonNullable<typeof run>) => {
-    const t = new LiveTuning(activeFlute(ctx.data).offsets);
+    const fl = activeFlute(ctx.data);
+    const t = new LiveTuning(fl.offsets, {}, fl.tuning.known);
     r.tuning = t;
     return t;
   };
@@ -439,13 +442,15 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
   /**
    * Nach einem *vollständigen* Durchgang die nachgeführten Werte (Töne mit mindestens 10 Messungen) in die
    * aktive Flöte übernehmen. Nur dann: Ein abgebrochener Versuch (oft gerade, weil es nicht klappte) soll
-   * das Profil nicht verschieben. Die Schritte sind klein und je Durchgang begrenzt (LiveTuning).
+   * das Profil nicht verschieben. Die Schritte sind klein und je Durchgang begrenzt (LiveTuning). Ein
+   * unbekannter Stimmton wird dabei neu ermittelt (Median der absoluten Lagen, recenter).
    */
   const saveTuning = (t: LiveTuning) => {
     const ch = t.changes();
     if (!Object.keys(ch).length) return;
     const fl = activeFlute(ctx.data);
     Object.assign(fl.offsets, ch);
+    recenter(fl);
     fl.updated = Date.now();
     ctx.save();
   };
@@ -477,11 +482,12 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
       songId: song.id,
       section: sec ? barRangeText(sec) : null,
       percent: host.percent(),
-      tuningHz: settings.tuningHz,
+      tuningHz: fl.tuning.hz,
+      tuningKnown: fl.tuning.known,
       headphones: settings.headphones,
       latencyMs: lat.ms,
       latencyCalibrated: lat.calibrated,
-      flute: { name: fl.name, offsets: { ...fl.offsets } },
+      flute: { name: fl.name, tuning: { ...fl.tuning }, offsets: { ...fl.offsets } },
       minClarity: DEFAULT_FOLLOW.minClarity,
       startMs: beat ? diag.rel(beat.startMs) : null,
       spq: beat?.spq ?? null,
@@ -511,7 +517,7 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
     };
     const tuning = startTuning(r);
     const w = new WaitFollower(tl, {
-      cfg: followConfig(settings),
+      cfg: followConfig(settings, tuningHz(ctx.data)),
       tuning,
       onFrame: (j) => diag.judged(j),
       onNote: (i, nr) => {
@@ -535,7 +541,7 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
         if (settings.headphones) {
           songPlayer.play(singleTone(tl.tones[i].midi), {
             secPerQuarter: PREVIEW_SEC,
-            a4: settings.tuningHz,
+            a4: tuningHz(ctx.data),
             countIn: false,
             melody: PREVIEW_VOL,
           });
@@ -575,7 +581,7 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
     const spq = secPerQuarter(song, host.percent());
     songPlayer.play(tl, {
       secPerQuarter: spq,
-      a4: settings.tuningHz,
+      a4: tuningHz(ctx.data),
       countIn: true,
       metronome: true,
       melody: settings.headphones ? MELODY_VOL : false,
@@ -605,7 +611,7 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
     const b = new BeatFollower(tl, {
       secPerQuarter: spq,
       startMs,
-      cfg: followConfig(settings),
+      cfg: followConfig(settings, tuningHz(ctx.data)),
       tuning,
       onFrame: (j) => diag.judged(j),
       onNote: (i, nr) => {
@@ -714,7 +720,7 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
         if (my !== token || cal !== c) return;
         songPlayer.play(calTimeline(), {
           secPerQuarter: CAL_SPQ,
-          a4: settings.tuningHz,
+          a4: tuningHz(ctx.data),
           countIn: true,
           metronome: true,
           melody: false,
@@ -738,7 +744,7 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
         const ac = songPlayer.context!;
         const t0 = songPlayer.timelineStart!;
         c.clicks = Array.from({ length: CAL_CLICKS }, (_, k) => heardAt(ac, t0 + k * CAL_SPQ));
-        const det = new OnsetDetector(DEFAULT_LATENCY, { tuning: settings.tuningHz });
+        const det = new OnsetDetector(DEFAULT_LATENCY, { tuning: tuningHz(ctx.data) });
         c.det = det;
         beginDiag("abgleich", performance.now(), null, null);
         diag.setMeta({ clicks: c.clicks.map((x) => diag.rel(x)), which, spq: CAL_SPQ });

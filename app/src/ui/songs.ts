@@ -29,6 +29,7 @@ import type { NoteEvent, Song, TimeSig } from "../songs/model";
 import { missingHtml, playabilityFor } from "../songs/playable";
 import { baseTempo, clampPercent, secPerQuarter, TEMPO_MAX, TEMPO_MIN } from "../songs/tempo";
 import { buildTimeline, fromBarTimeline, type Timeline } from "../songs/timeline";
+import { tuningHz } from "../store/data";
 import { esc, ICON_BACK, plural, type View } from "./common";
 import { brokenSongPage, mountOwnBox, takeListNote } from "./own-songs";
 import { Playhead } from "./playhead";
@@ -571,7 +572,8 @@ export const songView: View = (root, ctx) => {
     if (opts.from != null && tl.bars.length) keepVisible(tl.bars[0].index, true);
     songPlayer.play(tl, {
       secPerQuarter: secPerQuarter(song, percent),
-      a4: ctx.data.settings.tuningHz,
+      // im Stimmton der aktiven Flöte (passt mit Kopfhörern zu ihrem Spiel)
+      a4: tuningHz(ctx.data),
       countIn: opts.countIn,
       metronome,
       onPosition,

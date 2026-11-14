@@ -16,7 +16,7 @@
 // Eingangs-Verzögerung aus (UltraStar Standard 140 ms, Performous 90 ms).
 // - Toleranz = nächster Halbton: Ein Ton zählt als Zielton, wenn er näher am Zielton liegt als an
 //   jedem Nachbarton (|Abweichung| < 50 Cent) – relativ zur Lage dieses Tons auf *ihrer* Flöte
-//   (Flötenprofil, ./flute-profile.ts; für ungemessene Töne der Median der gemessenen, sonst 0). Das
+//   (Flötenprofil, ./flute-profile.ts: Stimmton der Flöte + Wert des Tons, ungemessene Töne 0). Das
 //   Profil wird während des Durchgangs je Ton langsam nachgeführt (LiveTuning). Die Toleranz aus den
 //   Einstellungen gilt nur noch für die Übung und das Stimmgerät.
 // - Klarheit ab 0,85 statt 0,9 (nur Mitspielen): Eine günstige Flöte klingt hauchig. Synthetisch
@@ -187,12 +187,12 @@ export function inputLatency(s: Pick<Settings, "inputLatencyMs" | "headphones">)
 }
 
 /**
- * Was aus den App-Einstellungen übernommen wird: Stimmton und Eingangs-Verzögerung (passend zum
- * Kopfhörer-Schalter, abgeglichen oder Standard). Toleranz und Haltedauer der Einstellungen gelten fürs
- * Üben, nicht hier.
+ * Was aus den App-Daten übernommen wird: der Stimmton der aktiven Flöte (tuningHz, ../store/data.ts) und
+ * die Eingangs-Verzögerung (passend zum Kopfhörer-Schalter, abgeglichen oder Standard). Toleranz und
+ * Haltedauer der Einstellungen gelten fürs Üben, nicht hier.
  */
-export function followConfig(s: Pick<Settings, "tuningHz" | "inputLatencyMs" | "headphones">): Partial<FollowConfig> {
-  return { tuning: s.tuningHz, latencyMs: inputLatency(s).ms };
+export function followConfig(s: Pick<Settings, "inputLatencyMs" | "headphones">, tuningHz: number): Partial<FollowConfig> {
+  return { tuning: tuningHz, latencyMs: inputLatency(s).ms };
 }
 
 /** Wertung einer Note im Warte-Modus */
