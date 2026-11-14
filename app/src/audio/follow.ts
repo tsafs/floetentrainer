@@ -57,10 +57,16 @@ export interface FollowConfig {
   reattackRise: number;
   /** Takt-Modus: Verzögerung von Mikrofon und Erkennung in ms (Frames werden so viel früher einsortiert) */
   latencyMs: number;
-  /** Takt-Modus: nötiger Anteil der Notendauer mit erkanntem Ton */
+  /** Takt-Modus: nötiger Anteil der klingbaren Notendauer (Dauer minus articulationMs) mit erkanntem Ton */
   minCoverage: number;
   /** Takt-Modus: mindestens so viele ms erkannt (bei sehr kurzen Noten höchstens 80 % der Dauer) */
   minHitMs: number;
+  /**
+   * Takt-Modus: so viel jeder Note ist beim abgesetzten Spielen gar nicht als Ton messbar
+   * (Zungen-Lücke vor dem nächsten Ton und unklarer Einsatz). Wird vor dem Anteil abgezogen,
+   * sonst wären schnelle Sechzehntel kaum zu treffen.
+   */
+  articulationMs: number;
   /** Takt-Modus: übliches Frame-Intervall in ms (Mikrofon: 25); größere Lücken zählen nur bis 2×. */
   frameMs: number;
   /** Glättung (./smooth.ts): Median über so viele Frames (ungerade, 1 = keiner) … */
@@ -97,7 +103,8 @@ export const DEFAULT_FOLLOW: FollowConfig = {
   reattackRise: 1.5,
   latencyMs: 50,
   minCoverage: 0.5,
-  minHitMs: 80,
+  minHitMs: 50,
+  articulationMs: 50,
   frameMs: 25,
   medianFrames: 3,
   tauMs: 0,
@@ -381,7 +388,9 @@ interface PassState {
  * latencyMs früher einsortiert. Jeder gültige Frame steht für ein Frame-Intervall um seinen
  * (korrigierten) Zeitpunkt; liegt der Ton in der Toleranz der Note, deren Fenster dieses Intervall
  * überlappt, zählt die Überlappung als erkannte Zeit. Getroffen: erkannte Zeit ≥ minCoverage der
- * Dauer und ≥ minHitMs (bei Noten unter 100 ms höchstens 80 % der Dauer).
+ * klingbaren Dauer (Dauer minus articulationMs für Zungen-Lücke und Einsatz) und ≥ minHitMs
+ * (bei Noten unter 100 ms höchstens 80 % der Dauer). So bleiben angestoßene Sechzehntel bis
+ * etwa ♩ = 120 messbar.
  * Tonwiederholungen brauchen hier keinen neuen Einsatz: Es zählt nur die erkannte Zeit im Fenster
  * der jeweiligen Note; wer eine Wiederholung durchhält, hat beide getroffen (das Tempo gibt die
  * Notengrenzen vor). Oktavfehler und Töne knapp außerhalb der Toleranz zählen einfach nicht.
@@ -535,7 +544,8 @@ export class BeatFollower {
   private enough(i: number): boolean {
     const n = this.tl.tones[i];
     const durMs = n.dur * this.anchor.spq * 1000;
-    const need = Math.min(Math.max(this.cfg.minCoverage * durMs, this.cfg.minHitMs), 0.8 * durMs);
+    const playable = Math.max(durMs - this.cfg.articulationMs, 0);
+    const need = Math.min(Math.max(this.cfg.minCoverage * playable, this.cfg.minHitMs), 0.8 * durMs);
     return this.cur.ms[i] >= need - 1e-6;
   }
 
