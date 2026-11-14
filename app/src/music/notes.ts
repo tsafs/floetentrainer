@@ -1,5 +1,7 @@
 // Töne, Griffe, Namen und Frequenzen der Sopranblockflöte in C (barocke Griffweise).
 
+import { A4, centsBetween, shiftHz } from "./tuning";
+
 /** Grifftabelle aus docs/app-prompt.md: Daumen · 1–3 · 4–7; x = zu, o = offen, h = halb. */
 export const FINGER_SRC =
   "c¹ x xxx xxxx | cis¹ x xxx xxxh | d¹ x xxx xxxo | es¹ x xxx xxho | e¹ x xxx xxoo | f¹ x xxx xoxx | " +
@@ -102,14 +104,14 @@ export function spellMidi(midi: number): { name: string; octave: number } {
 }
 
 /** Klingende Frequenz einer notierten Note auf der Sopranflöte (eine Oktave höher). */
-export function soundingFreq(n: Note | number, tuning = 440): number {
+export function soundingFreq(n: Note | number, tuning = A4): number {
   const midi = typeof n === "number" ? n : n.midi;
-  return tuning * Math.pow(2, (midi + 12 - 69) / 12);
+  return shiftHz(tuning, (midi + 12 - 69) * 100);
 }
 
 /** Gehörte Frequenz → notierte MIDI-Nummer (gebrochen). */
-export function freqToWrittenMidi(freq: number, tuning = 440): number {
-  return 69 + 12 * Math.log2(freq / tuning) - 12;
+export function freqToWrittenMidi(freq: number, tuning = A4): number {
+  return 69 - 12 + centsBetween(freq, tuning) / 100;
 }
 
 /** Zahl der verschiedenen Löcher zweier Griffe. */

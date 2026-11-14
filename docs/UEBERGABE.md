@@ -84,6 +84,14 @@ Silben, Atemzeichen, Seitenumbrüche.
      im Browser, nicht in der Sicherung). **Flötenprofile** (`flutes`/`activeFlute` in den Daten, mit Sicherung):
      Einstellungen → Flöte, „Flöte einstellen“ (`#/floete`, `app/src/ui/flute.ts`); angewandt im Mitspielen
      (dort nachgeführt) und in der Spielen-Übung, Logik `app/src/audio/flute-profile.ts`.
+     **Stimmton je Flöte (seit 14.11.2026):** Die Einstellung „Stimmton“ für alle (`settings.tuningHz`) ist weg;
+     jede Flöte hat `tuning: { hz, known }` – bekannt (Wahl 440/442/443, sonst ± 1 Hz, 415–466) oder unbekannt
+     (Median der gemessenen absoluten Lagen, beim Einstellen und Mitspielen mit ermittelt). Werte je Ton sind
+     relativ zum Stimmton der Flöte; ungemessene Töne 0. Der Stimmton der aktiven Flöte gilt überall (Übung,
+     Stimmgerät, Mitspielen, Vorspielen, Abgleich, Diagnose). Hz↔Cent und alle Umrechnungen (absolute Lagen
+     bleiben) in `app/src/music/tuning.ts`; alte Daten werden ohne Versionssprung umgewandelt
+     (`normalizeData`). Regeln in `docs/app-entscheidungen.md` 4/6/8. Tests `tuning.test.ts`,
+     `app/tests/e2e/stimmton.spec.ts`, Bildschirmfotos `*-s1…s6-*.png`.
    - **Diagnose-Datei:** Nach jedem Mitspiel-Durchgang (und nach dem Abgleich) steht unter dem großen Knopf
      „Diagnose speichern“. Auf dem Handy öffnet das das Teilen-Menü – die Nutzerin schickt die Datei z. B. per
      E-Mail; sonst landet sie in „Downloads“ (`floetentrainer-diagnose-JJJJ-MM-TT-HHMM.json`). Enthält nur

@@ -106,7 +106,7 @@ export function formatSummary(d, s = summarizeDiag(d)) {
   const lines = [];
   lines.push(`Diagnose vom ${d.created} – ${d.kind === "takt" ? "Im Takt" : d.kind === "warten" ? "Wartet auf mich" : "Verzögerung abgleichen"}`);
   if (m.song) lines.push(`Lied: ${m.song}${m.section ? ` (${m.section})` : ""}${m.percent ? `, Tempo ${m.percent} %` : ""}`);
-  lines.push(`Stimmton ${m.tuningHz ?? "?"} Hz, Verzögerung ${fmt(m.latencyMs, " ms")} (${m.latencyCalibrated ? "abgeglichen" : "Standard"}), Kopfhörer ${m.headphones ? "an" : "aus"}`);
+  lines.push(`Stimmton der Flöte ${m.tuningHz != null ? Math.round(m.tuningHz * 10) / 10 : "?"} Hz${m.tuningKnown === true ? " (angegeben)" : m.tuningKnown === false ? " (ermittelt)" : ""}, Verzögerung ${fmt(m.latencyMs, " ms")} (${m.latencyCalibrated ? "abgeglichen" : "Standard"}), Kopfhörer ${m.headphones ? "an" : "aus"}`);
   if (m.flute) lines.push(`Flöte: ${m.flute.name} – ${Object.entries(m.flute.offsets ?? {}).map(([k, v]) => `${k} ${v > 0 ? "+" : ""}${v}`).join(", ") || "keine Werte"}`);
   if (m.userAgent) lines.push(`Browser: ${m.userAgent}`);
   if (m.mic?.trackStats) lines.push(`Mikrofon-Statistik: ${JSON.stringify(m.mic.trackStats)}`);

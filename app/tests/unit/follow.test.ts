@@ -132,7 +132,7 @@ describe("Mitspielen: Warte-Modus", () => {
     expect(w.index).toBe(1);
     expect(w.results[0]).toMatchObject({ ok: true });
 
-    const cfg = followConfig({ tuningHz: 415, inputLatencyMs: { speaker: null, headphones: null }, headphones: false });
+    const cfg = followConfig({ inputLatencyMs: { speaker: null, headphones: null }, headphones: false }, 415);
     expect(cfg).toEqual({ tuning: 415, latencyMs: DEFAULT_INPUT_LATENCY });
     const w2 = new WaitFollower(tl, { cfg });
     feed(w2, frames([{ freq: hz(G, 30, 415), ms: 500 }]));

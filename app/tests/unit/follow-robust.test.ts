@@ -74,11 +74,11 @@ describe("Toleranz = nächster Halbton, relativ zur Flöte", () => {
     expect(wrong.wrongMidi).toBe(G + 1);
   });
 
-  it("Rückfall für ungemessene Töne: Median der gemessenen, ohne Werte 0", () => {
-    expect(offsetFor({ a1: -20, g1: -30, h1: -40 }, C2)).toBe(-30);
+  it("ungemessene Töne liegen beim Stimmton der Flöte (0) – der frühere Rückfall „Median der gemessenen“ entfällt", () => {
+    expect(offsetFor({ a1: -20, g1: -30, h1: -40 }, C2)).toBe(0);
     expect(offsetFor({ a1: -20, g1: -30, h1: -40 }, A)).toBe(-20);
-    expect(offsetFor({ a1: -20, g1: -30 }, C2)).toBe(-25);
     expect(offsetFor({}, C2)).toBe(0);
+    expect(offsetFor({ a1: -20 }, C2, -7)).toBe(-7);
   });
 
   it("e¹ bei −45 Cent: mit Profil sicher der Zielton, ohne Profil am Rand (teils als es¹ gehört)", () => {
@@ -125,11 +125,24 @@ describe("Flötenprofil beim Mitspielen nachführen", () => {
     expect(new LiveTuning().changes()).toEqual({});
   });
 
-  it("ungemessene Töne beginnen beim Median der übrigen (auch der nachgeführten)", () => {
+  it("unbekannter Stimmton: ungemessene Töne folgen beim Nachführen dem Median aller Werte (der Stimmton wandert mit)", () => {
     const t = new LiveTuning({ g1: -30, a1: -30 });
     expect(t.offsetOf(C2)).toBe(-30);
     for (let k = 0; k < 200; k++) t.observe(H, -30);
     expect(t.values.h1).toBeCloseTo(-30, 0);
+    // nie eingestellte Flöte: nach einem nachgeführten Ton liegen auch die übrigen dort
+    const u = new LiveTuning();
+    for (let k = 0; k < 200; k++) u.observe(G, -30);
+    expect(u.offsetOf(C2)).toBeCloseTo(u.values.g1!, 6);
+    expect(u.offsetOf(C2)).toBeLessThan(-20);
+  });
+
+  it("bekannter Stimmton: ungemessene Töne bleiben beim Stimmton (0), gemessene werden nachgeführt", () => {
+    const t = new LiveTuning({ g1: -30, a1: -30 }, {}, true);
+    expect(t.offsetOf(C2)).toBe(0);
+    for (let k = 0; k < 200; k++) t.observe(G, -20);
+    expect(t.values.g1).toBeGreaterThan(-30);
+    expect(t.offsetOf(H)).toBe(0);
   });
 });
 
@@ -248,12 +261,12 @@ describe("Takt-Modus: großzügigere Wertung und Verzögerung", () => {
 
   it("Standard-Verzögerung 120 ms (ohne Kopfhörer), 200 ms mit Kopfhörern; abgeglichene Werte je Zustand", () => {
     expect(DEFAULT_FOLLOW.latencyMs).toBe(120);
-    const s = { tuningHz: 440, headphones: false, inputLatencyMs: { speaker: null, headphones: null } };
+    const s = { headphones: false, inputLatencyMs: { speaker: null, headphones: null } };
     expect(inputLatency(s)).toEqual({ ms: DEFAULT_INPUT_LATENCY, calibrated: false });
     expect(inputLatency({ ...s, headphones: true })).toEqual({ ms: DEFAULT_HEADPHONE_LATENCY, calibrated: false });
     const cal = { ...s, inputLatencyMs: { speaker: 140, headphones: 260 } };
-    expect(followConfig(cal).latencyMs).toBe(140);
-    expect(followConfig({ ...cal, headphones: true }).latencyMs).toBe(260);
+    expect(followConfig(cal, 440).latencyMs).toBe(140);
+    expect(followConfig({ ...cal, headphones: true }, 440).latencyMs).toBe(260);
   });
 
   it("Spielerin 150 ms zu spät bei Standard-Verzögerung: alles grün (♩ = 100, Achtel)", () => {

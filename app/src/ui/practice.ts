@@ -44,12 +44,13 @@ export const practiceView: View = (root, ctx) => {
   const d = ctx.data;
   const lesenNotes = unlockedNotes("lesen", levelOf("lesen", d.stages.lesen));
   const range: Range = staffRange(lesenNotes);
-  // Abweichungen der aktiven Flöte (Flötenprofil): Toleranz und Anzeige relativ zur Lage jedes Tons auf
-  // ihrer Flöte; ungemessene Töne: Median der gemessenen (../audio/flute-profile.ts)
-  const fluteOffsets = activeFlute(d).offsets;
+  // Aktive Flöte (Flötenprofil): erwartet wird ihr Stimmton + Wert des Tons; Toleranz und Anzeige relativ
+  // zur Lage jedes Tons auf ihrer Flöte; ungemessene Töne liegen beim Stimmton (../audio/flute-profile.ts)
+  const myFlute = activeFlute(d);
+  const fluteOffsets = myFlute.offsets;
   const judge = new PlayJudge(
     {
-      tuning: d.settings.tuningHz,
+      tuning: myFlute.tuning.hz,
       toleranceCents: d.settings.toleranceCents,
       holdMs: d.settings.holdMs,
     },

@@ -1,45 +1,33 @@
-// Eigenheiten der Flöte: Wie weit liegt jeder Ton dieser Flöte vom Stimmton daneben? (Rückmeldung vom
-// 14.11.2026: günstige Sopranflöte, alle Töne etwa 30 Cent zu tief, einzelne je nach Blasdruck mehr.)
-// Rein rechnerisch, ohne Mikrofon und Oberfläche – testbar.
+// Eigenheiten der Flöte: Wie weit liegt jeder Ton dieser Flöte vom Stimmton der Flöte daneben?
+// (Rückmeldung vom 14.11.2026: günstige Sopranflöte, alle Töne etwa 30 Cent zu tief, einzelne je nach
+// Blasdruck mehr.) Rein rechnerisch, ohne Mikrofon und Oberfläche – testbar.
 //
-// - Profil: je Ton (Kennung der Grifftabelle, z. B. "a1") die Abweichung in Cent, gemessen beim
-//   „Flöte einstellen“ (FluteCalibrator) oder beim Mitspielen nachgeführt (LiveTuning). Gespeichert
-//   in den Daten (../store/data.ts, AppData.flutes), mehrere Flöten möglich.
-// - Für noch nicht gemessene Töne gilt der Median der gemessenen (eine Flöte, die insgesamt zu tief
-//   ist, ist es meist bei allen Tönen ähnlich), ohne gemessene Töne 0.
-// - Gewertet wird dann relativ zu diesem Wert: Liegt a¹ dieser Flöte bei −25 Cent, ist −25 Cent für
-//   a¹ „genau“. Das Stimmgerät zeigt dagegen weiter die echte Abweichung zum Stimmton.
+// - Profil: Stimmton der Flöte (bekannt oder aus den Messungen ermittelt, ../music/tuning.ts) und je Ton
+//   (Kennung der Grifftabelle, z. B. "a1") die Abweichung davon in Cent, gemessen beim „Flöte einstellen“
+//   (FluteCalibrator) oder beim Mitspielen nachgeführt (LiveTuning). Gespeichert in den Daten
+//   (../store/data.ts, AppData.flutes), mehrere Flöten möglich.
+// - Noch nicht gemessene Töne liegen beim Stimmton der Flöte (0). Bis 14.11.2026 galt hier der Median der
+//   gemessenen – das deckt jetzt der Stimmton ab: Ein unbekannter Stimmton ist genau dieser Median (die
+//   Werte liegen um 0), ein bekannter ist ihre Angabe. Nur beim Nachführen eines unbekannten Stimmtons
+//   folgen ungemessene Töne während des Durchgangs dem Median (siehe LiveTuning).
+// - Gewertet wird relativ zu Stimmton + Wert: Liegt a¹ dieser Flöte bei −25 Cent, ist −25 Cent für
+//   a¹ „genau“. Das Stimmgerät zeigt die Abweichung zum Stimmton der Flöte.
 
-import { chartNoteByMidi, CHART } from "../music/notes";
+import { chartNoteByMidi, CHART, freqToWrittenMidi } from "../music/notes";
+import { A4, clampOffset, median } from "../music/tuning";
 import { DEFAULT_SMOOTH, pitched, Smoother, type SmoothConfig } from "./smooth";
 import type { Frame } from "./judge";
 
 /** Abweichung je Ton in Cent, Schlüssel = Kennung der Grifftabelle */
 export type Offsets = Record<string, number>;
 
-/** Größte gespeicherte Abweichung: mehr als ein halber Halbton wäre schon der Nachbarton */
-export const MAX_OFFSET = 49;
+export { clampOffset, MAX_OFFSET, median } from "../music/tuning";
 
-export const clampOffset = (c: number) => Math.max(-MAX_OFFSET, Math.min(MAX_OFFSET, c));
-
-/** Median einer Zahlenliste (leer: null) */
-export function median(xs: number[]): number | null {
-  if (!xs.length) return null;
-  const s = [...xs].sort((a, b) => a - b);
-  const k = s.length >> 1;
-  return s.length % 2 ? s[k] : (s[k - 1] + s[k]) / 2;
-}
-
-/** Rückfall für ungemessene Töne: Median der gemessenen, sonst 0 */
-export function fallbackOffset(o: Offsets): number {
-  return median(Object.values(o)) ?? 0;
-}
-
-/** Abweichung des Tons mit dieser notierten MIDI-Nummer (gemessen oder Rückfall) */
-export function offsetFor(o: Offsets, midi: number): number {
+/** Abweichung des Tons mit dieser notierten MIDI-Nummer vom Stimmton der Flöte (ungemessen: fallback, sonst 0) */
+export function offsetFor(o: Offsets, midi: number, fallback = 0): number {
   const n = chartNoteByMidi(midi);
   const v = n ? o[n.id] : undefined;
-  return v ?? fallbackOffset(o);
+  return v ?? fallback;
 }
 
 /** Liefert die Abweichung je notierter MIDI-Nummer */
@@ -85,10 +73,16 @@ export interface LiveTuningConfig {
 export const DEFAULT_LIVE: LiveTuningConfig = { window: 40, minFrames: 5, rate: 0.03, maxStep: 0.5, maxDrift: 15 };
 
 /**
- * Abweichungen während eines Mitspiel-Durchgangs: beginnt mit dem gespeicherten Profil und führt jeden
- * Ton mit den Messungen nach, die als dieser Ton gewertet wurden (observe). Noch nicht gemessene Töne
- * beginnen beim Rückfall (Median der übrigen, auch der schon nachgeführten) – so gleicht sich eine
- * insgesamt zu tiefe Flöte auch ohne „Flöte einstellen“ nach wenigen Noten an.
+ * Abweichungen während eines Mitspiel-Durchgangs: beginnt mit dem gespeicherten Profil (Werte relativ zum
+ * Stimmton der Flöte) und führt jeden Ton mit den Messungen nach, die als dieser Ton gewertet wurden
+ * (observe).
+ * - Stimmton bekannt (tuningKnown): Noch nicht gemessene Töne liegen beim Stimmton (0) – sie hat ihn
+ *   angegeben.
+ * - Stimmton unbekannt: Er wird beim Nachführen mit ermittelt. Noch nicht gemessene Töne folgen dem
+ *   Median aller Werte (auch der schon nachgeführten) – genau dorthin, wohin der Stimmton nach dem
+ *   Speichern rückt (recenter in ../music/tuning.ts). So gleicht sich eine insgesamt zu tiefe Flöte auch
+ *   ohne „Flöte einstellen“ nach wenigen Noten an. Zu Beginn liegt dieser Median bei 0, denn ein
+ *   ermittelter Stimmton ist schon die Mitte der gespeicherten Werte.
  */
 export class LiveTuning {
   readonly cfg: LiveTuningConfig;
@@ -98,16 +92,25 @@ export class LiveTuning {
   private recent = new Map<string, number[]>();
   private count = new Map<string, number>();
 
-  constructor(stored: Offsets = {}, cfg: Partial<LiveTuningConfig> = {}) {
+  constructor(
+    stored: Offsets = {},
+    cfg: Partial<LiveTuningConfig> = {},
+    readonly tuningKnown = false,
+  ) {
     this.cfg = { ...DEFAULT_LIVE, ...cfg };
     this.stored = { ...stored };
     this.values = { ...stored };
   }
 
-  /** Abweichung je notierter MIDI-Nummer (für die Wertung) */
-  readonly offsetOf: OffsetOf = (midi) => offsetFor(this.values, midi);
+  /** Wert für noch nicht gemessene Töne: bekannter Stimmton 0, unbekannter der Median aller Werte */
+  fallback(): number {
+    return this.tuningKnown ? 0 : (median(Object.values(this.values)) ?? 0);
+  }
 
-  /** Messung: Ton midi klang mit cents Abweichung vom Stimmton (nicht vom Profil) */
+  /** Abweichung je notierter MIDI-Nummer (für die Wertung) */
+  readonly offsetOf: OffsetOf = (midi) => offsetFor(this.values, midi, this.fallback());
+
+  /** Messung: Ton midi klang mit cents Abweichung vom Stimmton der Flöte (nicht vom Wert des Tons) */
   observe(midi: number, cents: number): void {
     const n = chartNoteByMidi(midi);
     if (!n) return;
@@ -118,12 +121,13 @@ export class LiveTuning {
     this.recent.set(n.id, list);
     this.count.set(n.id, (this.count.get(n.id) ?? 0) + 1);
     if (list.length < cfg.minFrames) return;
-    const cur = this.values[n.id] ?? fallbackOffset(this.values);
+    const cur = this.values[n.id] ?? this.fallback();
     const med = median(list)!;
     const step = Math.max(-cfg.maxStep, Math.min(cfg.maxStep, cfg.rate * (med - cur)));
-    let v = clampOffset(cur + step);
+    // gespeicherte Töne höchstens maxDrift von ihrem Wert (der nach einem Wechsel des Stimmtons auch über
+    // ±49 liegen kann), neue höchstens einen halben Halbton vom Stimmton
     const s = this.stored[n.id];
-    if (s !== undefined) v = Math.max(s - cfg.maxDrift, Math.min(s + cfg.maxDrift, v));
+    const v = s !== undefined ? Math.max(s - cfg.maxDrift, Math.min(s + cfg.maxDrift, cur + step)) : clampOffset(cur + step);
     this.values[n.id] = v;
   }
 
@@ -175,7 +179,8 @@ export type CalibrateState =
   | { phase: "wrong"; heardMidi: number };
 
 /**
- * Misst die Abweichung eines Tons: Median der Cent-Abweichung (relativ zum Stimmton) über die stabile
+ * Misst die Abweichung eines Tons: Median der Cent-Abweichung (relativ zum Stimmton tuning, dem der
+ * Flöte) über die stabile
  * Phase eines ruhig gehaltenen Tons. Ein Toneinsatz beginnt nach Stille bzw. bei einem Tonwechsel (über
  * 70 Cent, wie im Glätter); nur klare, stabile Messungen zählen. Liegt der Median 50 Cent oder mehr vom
  * Zielton weg, war es wohl ein anderer Ton („wrong“, mit dem gehörten Ton).
@@ -189,7 +194,7 @@ export class FluteCalibrator {
 
   constructor(
     readonly targetMidi: number,
-    readonly tuning = 440,
+    readonly tuning = A4,
     cfg: Partial<CalibrateConfig> = {},
   ) {
     this.cfg = { ...DEFAULT_CALIBRATE, ...cfg };
@@ -208,7 +213,7 @@ export class FluteCalibrator {
       return this.state;
     }
     this.gapStart = null;
-    const m = 69 + 12 * Math.log2(f.freq / this.tuning) - 12;
+    const m = freqToWrittenMidi(f.freq, this.tuning);
     const dev = (m - this.targetMidi) * 100;
     const r = this.run;
     if (!r || (r.devs.length >= 3 && Math.abs(dev - median(r.devs)!) > 70)) {

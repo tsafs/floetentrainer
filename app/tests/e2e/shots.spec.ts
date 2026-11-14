@@ -352,12 +352,12 @@ for (const s of SIZES.filter((x) => x.name === "360x740" || x.name === "740x360"
       // Einstellungen: Abschnitt Flöte, zweite Flöte, Umbenennen, Löschen
       await page.goto("./#/einstellungen");
       await page.getByRole("button", { name: "Flöte hinzufügen" }).click();
-      await page.getByTestId("flute-name-input").fill("Holzflöte");
-      await page.getByRole("heading", { name: "Flöte" }).scrollIntoViewIfNeeded();
+      await page.getByTestId("flute-new-name").fill("Holzflöte");
+      await page.getByRole("heading", { name: "Flöte", exact: true }).scrollIntoViewIfNeeded();
       await page.evaluate(() => window.scrollBy(0, -12));
-      await page.screenshot({ path: p("r7-einstellungen-floete-umbenennen") });
-      await page.getByRole("button", { name: "Übernehmen" }).click();
-      await page.getByRole("heading", { name: "Flöte" }).scrollIntoViewIfNeeded();
+      await page.screenshot({ path: p("r7-einstellungen-floete-neu") });
+      await page.getByRole("button", { name: "Flöte anlegen" }).click();
+      await page.getByRole("heading", { name: "Flöte", exact: true }).scrollIntoViewIfNeeded();
       await page.evaluate(() => window.scrollBy(0, -12));
       await page.screenshot({ path: p("r8-einstellungen-floete") });
       await page.getByRole("button", { name: "Löschen" }).click();
@@ -381,6 +381,58 @@ for (const s of SIZES.filter((x) => x.name === "360x740" || x.name === "740x360"
       await page.evaluate(() => window.scrollTo(0, 0));
       await page.screenshot({ path: p("r12-floete-einstellen-fertig") });
       await page.screenshot({ path: p("r12-floete-einstellen-fertig-ganz"), fullPage: true });
+    });
+  });
+}
+
+// Stimmton je Flöte: Einstellungen (bekannt/unbekannt), Neuanlegen-Frage, Flöte einstellen, Stimmgerät.
+// Nur 360×740 und quer 740×360 (SCHEME=dark für dunkel).
+for (const s of SIZES.filter((x) => x.name === "360x740" || x.name === "740x360")) {
+  test.describe(`stimmton ${s.name}`, () => {
+    test.use({ viewport: { width: s.width, height: s.height }, deviceScaleFactor: 2, colorScheme: scheme });
+    test("Stimmton der Flöte", async ({ page }) => {
+      test.setTimeout(90_000);
+      await page.addInitScript(FAKE_MIC);
+      const kid = 440 * 2 ** (-30 / 1200);
+      await seed(page, {
+        ...sampleData(),
+        version: 2,
+        flutes: [
+          { id: "floete-1", name: "Kinderflöte", tuning: { hz: kid, known: false }, offsets: { d1: 2, e1: -15, fis1: 8, g1: 0, a1: 3, h1: -4, c2: 6, d2: -2 }, updated: 1 },
+          { id: "floete-2", name: "Neue Flöte", tuning: { hz: 442, known: true }, offsets: { g1: -18, a1: -12, h1: -20, c2: -9 }, updated: 1 },
+        ],
+        activeFlute: "floete-1",
+      });
+      const p = (x: string) => `${OUT}/${scheme}-${s.name}-${x}.png`;
+      const toFlute = async () => {
+        await page.evaluate(() => window.scrollBy(0, (document.querySelector(".settings h2 + .flutes")!.previousElementSibling as HTMLElement).getBoundingClientRect().top - 12));
+      };
+      await page.goto("./#/einstellungen");
+      await page.evaluate(() => document.fonts.ready);
+      await toFlute();
+      await page.screenshot({ path: p("s1-einstellungen-stimmton-unbekannt") });
+      await page.getByRole("radio", { name: /Neue Flöte/ }).click();
+      await toFlute();
+      await page.screenshot({ path: p("s2-einstellungen-stimmton-bekannt") });
+      await page.getByRole("button", { name: "Flöte hinzufügen" }).click();
+      await page.getByTestId("flute-new-name").fill("Altflöte");
+      await toFlute();
+      await page.screenshot({ path: p("s3-neue-floete-frage") });
+      await page.getByTestId("flute-add").getByRole("button", { name: "442 Hz" }).click();
+      await toFlute();
+      await page.screenshot({ path: p("s4-neue-floete-442") });
+      await page.getByRole("button", { name: "Abbrechen" }).click();
+      // Flöte einstellen (bekannt, mit Angebot) und Stimmgerät
+      await page.goto("./#/floete");
+      await page.evaluate(() => document.fonts.ready);
+      await page.screenshot({ path: p("s5-floete-einstellen-bekannt"), fullPage: true });
+      await page.goto("./#/stimmgeraet");
+      await page.getByRole("button", { name: "Mikrofon einschalten" }).click();
+      await page.waitForFunction(() => (window as unknown as { __osc: unknown }).__osc !== null);
+      await page.evaluate((f) => (window as unknown as { __osc: { play(f: number): void } }).__osc.play(f), soundingFreq(69, 442) * 2 ** (-12 / 1200));
+      await expect(page.getByTestId("tuner-flute")).not.toHaveText("");
+      await page.waitForTimeout(300);
+      await page.screenshot({ path: p("s6-stimmgeraet-floete") });
     });
   });
 }

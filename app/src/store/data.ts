@@ -3,6 +3,7 @@
 import { levelOf, stagesOf, type Kind, type Track } from "../music/levels";
 import { NOTES } from "../music/notes";
 import { TEMPO_MAX, TEMPO_MIN } from "../songs/tempo";
+import { A4, clampTuning, defaultTuning, fromLegacy, roundOffset, type Tuning } from "../music/tuning";
 import { isValidDayKey } from "./dates";
 
 export const DATA_VERSION = 2;
@@ -17,7 +18,8 @@ export interface Settings {
   sessionCards: number;
   toleranceCents: number;
   holdMs: number;
-  tuningHz: number;
+  // (Bis 14.11.2026 stand hier der Stimmton für alle Flöten, tuningHz. Er gehört jetzt zur Flöte,
+  // Flute.tuning; alte Daten werden in normalizeData umgewandelt.)
   theme: Theme;
   /** Mitspielen: Sie trägt Kopfhörer – dann darf leise die Melodie mitklingen */
   headphones: boolean;
@@ -43,15 +45,19 @@ export interface InputLatency {
 }
 
 /**
- * Eine Flöte mit ihren Eigenheiten: je Ton die Abweichung vom Stimmton in Cent (Kennung der
- * Grifftabelle → Cent), gemessen mit „Flöte einstellen“ oder beim Mitspielen nachgeführt
- * (../audio/flute-profile.ts). Gehört zum Gegenstand Flöte, der mit ihr umzieht – kommt deshalb mit in die
+ * Eine Flöte mit ihren Eigenheiten: ihr Stimmton (bekannt oder aus den Messungen ermittelt) und je Ton
+ * die Abweichung von diesem Stimmton in Cent (Kennung der Grifftabelle → Cent, auf 0,01 genau), gemessen
+ * mit „Flöte einstellen“ oder beim Mitspielen nachgeführt (../audio/flute-profile.ts; Rechnung in
+ * ../music/tuning.ts). Gehört zum Gegenstand Flöte, der mit ihr umzieht – kommt deshalb mit in die
  * Sicherung (anders als die Verzögerung des Geräts).
  */
 export interface Flute {
   /** Kennung, z. B. "floete-1" */
   id: string;
   name: string;
+  /** Stimmton dieser Flöte (seit 14.11.2026; vorher galt settings.tuningHz für alle) */
+  tuning: Tuning;
+  /** Wert je Ton in Cent relativ zu tuning.hz; ungemessene Töne: 0 */
   offsets: Record<string, number>;
   /** Zeitpunkt der letzten Änderung der Werte (ms), 0 = nie */
   updated: number;
@@ -61,7 +67,12 @@ export const FLUTE_NAME_MAX = 40;
 export const DEFAULT_FLUTE_NAME = "Meine Flöte";
 
 export function defaultFlute(): Flute {
-  return { id: "floete-1", name: DEFAULT_FLUTE_NAME, offsets: {}, updated: 0 };
+  return newFlute("floete-1", DEFAULT_FLUTE_NAME);
+}
+
+/** Neue Flöte ohne Werte; ohne Angabe ist der Stimmton unbekannt (440 angenommen) */
+export function newFlute(id: string, name: string, tuning: Tuning = defaultTuning()): Flute {
+  return { id, name, tuning: { ...tuning }, offsets: {}, updated: 0 };
 }
 
 /** Art des Mitspielens: Warte-Modus oder Takt-Modus */
@@ -148,6 +159,14 @@ export interface AppData {
    * neu messen (und werden beim Mitspielen ohnehin nachgeführt). Eine ältere App ließe das Feld beim
    * Speichern weg – das kostet höchstens ein erneutes „Flöte einstellen“. Ein Sprung würde dagegen eine
    * noch nicht aktualisierte App alle Daten ablehnen lassen.
+   *
+   * Auch der Stimmton je Flöte (Flute.tuning, statt settings.tuningHz) kam ohne Sprung: Eine ältere App
+   * fände kein settings.tuningHz und nähme 440 Hz; die Werte je Ton (jetzt relativ zum Stimmton der Flöte)
+   * hielte sie für relativ zu 440 – bei einer Flöte mit 432 Hz läge sie etwa 30 Cent daneben, was ihr
+   * Nachführen beim Mitspielen ohnehin ausgleicht, und beim Speichern ginge tuning verloren (ein
+   * eingetragener Stimmton wäre neu einzutragen, ein ermittelter neu zu messen). Beides ist
+   * wiederherstellbar und kommt nur vor, solange eine veraltete App läuft; ein Sprung würde dagegen dort
+   * alle Daten sperren.
    */
   flutes: Flute[];
   activeFlute: string;
@@ -158,7 +177,6 @@ export const DEFAULT_SETTINGS: Settings = {
   sessionCards: 20,
   toleranceCents: 40,
   holdMs: 300,
-  tuningHz: 440,
   theme: "auto",
   headphones: false,
   followMode: "wait",
@@ -170,7 +188,6 @@ export const SETTING_LIMITS: Record<NumSetting, [number, number]> = {
   sessionCards: [5, 60],
   toleranceCents: [10, 50],
   holdMs: [100, 1000],
-  tuningHz: [415, 466],
 };
 
 export function defaultData(): AppData {
@@ -195,6 +212,11 @@ export function defaultData(): AppData {
 /** Die aktive Flöte (gibt es immer) */
 export function activeFlute(d: Pick<AppData, "flutes" | "activeFlute">): Flute {
   return d.flutes.find((f) => f.id === d.activeFlute) ?? d.flutes[0];
+}
+
+/** Stimmton der aktiven Flöte in Hz – gilt überall (Übung, Stimmgerät, Mitspielen, Vorspielen, Abgleich) */
+export function tuningHz(d: Pick<AppData, "flutes" | "activeFlute">): number {
+  return activeFlute(d).tuning.hz;
 }
 
 /** Grenzen der Eingangs-Verzögerung in ms (wie LATENCY_MIN/MAX in ../audio/follow.ts) */
@@ -388,27 +410,47 @@ export function normalizeData(raw: unknown): AppData {
       });
     });
   }
-  // Flöten: Messwerte, keine Eingabe von ihr außer dem Namen – Fehlerhaftes wird still übergangen,
-  // unbekannte Töne und Werte außerhalb ±49 Cent fallen weg bzw. werden begrenzt. Ohne gültige Flöte
-  // bleibt die Standard-Flöte.
+  // Flöten: Messwerte, keine Eingabe von ihr außer Name und bekanntem Stimmton – Fehlerhaftes wird still
+  // übergangen, unbekannte Töne und Werte außerhalb ±49 Cent fallen weg bzw. werden begrenzt, der
+  // Stimmton auf 415–466 Hz. Ohne gültige Flöte bleibt die Standard-Flöte.
+  //
+  // Umwandlung (ohne Versionssprung, siehe AppData.flutes): Bis 14.11.2026 galt ein Stimmton für alle
+  // (settings.tuningHz), und die Werte je Ton waren relativ dazu gemessen. Eine Flöte ohne Feld tuning
+  // bekommt einen unbekannten Stimmton aus ihren absoluten Lagen (fromLegacy in ../music/tuning.ts);
+  // ohne Werte gilt für die aktive Flöte der alte Stimmton, für weitere Flöten 440 Hz.
+  const legacyHz = isObj(d.settings) && isNum(d.settings.tuningHz) ? clampTuning(d.settings.tuningHz) : A4;
+  const rawActive = typeof d.activeFlute === "string" ? d.activeFlute : null;
   if (Array.isArray(d.flutes)) {
     const taken = new Set<string>();
     const list: Flute[] = [];
     for (const f of d.flutes) {
       if (!isObj(f) || typeof f.id !== "string" || !FLUTE_ID_RE.test(f.id) || taken.has(f.id)) continue;
       taken.add(f.id);
-      const offsets: Record<string, number> = {};
+      let offsets: Record<string, number> = {};
       if (isObj(f.offsets)) {
         for (const [k, v] of Object.entries(f.offsets)) {
-          if (NOTES[k] && !NOTES[k].partner && isNum(v)) offsets[k] = Math.round(Math.max(-49, Math.min(49, v)));
+          if (NOTES[k] && !NOTES[k].partner && isNum(v)) offsets[k] = roundOffset(v);
         }
       }
       const name = typeof f.name === "string" && f.name.trim() ? f.name.trim().slice(0, FLUTE_NAME_MAX) : DEFAULT_FLUTE_NAME;
-      list.push({ id: f.id, name, offsets, updated: isNum(f.updated) ? f.updated : 0 });
+      let tuning: Tuning;
+      if (isObj(f.tuning) && isNum(f.tuning.hz)) {
+        tuning = { hz: clampTuning(f.tuning.hz), known: f.tuning.known === true };
+      } else {
+        // alte Flöte: aktive (bzw. erste) mit dem alten Stimmton, weitere ohne Werte mit 440 Hz
+        const isActive = rawActive === null ? list.length === 0 : f.id === rawActive;
+        const conv = fromLegacy(offsets, Object.keys(offsets).length || isActive ? legacyHz : A4);
+        tuning = conv.tuning;
+        offsets = conv.offsets;
+      }
+      list.push({ id: f.id, name, tuning, offsets, updated: isNum(f.updated) ? f.updated : 0 });
     }
     if (list.length) out.flutes = list;
+  } else {
+    // ganz alte Daten ohne Flöten: die Standard-Flöte übernimmt den alten Stimmton (unbekannt)
+    out.flutes[0].tuning.hz = legacyHz;
   }
-  if (typeof d.activeFlute === "string" && out.flutes.some((f) => f.id === d.activeFlute)) out.activeFlute = d.activeFlute;
+  if (rawActive !== null && out.flutes.some((f) => f.id === rawActive)) out.activeFlute = rawActive;
   else out.activeFlute = out.flutes[0].id;
   return out;
 }
