@@ -1,4 +1,5 @@
-// Mitspielen mit Mikrofon: Warte-Modus und Takt-Modus, mit vorgetäuschtem Mikrofon (Oszillator).
+// Mitspielen mit Mikrofon: „Wartet auf mich“ (Warte-Modus) und „Im Takt“ (Takt-Modus), mit vorgetäuschtem
+// Mikrofon (Oszillator). Rückmeldung nur über Farben (keine Auswertung, keine Bestwerte).
 //
 // Verfahren: Diese Tests laufen in Echtzeit, ohne page.clock. Die Tonerkennung braucht echtes
 // Audio-Rendering (Oszillator → MediaStream → Analyser → pitchy), und das läuft auf dem Audio-Thread
@@ -52,10 +53,21 @@ interface FollowDebug {
 }
 const dbg = (page: Page) => page.evaluate(() => (window as unknown as { __lied: { follow(): FollowDebug } }).__lied.follow());
 
-async function start(page: Page, mode: "Warte-Modus" | "Takt-Modus") {
-  await page.getByRole("button", { name: "Mitspielen" }).click();
+type Mode = "Wartet auf mich" | "Im Takt";
+const go = (page: Page) => page.locator('[data-act="fstart"]');
+/** zum Mitspielen umschalten (Umschalter oben) */
+const toFollow = (page: Page) => page.getByRole("tab", { name: "Mitspielen" }).click();
+/** warten, bis der Durchgang fertig ist (Leiste wieder zum Einstellen) */
+const finished = (page: Page, timeout = 9000) =>
+  page.waitForFunction(() => {
+    const f = (window as unknown as { __lied: { follow(): FollowDebug } }).__lied.follow();
+    return f.active && !f.running;
+  }, null, { timeout });
+
+async function start(page: Page, mode: Mode) {
+  await toFollow(page);
   await page.getByRole("button", { name: mode }).click();
-  await page.getByRole("button", { name: "Start" }).click();
+  await go(page).click();
   await page.waitForFunction(() => (window as unknown as { __lied: { follow(): FollowDebug } }).__lied.follow().started);
   await page.waitForFunction(() => (window as unknown as { __osc: unknown }).__osc !== null);
 }
@@ -105,7 +117,14 @@ async function colors(page: Page): Promise<string[]> {
     return gs.slice(0, n).map((g) => (g.classList.contains("hit") ? "hit" : g.classList.contains("miss") ? "miss" : ""));
   }, MELODY.length);
 }
-const result = (page: Page) => page.getByTestId("follow-result");
+/** keine Auswertung, kein Bestwert: nur Farben */
+async function noScore(page: Page) {
+  await expect(page.getByText(/von \d+ (Noten|Tönen)/)).toHaveCount(0);
+  await expect(page.getByText(/Bestes|Schwierig|Bis hierher/)).toHaveCount(0);
+  await expect(page.locator("button.barbtn")).toHaveCount(0);
+  const d = await stored(page);
+  expect(JSON.stringify(d.songs ?? {})).not.toContain("best");
+}
 const learning = async (page: Page) => {
   const d = await stored(page);
   return JSON.stringify([d.history, d.cards, d.days, d.sessions, d.stages, d.introduced]);
@@ -113,34 +132,37 @@ const learning = async (page: Page) => {
 
 test.describe.configure({ mode: "parallel" });
 
-test("Warte-Modus richtig gespielt: alles grün, Auswertung, Bestwert gemerkt, Lernspuren unverändert, Mikrofon wieder aus", async ({ page }) => {
+test("Warte-Modus richtig gespielt: alles grün, keine Auswertung, kein Bestwert, Lernspuren unverändert, Mikrofon wieder aus", async ({ page }) => {
   await open(page);
   const before = await learning(page);
-  await start(page, "Warte-Modus");
-  // vor dem ersten Ton: Markierung auf der ersten Note, Griffbild g¹
+  await start(page, "Wartet auf mich");
+  // vor dem ersten Ton: Markierung auf der ersten Note, Name g¹ (kein Griffbild)
   await expect(page.getByTestId("follow-note")).toHaveText("g1");
   expect((await dbg(page)).index).toBe(0);
   await expect(page.locator(".score .cur")).toHaveCount(1);
   // Stille: nichts geht weiter
   await page.waitForTimeout(600);
   expect((await dbg(page)).index).toBe(0);
+  await expect(page.locator(".songpage .flute")).toHaveCount(0);
   await playSeq(page, waitPieces());
-  await expect(result(page)).toContainText("7 von 7 Noten getroffen", { timeout: 8000 });
+  await finished(page, 8000);
   expect(await colors(page)).toEqual(Array(7).fill("hit"));
   await expect(page.locator(".score .cur")).toHaveCount(0);
-  await expect(page.getByTestId("follow-best")).toHaveText("Bestes im Warte-Modus: 7 von 7");
-  const d = await stored(page);
-  expect(d.songs[SONG].best.wait).toMatchObject({ hits: 7, total: 7 });
-  expect(d.songs[SONG].best.beat).toBeUndefined();
+  await noScore(page);
+  // die Farben bleiben stehen; „Nochmal“ ist wieder der Knopf „Mitspielen“
+  await expect(go(page)).toBeVisible();
+  await expect(go(page)).toHaveText("Mitspielen");
+  await page.waitForTimeout(500);
+  expect(await colors(page)).toEqual(Array(7).fill("hit"));
   expect(await learning(page)).toBe(before);
   expect(await page.evaluate(() => (window as unknown as { __micStopped: boolean }).__micStopped)).toBe(true);
   // ohne Kopfhörer: kein Ton erklungen
   expect(await audioLog(page, "tone")).toEqual([]);
 });
 
-test("Warte-Modus mit falschen Tönen: Note rot, „Du spielst …“, geht weiter; schlechteres Ergebnis ersetzt den Bestwert nicht", async ({ page }) => {
-  await open(page, { ...data(), songs: { [SONG]: { best: { wait: { hits: 6, total: 7, at: 1 } } } } });
-  await start(page, "Warte-Modus");
+test("Warte-Modus mit falschen Tönen: Note rot, „Du spielst …“, geht weiter; Farben bleiben bis zum Neustart oder einer neuen Auswahl; alte Bestwerte werden verworfen", async ({ page }) => {
+  await open(page, { ...data(), songs: { [SONG]: { tempo: 90, best: { wait: { hits: 6, total: 7, at: 1 } } } } });
+  await start(page, "Wartet auf mich");
   await expect(page.getByTestId("follow-note")).toHaveText("g1");
   // erst ein falscher Ton für die erste Note: Hinweis, Note schon rot, Markierung wartet
   const t0 = Date.now();
@@ -151,21 +173,37 @@ test("Warte-Modus mit falschen Tönen: Note rot, „Du spielst …“, geht weit
   expect((await dbg(page)).index).toBe(0);
   // dann der Rest, mit einem falschen Ton vor der fünften Note (c²)
   await playSeq(page, waitPieces({ 4: 74 }));
-  await expect(result(page)).toContainText("5 von 7 Noten getroffen", { timeout: 9000 });
-  expect(await colors(page)).toEqual(["miss", "hit", "hit", "hit", "miss", "hit", "hit"]);
-  // Schwierige Takte: je ein Fehler, Takt 2 hat weniger Noten (höhere Fehlerquote) und steht vorn
-  await expect(result(page).locator("button.barbtn")).toHaveText(["Takt 2", "Takt 1"]);
-  await expect(page.getByTestId("follow-best")).toHaveText("Bestes im Warte-Modus: 6 von 7");
-  expect((await stored(page)).songs[SONG].best.wait).toMatchObject({ hits: 6, total: 7 });
-  // Takt antippen → wird als Abschnitt gewählt
-  await result(page).locator("button.barbtn", { hasText: "Takt 2" }).click();
-  await expect(page.locator('rect.takt[data-bar="1"]')).toHaveClass(/inloop/);
-  await expect(page.getByTestId("follow-go")).toHaveText("Takt 2 in Schleife");
+  await finished(page, 9000);
+  const after = ["miss", "hit", "hit", "hit", "miss", "hit", "hit"];
+  expect(await colors(page)).toEqual(after);
+  await noScore(page);
+  // gespeichert wurde (Wahl der Art): das alte Feld ist weg, das Tempo bleibt
+  expect((await stored(page)).songs[SONG]).toEqual({ tempo: 90 });
+  // Wechsel der Art lässt die Farben stehen
+  await page.getByRole("button", { name: "Im Takt" }).click();
+  await page.getByRole("button", { name: "Wartet auf mich" }).click();
+  expect(await colors(page)).toEqual(after);
+  // eine neue Auswahl löscht sie
+  await page.locator('rect.takt[data-bar="1"]').click();
+  expect(await colors(page)).toEqual(Array(7).fill(""));
+});
+
+test("Mitspielen: ein Neustart löscht die Farben des letzten Durchgangs", async ({ page }) => {
+  await open(page);
+  await start(page, "Wartet auf mich");
+  const ms = await playSeq(page, waitPieces().slice(0, 4)); // zwei Noten
+  await page.waitForTimeout(ms + 200);
+  await page.getByRole("button", { name: "Stopp" }).click();
+  expect(await colors(page)).toEqual(["hit", "hit", "", "", "", "", ""]);
+  await go(page).click();
+  await page.waitForFunction(() => (window as unknown as { __lied: { follow(): FollowDebug } }).__lied.follow().started);
+  expect(await colors(page)).toEqual(Array(7).fill(""));
+  await page.getByRole("button", { name: "Stopp" }).click();
 });
 
 test("Warte-Modus: Tonwiederholung braucht einen neuen Einsatz", async ({ page }) => {
   await open(page);
-  await start(page, "Warte-Modus");
+  await start(page, "Wartet auf mich");
   // g¹, a¹, dann h¹ lange gehalten (über beide h¹-Noten)
   const ms = await playSeq(page, [[67, 300], [null, 150], [69, 300], [null, 150], [71, 1200]]);
   await page.waitForTimeout(ms + 100);
@@ -175,11 +213,10 @@ test("Warte-Modus: Tonwiederholung braucht einen neuen Einsatz", async ({ page }
   await playSeq(page, [[71, 300], [null, 150]]);
   await expect.poll(async () => (await dbg(page)).index, { timeout: 3000 }).toBe(4);
   expect(await colors(page)).toEqual(["hit", "hit", "hit", "hit", "", "", ""]);
-  // Stopp mittendrin: Auswertung bis hierher, kein Bestwert
+  // Stopp mittendrin: das Gespielte bleibt gefärbt, keine Auswertung, kein Bestwert
   await page.getByRole("button", { name: "Stopp" }).click();
-  await expect(result(page)).toContainText("Bis hierher:");
-  await expect(result(page)).toContainText("4 von 4 Noten getroffen");
-  expect((await stored(page)).songs[SONG]?.best).toBeUndefined();
+  expect(await colors(page)).toEqual(["hit", "hit", "hit", "hit", "", "", ""]);
+  await noScore(page);
 });
 
 /** Balken (Mitte x) und Mitte des Notenkopfs der i-ten Note; x null, wenn der Balken nicht zu sehen ist */
@@ -194,7 +231,7 @@ const barAndHead = (page: Page, i: number) =>
 
 test("Balken: im Warte-Modus an der Note, auf die gewartet wird; im Takt-Modus läuft er mit", async ({ page }) => {
   await open(page);
-  await start(page, "Warte-Modus");
+  await start(page, "Wartet auf mich");
   let p = await barAndHead(page, 0);
   expect(p.x).not.toBeNull();
   expect(Math.abs(p.x! - p.head)).toBeLessThan(1);
@@ -206,8 +243,8 @@ test("Balken: im Warte-Modus an der Note, auf die gewartet wird; im Takt-Modus l
   expect((await barAndHead(page, 0)).x).toBeNull();
 
   // Takt-Modus: nach dem Einzählen (2 s) stetig nach rechts
-  await page.getByRole("button", { name: "Takt-Modus" }).click();
-  await page.getByRole("button", { name: "Start" }).click();
+  await page.getByRole("button", { name: "Im Takt" }).click();
+  await go(page).click();
   await page.waitForFunction(() => (window as unknown as { __lied: { follow(): FollowDebug } }).__lied.follow().startMs !== null);
   const startMs = (await dbg(page)).startMs!;
   await page.waitForFunction((t) => performance.now() > t + 300, startMs);
@@ -219,16 +256,15 @@ test("Balken: im Warte-Modus an der Note, auf die gewartet wird; im Takt-Modus l
   expect((await barAndHead(page, 0)).x).toBeNull();
 });
 
-test("Takt-Modus richtig gespielt: Einzählen und leise Klicks ohne Melodie, alles grün, Bestwert", async ({ page }) => {
+test("Takt-Modus richtig gespielt: Einzählen und leise Klicks ohne Melodie, alles grün, keine Auswertung", async ({ page }) => {
   await open(page);
   const before = await learning(page);
-  await start(page, "Takt-Modus");
+  await start(page, "Im Takt");
   await playBeat(page);
   await expect(page.getByTestId("follow-count")).toBeVisible();
-  await expect(result(page)).toContainText("7 von 7 Noten getroffen", { timeout: 9000 });
+  await finished(page);
   expect(await colors(page)).toEqual(Array(7).fill("hit"));
-  await expect(page.getByTestId("follow-best")).toHaveText("Bestes im Takt-Modus: 7 von 7");
-  expect((await stored(page)).songs[SONG].best.beat).toMatchObject({ hits: 7, total: 7 });
+  await noScore(page);
   expect(await learning(page)).toBe(before);
   // Klicks: 4 Einzählen + 8 Metronom, Melodie aus (ohne Kopfhörer)
   expect((await audioLog(page, "click")).length).toBe(12);
@@ -236,48 +272,48 @@ test("Takt-Modus richtig gespielt: Einzählen und leise Klicks ohne Melodie, all
   expect(await page.evaluate(() => (window as unknown as { __micStopped: boolean }).__micStopped)).toBe(true);
 });
 
-test("Takt-Modus mit falschen Tönen: diese Noten rot, schwierigster Takt genannt", async ({ page }) => {
+test("Takt-Modus mit falschen Tönen: diese Noten rot, sonst nichts", async ({ page }) => {
   await open(page);
-  await start(page, "Takt-Modus");
+  await start(page, "Im Takt");
   const midis = [...MELODY];
   midis[1] = 72; // statt a¹ ein c²
   midis[5] = 74; // statt a¹ ein d²
   midis[4] = 74; // statt c² ein d²
   await playBeat(page, { midis });
-  await expect(result(page)).toContainText("4 von 7 Noten getroffen", { timeout: 9000 });
+  await finished(page);
   expect(await colors(page)).toEqual(["hit", "miss", "hit", "hit", "miss", "miss", "hit"]);
-  await expect(result(page).locator("button.barbtn")).toHaveText(["Takt 2", "Takt 1"]);
+  await noScore(page);
 });
 
 test("Takt-Modus mit Verspätung: 0,1 s wird ausgeglichen, 0,35 s macht die Noten rot", async ({ page }) => {
   await open(page);
-  await start(page, "Takt-Modus");
+  await start(page, "Im Takt");
   await playBeat(page, { delay: 100 });
-  await expect(result(page)).toContainText("7 von 7 Noten getroffen", { timeout: 9000 });
+  await finished(page);
+  expect(await colors(page)).toEqual(Array(7).fill("hit"));
   // nochmal, deutlich zu spät: Nur die zweite h¹ (der verspätete erste Ton passt) und die lange
   // Schlussnote haben genug Zeit mit ihrem Ton.
-  await page.getByRole("button", { name: "Start" }).click();
+  await go(page).click();
   await page.waitForFunction(() => (window as unknown as { __lied: { follow(): FollowDebug } }).__lied.follow().started);
   await playBeat(page, { delay: 350 });
-  await expect(result(page)).toContainText("2 von 7 Noten getroffen", { timeout: 9000 });
+  await finished(page);
   expect(await colors(page)).toEqual(["miss", "miss", "miss", "hit", "miss", "miss", "hit"]);
-  // der erste Durchgang bleibt der Bestwert
-  expect((await stored(page)).songs[SONG].best.beat).toMatchObject({ hits: 7, total: 7 });
 });
 
 test("Kopfhörer: Schalter im Mitspielen und in den Einstellungen ist dieselbe Einstellung; Melodie leise im Takt-Modus, Zielton im Warte-Modus", async ({ page }) => {
   await open(page);
-  await page.getByRole("button", { name: "Mitspielen" }).click();
+  await toFollow(page);
   const sw = page.getByRole("switch", { name: /Ich trage Kopfhörer/ });
   await expect(sw).toHaveAttribute("aria-checked", "false");
-  await expect(page.getByTestId("phones-hint")).toContainText("das Mikrofon das Handy mithören");
+  await expect(page.getByTestId("phones-hint")).toContainText("bleibt die Melodie aus");
+  await expect(page.getByTestId("phones-hint")).toContainText("Mikrofon");
   await sw.click();
   await expect(sw).toHaveAttribute("aria-checked", "true");
   expect((await stored(page)).settings.headphones).toBe(true);
   // Takt-Modus: Melodie klingt mit
-  await page.getByRole("button", { name: "Takt-Modus" }).click();
+  await page.getByRole("button", { name: "Im Takt" }).click();
   await expect(page.getByTestId("phones-hint")).toHaveText("Die Melodie spielt leise mit.");
-  await page.getByRole("button", { name: "Start" }).click();
+  await go(page).click();
   await page.waitForFunction(() => (window as unknown as { __lied: { follow(): FollowDebug } }).__lied.follow().startMs !== null);
   await expect.poll(async () => (await audioLog(page, "tone")).length, { timeout: 6000 }).toBeGreaterThanOrEqual(3);
   const tones = await audioLog(page, "tone");
@@ -285,15 +321,18 @@ test("Kopfhörer: Schalter im Mitspielen und in den Einstellungen ist dieselbe E
   expect(tones[1].freq).toBeCloseTo(hz(69), 0);
   await page.getByRole("button", { name: "Stopp" }).click();
   // Warte-Modus: falscher Ton → der richtige erklingt kurz
-  await page.getByRole("button", { name: "Warte-Modus" }).click();
+  await page.getByRole("button", { name: "Wartet auf mich" }).click();
   const n = (await audioLog(page, "tone")).length;
-  await page.getByRole("button", { name: "Start" }).click();
+  await go(page).click();
   await page.waitForFunction(() => (window as unknown as { __lied: { follow(): FollowDebug } }).__lied.follow().started);
   await playSeq(page, [[72, 400], [null, 100]]);
   await expect(page.getByTestId("follow-wrong")).toHaveText("Du spielst c2");
   await expect.poll(async () => (await audioLog(page, "tone")).length).toBe(n + 1);
   expect((await audioLog(page, "tone"))[n].freq).toBeCloseTo(hz(67), 0);
-  await page.getByRole("button", { name: "Mitspielen beenden" }).click();
+  // während des Spielens ist der Umschalter gesperrt; nach dem Stopp zurück zum Anhören
+  await expect(page.getByRole("tab", { name: "Anhören" })).toBeDisabled();
+  await page.getByRole("button", { name: "Stopp" }).click();
+  await page.getByRole("tab", { name: "Anhören" }).click();
   // Einstellungen zeigen denselben Schalter; ausschalten wirkt auf der Liedseite
   await page.goto("./#/einstellungen");
   const sw2 = page.getByRole("switch", { name: /Ich trage Kopfhörer/ });
@@ -301,36 +340,41 @@ test("Kopfhörer: Schalter im Mitspielen und in den Einstellungen ist dieselbe E
   await sw2.click();
   await expect(sw2).toHaveAttribute("aria-checked", "false");
   await page.goto(`./#/lied/${SONG}`);
-  await page.getByRole("button", { name: "Mitspielen" }).click();
+  await toFollow(page);
   await expect(page.getByRole("switch", { name: /Ich trage Kopfhörer/ })).toHaveAttribute("aria-checked", "false");
   // letzte Wahl der Art ist gemerkt
-  await expect(page.getByRole("button", { name: "Warte-Modus" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Wartet auf mich" })).toHaveAttribute("aria-pressed", "true");
 });
 
-test("Mitspielen-Zustand: Vorspielen aus, Abschnitt gilt (Schleife), Verlassen beendet Mikrofon und Klicks", async ({ page }) => {
+test("Mitspielen-Zustand: Anhören aus, Auswahl gilt einmal (keine Schleife), Verlassen beendet Mikrofon und Klicks", async ({ page }) => {
   await open(page);
-  await page.getByRole("button", { name: "Mitspielen" }).click();
+  await toFollow(page);
   await expect(page.getByRole("button", { name: "Abspielen" })).toBeHidden();
-  await expect(page.getByRole("button", { name: "Start" })).toBeVisible();
-  // Abschnitt Takt 2 wählen: gilt beim Mitspielen
+  await expect(go(page)).toBeVisible();
+  // Takt 2 wählen: gilt beim Mitspielen
   await page.locator('rect.takt[data-bar="1"]').click();
-  await page.locator('rect.takt[data-bar="1"]').click();
-  await expect(page.getByTestId("follow-go")).toHaveText("Takt 2 in Schleife");
-  await page.getByRole("button", { name: "Takt-Modus" }).click();
-  await page.getByRole("button", { name: "Start" }).click();
+  await expect(go(page)).toHaveText("Takt 2 mitspielen");
+  await page.getByRole("button", { name: "Im Takt" }).click();
+  await go(page).click();
   await page.waitForFunction(() => (window as unknown as { __lied: { follow(): FollowDebug } }).__lied.follow().startMs !== null);
   const d = await dbg(page);
   expect(d.timeline!.tones.map((t) => t.midi)).toEqual([72, 69, 67]);
   await expect(page.getByTestId("follow-status")).toContainText("Takt 2", { timeout: 5000 });
-  // Seite verlassen: Mikrofon frei, Abspieler still
+  // ein Durchgang, dann ist Schluss (Einzählen 2 s + Takt 2 s): Mikrofon wieder aus, Auswahl bleibt
+  await finished(page, 7000);
+  expect(await page.evaluate(() => (window as unknown as { __micStopped: boolean }).__micStopped)).toBe(true);
+  expect((await audioLog(page, "click")).length).toBe(4 + 4);
+  await expect(go(page)).toHaveText("Takt 2 mitspielen");
+  // nochmal starten, dann die Seite verlassen: Mikrofon frei, Abspieler still
+  await go(page).click();
+  await page.waitForFunction(() => (window as unknown as { __lied: { follow(): FollowDebug } }).__lied.follow().startMs !== null);
   await page.getByRole("link", { name: "Zurück" }).click();
   await expect(page.getByRole("heading", { name: "Lieder", exact: true })).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as { __micStopped: boolean }).__micStopped)).toBe(true);
   expect(await page.evaluate(() => (window as unknown as { __lied: { player: { playing: boolean } } }).__lied.player.playing)).toBe(false);
-  // beenden führt zurück zum Vorspielen
+  // neu geöffnet: wieder beim Anhören
   await page.goto(`./#/lied/${SONG}`);
-  await page.getByRole("button", { name: "Mitspielen" }).click();
-  await page.getByRole("button", { name: "Mitspielen beenden" }).click();
+  await expect(page.getByRole("tab", { name: "Anhören" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("button", { name: "Abspielen" })).toBeVisible();
 });
 
@@ -340,8 +384,8 @@ test("Mikrofon verweigert: dieselbe Erklärung wie beim Spielen", async ({ page 
   });
   await seed(page, data());
   await page.goto(`./#/lied/${SONG}`);
-  await page.getByRole("button", { name: "Mitspielen" }).click();
-  await page.getByRole("button", { name: "Start" }).click();
+  await toFollow(page);
+  await go(page).click();
   await expect(page.getByRole("heading", { name: "Das Mikrofon ist nicht erlaubt" })).toBeVisible();
   await expect(page.getByText("Bei „Mikrofon“ auf „Zulassen“ stellen.")).toBeVisible();
 });
@@ -361,7 +405,7 @@ test("Takt-Modus: gemeldete Ausgabe-Verzögerung (z. B. Bluetooth) gilt für Mar
   });
   await open(page);
   expect(await page.evaluate(() => new AudioContext().outputLatency)).toBe(0.3);
-  await start(page, "Takt-Modus");
+  await start(page, "Im Takt");
   await page.waitForFunction(() => (window as unknown as { __lied: { follow(): FollowDebug } }).__lied.follow().startMs !== null);
   // Hörbeginn unabhängig von der Seite berechnet: eingeplanter Beginn + 0,3 s
   const heard = await page.evaluate(() => {
@@ -384,10 +428,11 @@ test("Takt-Modus: gemeldete Ausgabe-Verzögerung (z. B. Bluetooth) gilt für Mar
   }, heard);
   expect(markAt).toBeGreaterThan(SPQ * 1000 - 60);
   expect(markAt).toBeLessThan(SPQ * 1000 + 100);
-  await expect(result(page)).toContainText("7 von 7 Noten getroffen", { timeout: 9000 });
+  await finished(page);
+  expect(await colors(page)).toEqual(Array(7).fill("hit"));
 });
 
-test("Schneller Doppeltipp Start/Stopp bzw. Beenden während der Mikrofon-Abfrage: Mikrofon bleibt nicht an", async ({ page }) => {
+test("Schneller Doppeltipp Mitspielen/Stopp bzw. Verlassen während der Mikrofon-Abfrage: Mikrofon bleibt nicht an", async ({ page }) => {
   // getUserMedia antwortet erst nach 600 ms (wie bei der Erlaubnis-Abfrage); gezählt werden offene Spuren
   await page.addInitScript(FAKE_MIC);
   await page.addInitScript(() => {
@@ -414,20 +459,21 @@ test("Schneller Doppeltipp Start/Stopp bzw. Beenden während der Mikrofon-Abfrag
   await seed(page, data());
   await page.goto(`./#/lied/${SONG}`);
   const live = () => page.evaluate(() => (window as unknown as { __live: number }).__live);
-  await page.getByRole("button", { name: "Mitspielen" }).click();
-  await page.getByRole("button", { name: "Start" }).click();
+  await toFollow(page);
+  await go(page).click();
   await page.getByRole("button", { name: "Stopp" }).click();
   await page.waitForTimeout(1000);
   expect(await live()).toBe(0);
-  await page.getByRole("button", { name: "Start" }).click();
-  await page.getByRole("button", { name: "Mitspielen beenden" }).click();
+  await go(page).click();
+  await page.getByRole("link", { name: "Zurück" }).click();
   await page.waitForTimeout(1000);
   expect(await live()).toBe(0);
-  // Start, Stopp, Start: ein einziger Strom, und der Lauf beginnt
-  await page.getByRole("button", { name: "Mitspielen" }).click();
-  await page.getByRole("button", { name: "Start" }).click();
+  // Mitspielen, Stopp, Mitspielen: ein einziger Strom, und der Lauf beginnt
+  await page.goto(`./#/lied/${SONG}`);
+  await toFollow(page);
+  await go(page).click();
   await page.getByRole("button", { name: "Stopp" }).click();
-  await page.getByRole("button", { name: "Start" }).click();
+  await go(page).click();
   await page.waitForFunction(() => (window as unknown as { __lied: { follow(): FollowDebug } }).__lied.follow().started);
   expect(await live()).toBe(1);
   await page.getByRole("button", { name: "Stopp" }).click();
@@ -436,7 +482,7 @@ test("Schneller Doppeltipp Start/Stopp bzw. Beenden während der Mikrofon-Abfrag
 
 test("Warte-Modus mit Kopfhörern ohne falschen Ton: nach dem Stopp läuft der AudioContext des Abspielers nicht weiter", async ({ page }) => {
   await open(page, data({ headphones: true }));
-  await start(page, "Warte-Modus");
+  await start(page, "Wartet auf mich");
   const state = () => page.evaluate(() => (window as unknown as { __lied: { player: { context: AudioContext | null } } }).__lied.player.context?.state);
   expect(await state()).toBe("running"); // vorbereitet für den Zielton
   await page.getByRole("button", { name: "Stopp" }).click();

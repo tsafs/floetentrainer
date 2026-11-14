@@ -35,8 +35,8 @@ Silben, Atemzeichen, Seitenumbrüche.
    Durchsicht: `SHOTS=1 npx playwright test shots` (optional `SCHEME=dark`), landen in `app/shots/`.
    Veröffentlichung über `.github/workflows/pages.yml` auf https://tsafs.github.io/floetentrainer/.
 3. Lieder-Erweiterung (`docs/app-lieder.md`): **Runde 1 umgesetzt** (Liederliste `#/lieder`, Liedseite
-   `#/lied/<kennung>` mit Notensatz, Vorspielen, Tempo je Lied, Einzählen, Metronom, Abschnitt in
-   Schleife, Griffbild). Runde 2 (ABC-Dateien) und Runde 3 (Mitspielen) umgesetzt.
+   `#/lied/<kennung>` mit Notensatz, Vorspielen, Tempo je Lied, Einzählen, Metronom; Schleife und
+   Griffbild sind mit der Nachsteuerung vom 14.11.2026 entfallen). Runde 2 (ABC-Dateien) und Runde 3 (Mitspielen) umgesetzt.
    - Wo was liegt: `app/src/songs/` (Leser `parse.ts`, Modell, Zeitplan, Tempo, Spielbarkeit,
      Notensatz `layout.ts`/`engrave.ts`), Klang `app/src/audio/flute-synth.ts` und `song-player.ts`,
      Seiten `app/src/ui/songs.ts`, Tests `app/tests/unit/songs*.test.ts`, `timeline.test.ts`,
@@ -60,17 +60,21 @@ Silben, Atemzeichen, Seitenumbrüche.
      Version 2** (Umwandlung aus 1): eine ältere App hätte die eigenen Lieder sonst beim Speichern still
      verworfen, so lehnt sie die Daten ab. Kommen mit in die Sicherung; Tests `own-songs.test.ts`,
      `app/tests/e2e/abc.spec.ts`, Bildschirmfotos `*-e1…e7-*.png`.
-   - **Runde 3, Mitspielen:** Liedseite → Knopf „Mitspielen“ → Bedienleiste wechselt (Vorspielen aus):
-     Wahl Warte-/Takt-Modus (gemerkt in `settings.followMode`), Schalter „Ich trage Kopfhörer“
-     (`settings.headphones`, derselbe wie in den Einstellungen), Start/Stopp, im Takt-Modus Tempo,
-     „Mitspielen beenden“. Gewählter Abschnitt läuft in Schleife, jeder Durchgang einzeln gewertet.
-     Noten werden grün/rot (`.hit`/`.miss`), danach Auswertung „x von y Noten getroffen“ mit
-     schwierigsten Takten (antippen = Abschnitt). Bestwert je Lied und Art in `songs[id].best`
-     (optional, ohne Versionssprung; nur vollständige Durchgänge des ganzen Lieds). Lernspuren bleiben
-     unberührt. Wertung `app/src/audio/follow.ts`, Oberfläche `app/src/ui/song-follow.ts`, Abspieler-
+   - **Runde 3, Mitspielen** (Stand nach der Nachsteuerung vom 14.11.2026, siehe Ende von
+     `docs/app-lieder.md`): Liedseite mit Umschalter „Anhören | Mitspielen“ unter dem Titel, kein
+     Griffbild auf der Liedseite. Anhören: Takt antippen = ab dort vorspielen (keine Schleife mehr,
+     `fromBarTimeline` in `timeline.ts`). Mitspielen: Takt antippen wählt, zweiter Tipp erweitert, ohne
+     Auswahl ganzes Lied, ein Durchgang; Wahl „Wartet auf mich | Im Takt“ (`settings.followMode`), Schalter
+     „Ich trage Kopfhörer“ (`settings.headphones`, derselbe wie in den Einstellungen), im Takt-Modus Tempo.
+     Rückmeldung **nur Farben** (`.hit`/`.miss`), die nach dem Durchgang stehen bleiben; **Auswertung,
+     schwierigste Takte und Bestwerte entfallen** (alte `songs[id].best` werden beim Laden still verworfen,
+     kein Versionssprung). Lernspuren bleiben unberührt. Wertung `app/src/audio/follow.ts` (kann weiterhin
+     Schleifen, die Oberfläche nutzt sie nicht), Oberfläche `app/src/ui/song-follow.ts`, Abspieler-
      Option `melody` (false = nur Klicks, Zahl = leise) in `song-player.ts`. Ohne Kopfhörer: Takt-Modus
      nur Klicks, Warte-Modus still; mit Kopfhörern Melodie leise bzw. im Warte-Modus nach einem falschen
-     Ton kurz der richtige. Tests `follow.test.ts`, `app/tests/e2e/follow.spec.ts` (echtes Audio in
-     Echtzeit, Mikrofon-Attrappe plant Töne auf der Audio-Uhr), Bildschirmfotos `*-f0…f6-*.png`.
+     Ton kurz der richtige. Liederliste als klappbare Karten (Klappzustand im localStorage unter
+     `floetentrainer-liederliste`). Tests `follow.test.ts`, `app/tests/e2e/follow.spec.ts` (echtes Audio in
+     Echtzeit, Mikrofon-Attrappe plant Töne auf der Audio-Uhr), `songs.spec.ts`, Bildschirmfotos
+     `*-l2…l6-*.png`, `*-f1…f6-*.png`.
      Verzögerung: fest 50 ms für Mikrofon und Erkennung, dazu die vom Browser gemeldete Ausgabe-Verzögerung
      (wie bei der Markierung; ohne Meldung 30 ms). Offen: Abgleich-Knopf für Kopfhörer, die zu knapp gemeldet werden.

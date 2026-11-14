@@ -1,35 +1,39 @@
-// Liederliste und Liedseite: Lieder aus dem Heft ansehen und vorspielen lassen.
+// Liederliste und Liedseite: Lieder aus dem Heft ansehen, vorspielen lassen und mitspielen.
 //
-// Bedienung der Liedseite:
-// - Abspielen/Stopp, Tempo (50–120 %, je Lied gemerkt), Metronom: in der Bedienleiste (Hochformat
-//   unten fest, Querformat rechts). Vor dem Start wird ein Takt eingezählt.
-// - Abschnitt wiederholen: einen Takt antippen (Anfang), einen zweiten antippen (Ende) – der Bereich läuft
-//   in Schleife. Langes Tippen wählt die ganze Zeile. Tippen bei bestehendem Abschnitt beginnt neu.
-//   Wischen (Scrollen) wählt nichts.
-// - Mitlaufen: Die klingende Note ist markiert, ein senkrechter Balken läuft gleichmäßig mit
-//   (./playhead.ts); die Seite scrollt sanft mit, sobald die aktuelle Zeile aus dem gut sichtbaren
-//   Bereich läuft. Scrollt sie selbst, hält das Mitscrollen ein paar Sekunden still.
+// Liederliste: Abschnitte als Karten („Kannst du schon spielen“, „Eigene Lieder“, unter „Aus dem Heft“ je
+// Kapitel eine Karte), jede über ihre Kopfzeile ein- und ausklappbar. Der Klappzustand wird als
+// Bequemlichkeit im localStorage des Geräts gemerkt (eigener Schlüssel, nicht im Datenformat: er gehört
+// zur Ansicht auf diesem Gerät und hat in einer Sicherung nichts verloren).
+//
+// Liedseite (Nachsteuerung vom 14.11.2026, Entwurf A1): Unter dem Titel der Umschalter „Anhören |
+// Mitspielen“; jede Art hat ihre eigene Bedienleiste (Hochformat unten fest, Querformat rechts).
+// - Anhören: Abspielen/Stopp, Tempo (50–120 %, je Lied gemerkt), Metronom; vor dem Start wird ein Takt
+//   eingezählt. Einen Takt antippen startet das Vorspielen ab diesem Takt bzw. springt beim Spielen
+//   dorthin (ohne neues Einzählen). Keine Schleife.
+// - Mitspielen (./song-follow.ts): Antippen wählt einen Takt, ein zweiter Tipp erweitert die Auswahl bis
+//   dorthin, ein weiterer beginnt neu. Ohne Auswahl gilt das ganze Lied; nichts wird vorausgewählt.
+// Wischen (Scrollen) tippt nichts an.
+// Kein Griffbild auf der Liedseite (nur der kleine Name der klingenden Note), damit sie Noten liest.
+// Mitlaufen: Die klingende Note ist markiert, ein senkrechter Balken läuft gleichmäßig mit
+// (./playhead.ts); die Seite scrollt sanft mit, sobald die aktuelle Zeile aus dem gut sichtbaren
+// Bereich läuft. Scrollt sie selbst, hält das Mitscrollen ein paar Sekunden still.
 
 import { keepAwake } from "../audio/mic";
 import { songPlayer, type PlayerPosition } from "../audio/song-player";
 import { GLYPHS } from "../music/bravura";
-import { fluteSvg } from "../music/flute";
-import { nameHtml, nameText } from "../music/names";
-import { chartNoteByMidi } from "../music/notes";
+import { nameHtml } from "../music/names";
 import { renderScore, type Score } from "../songs/engrave";
 import { chapters, SONGS, songById } from "../songs/library";
 import { ownEntries, ownEntryById } from "../songs/own";
 import type { NoteEvent, Song, TimeSig } from "../songs/model";
 import { missingHtml, playabilityFor } from "../songs/playable";
 import { baseTempo, clampPercent, secPerQuarter, TEMPO_MAX, TEMPO_MIN } from "../songs/tempo";
-import { buildTimeline, sectionTimeline, type Timeline } from "../songs/timeline";
-import { esc, ICON_BACK, type View } from "./common";
+import { buildTimeline, fromBarTimeline, type Timeline } from "../songs/timeline";
+import { esc, ICON_BACK, plural, type View } from "./common";
 import { brokenSongPage, mountOwnBox, takeListNote } from "./own-songs";
 import { Playhead } from "./playhead";
 import { followBarHtml, ICON_MIC, mountFollow } from "./song-follow";
 
-/** so lange (ms) gilt ein Finger auf dem Takt als langes Tippen */
-const LONG_PRESS_MS = 500;
 /** so weit (px) darf sich der Finger bewegen, ohne dass es als Wischen gilt */
 const TAP_SLOP = 10;
 /** nach eigenem Scrollen so lange (ms) nicht mitscrollen */
@@ -74,6 +78,9 @@ function tempoMark(song: Song, percent: number): string {
 
 const ICON_PLAY = `<svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><path d="M8.5 5.2v15.6L21 13z"/></svg>`;
 const ICON_STOP = `<svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><rect x="7" y="7" width="12" height="12" rx="1.6"/></svg>`;
+const ICON_EAR = `<svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><path d="M3.5 8.4h3.2L11 4.8v12.4l-4.3-3.6H3.5z" fill="none" stroke-width="1.4" stroke-linejoin="round"/><path d="M14.2 8.2a3.9 3.9 0 0 1 0 5.6M16.6 5.9a7.2 7.2 0 0 1 0 10.2" fill="none" stroke-width="1.4" stroke-linecap="round"/></svg>`;
+const ICON_CHEVRON = `<svg class="chev" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 7.5l5 5 5-5" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const ICON_PLUS = `<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3.5v13M3.5 10h13" fill="none" stroke-width="1.6" stroke-linecap="round"/></svg>`;
 const ICON_METRO = `<svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><path d="M9.6 3.6h6.8l4.2 18.4H5.4z" fill="none" stroke-width="1.5" stroke-linejoin="round"/><path d="M6.6 17.4h12.8" fill="none" stroke-width="1.3"/><path d="M13 17.4L18.6 6.4" fill="none" stroke-width="1.5" stroke-linecap="round"/><circle cx="17.2" cy="9.2" r="1.6"/></svg>`;
 
 // ---------------------------------------------------------------- Liederliste
@@ -88,6 +95,59 @@ function songRow(song: Song, missing: string | null): string {
   );
 }
 
+/** Schlüssel für den Klappzustand der Karten (Bequemlichkeit je Gerät, siehe Kopfkommentar) */
+export const LIST_OPEN_KEY = "floetentrainer-liederliste";
+
+/** gemerkter Klappzustand: Karte → offen; fehlt eine Karte, gilt der Standard */
+function loadOpen(): Record<string, boolean> {
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(LIST_OPEN_KEY) ?? "{}");
+    if (typeof v !== "object" || v === null || Array.isArray(v)) return {};
+    const out: Record<string, boolean> = {};
+    for (const [k, o] of Object.entries(v)) if (typeof o === "boolean") out[k] = o;
+    return out;
+  } catch {
+    return {};
+  }
+}
+function saveOpen(m: Record<string, boolean>): void {
+  try {
+    localStorage.setItem(LIST_OPEN_KEY, JSON.stringify(m));
+  } catch {
+    /* ohne Speicher gilt beim nächsten Mal wieder der Standard */
+  }
+}
+
+interface CardOpts {
+  key: string;
+  title: string;
+  /** z. B. „7 Lieder“; leer = keine Anzahl */
+  count: string;
+  sub: string;
+  body: string;
+  open: boolean;
+  cls: string;
+  testid?: string;
+}
+
+/** Abschnitt als Karte; die Kopfzeile klappt ihn ein und aus */
+function cardHtml(o: CardOpts, n: number): string {
+  const id = `liste-${n}`;
+  return (
+    `<section class="card ${o.cls}${o.open ? "" : " closed"}" data-card="${esc(o.key)}"${o.testid ? ` data-testid="${o.testid}"` : ""}>` +
+    `<h2 class="cardh"><button class="cardhd" aria-expanded="${o.open}" aria-controls="${id}">` +
+    `<span class="ct">${esc(o.title)}</span>` +
+    (o.count ? `<span class="cn">${o.count}</span>` : "") +
+    ICON_CHEVRON +
+    (o.sub ? `<span class="cs">${o.sub}</span>` : "") +
+    `</button></h2>` +
+    `<div class="cardbody" id="${id}"${o.open ? "" : " inert"}><div class="cardin">${o.body}</div></div>` +
+    `</section>`
+  );
+}
+
+const songCount = (n: number) => (n ? plural(n, "Lied", "Lieder") : "");
+
 export const songListView: View = (root, ctx) => {
   const can: Song[] = [];
   const rest = new Map<Song, string>();
@@ -96,7 +156,7 @@ export const songListView: View = (root, ctx) => {
     if (p.playable) can.push(s);
     else rest.set(s, missingHtml(p.missing));
   }
-  // Eigene Lieder: spielbare stehen wie Heft-Lieder oben, die übrigen im eigenen Kapitel
+  // Eigene Lieder: spielbare stehen wie Heft-Lieder oben, die übrigen in der eigenen Karte
   const own = ownEntries(ctx.data);
   const ownRows: string[] = [];
   for (const e of own) {
@@ -112,36 +172,102 @@ export const songListView: View = (root, ctx) => {
     else ownRows.push(songRow(e.song, missingHtml(p.missing)));
   }
   const ownHelp = !own.length
-    ? "Lieder aus einer ABC-Datei, zum Beispiel von thesession.org oder abcnotation.com."
+    ? "Noch keins – viele Volkslieder gibt es auch bei abcnotation.com."
     : !ownRows.length
       ? "Deine eigenen Lieder kannst du alle schon spielen – sie stehen oben."
       : "";
-  const groups = chapters(SONGS.filter((s) => rest.has(s)))
-    .map(
-      (c) =>
-        `<section class="chap"><h2>${esc(c.chapter)}</h2><ul class="songs">${c.songs.map((s) => songRow(s, rest.get(s)!)).join("")}</ul></section>`,
-    )
-    .join("");
+  const chapterNo = new Map(chapters(SONGS).map((c, i) => [c.chapter, i + 1]));
+  const groups = chapters(SONGS.filter((s) => rest.has(s)));
   const note = takeListNote();
+
+  // Standard: „Kannst du schon spielen“ offen, die übrigen zu. „Eigene Lieder“ ist offen, wenn darin
+  // nur Hinweis und „Lied hinzufügen“ stehen (klein, zeigt die Möglichkeit), wenn „Kannst du schon
+  // spielen“ leer ist oder gerade ein Lied hinzugefügt/gelöscht wurde. Sind beide leer, ist das erste
+  // Kapitel offen, damit es überhaupt etwas zu sehen gibt.
+  const defaults: Record<string, boolean> = {
+    can: can.length > 0,
+    own: !ownRows.length || !can.length,
+  };
+  if (!can.length && !ownRows.length && groups.length) defaults[`kapitel:${groups[0].chapter}`] = true;
+  const saved = loadOpen();
+  const isOpen = (key: string) => (key === "own" && note ? true : (saved[key] ?? defaults[key] ?? false));
+
+  let n = 0;
+  const cards: string[] = [];
+  cards.push(
+    cardHtml(
+      {
+        key: "can",
+        title: "Kannst du schon spielen",
+        count: songCount(can.length),
+        sub: "Alle Töne kennst du schon.",
+        body: can.length
+          ? `<ul class="songs">${can.map((s) => songRow(s, null)).join("")}</ul>`
+          : `<p class="help">Noch keins – mit den nächsten Stufen kommen die ersten Lieder dazu.</p>`,
+        open: isOpen("can"),
+        cls: "can",
+        testid: "can-play",
+      },
+      n++,
+    ),
+  );
   // „Eigene Lieder“ steht oben, gleich nach „Kannst du schon spielen“: Die Heft-Liste ist lang, und
   // was sie selbst hinzugefügt hat, sucht sie am ehesten – samt dem Knopf zum Hinzufügen.
+  cards.push(
+    cardHtml(
+      {
+        key: "own",
+        title: "Eigene Lieder",
+        count: songCount(ownRows.length),
+        sub: "Aus einer ABC-Datei, zum Beispiel von thesession.org.",
+        body:
+          (ownRows.length ? `<ul class="songs">${ownRows.join("")}</ul>` : "") +
+          (ownHelp ? `<p class="help">${ownHelp}</p>` : "") +
+          `<a class="addrow addsong" href="#/lied-hinzufuegen">${ICON_PLUS}<span>Lied hinzufügen</span></a>`,
+        open: isOpen("own"),
+        cls: "own",
+        testid: "own-songs",
+      },
+      n++,
+    ),
+  );
+  const heft = groups
+    .map((c) =>
+      cardHtml(
+        {
+          key: `kapitel:${c.chapter}`,
+          title: c.chapter,
+          count: songCount(c.songs.length),
+          sub: `Kapitel ${chapterNo.get(c.chapter)} · dir fehlen noch Töne`,
+          body: `<ul class="songs">${c.songs.map((s) => songRow(s, rest.get(s)!)).join("")}</ul>`,
+          open: isOpen(`kapitel:${c.chapter}`),
+          cls: "chap",
+        },
+        n++,
+      ),
+    )
+    .join("");
   root.innerHTML = `
 <main class="screen page songlist">
   <header class="topbar"><a class="iconbtn" href="#/" aria-label="Zurück">${ICON_BACK}</a><h1>Lieder</h1><span></span></header>
-  <p class="help">Jedes Lied lässt sich anhören: Die App spielt es vor und zeigt die Noten mit.</p>
+  <p class="help intro">Jedes Lied lässt sich anhören und mitspielen: Die App spielt es vor und zeigt die Noten mit.</p>
   ${note ? `<p class="msg ok" data-testid="msg" role="status">${esc(note)}</p>` : ""}
-  <section class="can" data-testid="can-play"><h2>Kannst du schon spielen</h2>${
-    can.length
-      ? `<ul class="songs">${can.map((s) => songRow(s, null)).join("")}</ul>`
-      : `<p class="help">Noch keins – mit den nächsten Stufen kommen die ersten Lieder dazu.</p>`
-  }</section>
-  <section class="chap own" data-testid="own-songs"><h2>Eigene Lieder</h2>
-    ${ownRows.length ? `<ul class="songs">${ownRows.join("")}</ul>` : ""}
-    ${ownHelp ? `<p class="help">${ownHelp}</p>` : ""}
-    <a class="big alt addsong" href="#/lied-hinzufuegen">Lied hinzufügen</a>
-  </section>
-  ${groups}
+  ${cards.join("")}
+  ${heft ? `<p class="grp">Aus dem Heft</p>${heft}` : ""}
 </main>`;
+
+  root.querySelector("main")!.addEventListener("click", (e) => {
+    const btn = (e.target as Element).closest?.("button.cardhd") as HTMLButtonElement | null;
+    if (!btn) return;
+    const card = btn.closest(".card") as HTMLElement;
+    const open = card.classList.contains("closed");
+    card.classList.toggle("closed", !open);
+    btn.setAttribute("aria-expanded", String(open));
+    (card.querySelector(".cardbody") as HTMLElement).inert = !open;
+    const m = loadOpen();
+    m[card.dataset.card!] = open;
+    saveOpen(m);
+  });
 };
 
 // ---------------------------------------------------------------- Liedseite
@@ -165,6 +291,9 @@ interface Section {
   to: number;
 }
 
+/** Art der Liedseite */
+type SongMode = "listen" | "follow";
+
 export const songView: View = (root, ctx) => {
   const id = decodeURIComponent(location.hash.replace(/^#\/?lied\/?/, "").split("?")[0]);
   const ownEntry = songById(id) ? undefined : ownEntryById(ctx.data, id);
@@ -185,7 +314,7 @@ export const songView: View = (root, ctx) => {
   let metronome = false;
 
   root.innerHTML = `
-<main class="screen songpage" data-song="${song.id}">
+<main class="screen songpage" data-song="${song.id}" data-mode="listen">
   <header class="topbar songhead">
     <a class="iconbtn" href="#/lieder" aria-label="Zurück">${ICON_BACK}</a>
     <div class="ttl">
@@ -194,20 +323,20 @@ export const songView: View = (root, ctx) => {
     </div>
     <span></span>
   </header>
-  <div class="songtools"><button class="followbtn" data-act="follow">${ICON_MIC}<span>Mitspielen</span></button></div>
-  <p class="hint" data-testid="hint">Tippe einen Takt an, um einen Abschnitt zu wiederholen. Lange tippen wählt die ganze Zeile.</p>
+  <div class="seg modes" role="tablist" aria-label="Anhören oder mitspielen">
+    <button role="tab" data-mode="listen" aria-selected="true">${ICON_EAR}<span>Anhören</span></button><button role="tab" data-mode="follow" aria-selected="false">${ICON_MIC}<span>Mitspielen</span></button>
+  </div>
+  <p class="hint" data-testid="hint"></p>
   <div class="scorebox" data-testid="score"></div>
   ${stanzasHtml(song)}
   ${song.credit ? `<p class="credit">${esc(song.credit)}</p>` : ""}
   ${ownEntry ? `<section class="ownbox" data-testid="own-info"></section>` : ""}
-  <div class="player" role="region" aria-label="Wiedergabe">
+  <div class="player" role="region" aria-label="Bedienung">
     <div class="pin">
-      <div class="pfl" data-testid="flute"></div>
       <div class="pinfo">
         <span class="pname" data-testid="note-name" aria-live="off"></span>
         <span class="pcount" data-testid="count" hidden></span>
         <span class="pstat" data-testid="status" aria-live="polite"></span>
-        <button class="clear" data-act="clear" hidden>Schleife aufheben</button>
       </div>
       <button class="playbtn" data-act="play" aria-label="Abspielen">${ICON_PLAY}</button>
       <label class="tempo">
@@ -222,24 +351,26 @@ export const songView: View = (root, ctx) => {
   const box = main.querySelector(".scorebox") as HTMLElement;
   const hint = main.querySelector(".hint") as HTMLElement;
   const player = main.querySelector(".player") as HTMLElement;
-  const fl = main.querySelector(".pfl") as HTMLElement;
+  const modeTabs = [...main.querySelectorAll<HTMLButtonElement>(".modes button")];
   const pname = main.querySelector(".pname") as HTMLElement;
   const pcount = main.querySelector(".pcount") as HTMLElement;
   const pstat = main.querySelector(".pstat") as HTMLElement;
-  const clearBtn = main.querySelector('[data-act="clear"]') as HTMLButtonElement;
   const playBtn = main.querySelector('[data-act="play"]') as HTMLButtonElement;
   const metroBtn = main.querySelector('[data-act="metro"]') as HTMLButtonElement;
   const range = main.querySelector('input[type="range"]') as HTMLInputElement;
   const tempoOut = main.querySelector("output") as HTMLOutputElement;
 
   // ------------------------------------------------------------ Zustand
+  let mode: SongMode = "listen";
   let score: Score | null = null;
   let width = 0;
   /** gerade markierte Noten (Kennungen) */
   let cur: number[] = [];
-  /** angetippter Anfangstakt (Abschnitt noch nicht fertig) */
-  let selStart: number | null = null;
+  /** Mitspielen: gewählte Takte; extendable = erst ein Takt angetippt, ein zweiter Tipp erweitert */
   let section: Section | null = null;
+  let extendable = false;
+  /** Anhören: Takt, ab dem gerade vorgespielt wird (null = vom Anfang) */
+  let fromBar: number | null = null;
   /** Zeitplan, der gerade spielt (null = Stille) */
   let playingTl: Timeline | null = null;
   let lastPos: PlayerPosition | null = null;
@@ -270,13 +401,16 @@ export const songView: View = (root, ctx) => {
     }
   };
 
+  /** Auswahl (Mitspielen) bzw. Takt „ab hier“ (Anhören) hinterlegen */
   const markBars = () => {
     if (!score) return;
+    const picked = mode === "follow" ? section : null;
+    const from = mode === "listen" && playingTl ? fromBar : null;
     for (let i = 0; i < song.bars.length; i++) {
       const r = score.barEl(i);
       if (!r) continue;
-      r.classList.toggle("inloop", !!section && i >= section.from && i <= section.to);
-      r.classList.toggle("sel", selStart === i);
+      r.classList.toggle("picked", !!picked && i >= picked.from && i <= picked.to);
+      r.classList.toggle("from", from === i);
     }
   };
 
@@ -298,40 +432,42 @@ export const songView: View = (root, ctx) => {
     for (const i of cur) score?.noteEl(i)?.classList.add("cur");
   };
 
-  // ------------------------------------------------------------ Griffbild und Name
+  // ------------------------------------------------------------ Name der Note
+  // Ein Griffbild zeigt die Liedseite bewusst nicht (Nachsteuerung vom 14.11.2026): beim Anhören und
+  // Mitspielen soll sie die Noten lesen; der kleine Name der klingenden Note genügt.
   const showNote = (n: NoteEvent | undefined) => {
     const midi = n ? n.pitch.midi : null;
     if (midi === shownMidi) return;
     shownMidi = midi;
-    if (!n) {
-      fl.innerHTML = "";
-      fl.classList.add("none");
-      pname.innerHTML = "";
-      return;
-    }
-    const chart = chartNoteByMidi(n.pitch.midi);
-    fl.classList.toggle("none", !chart);
-    fl.innerHTML = chart ? fluteSvg(chart.fingering, `Griffbild ${nameText(n.pitch.id)}`) : "";
-    pname.innerHTML = nameHtml(n.pitch.id);
+    pname.innerHTML = n ? nameHtml(n.pitch.id) : "";
   };
-  /** vor dem Start: erste Note des Lieds bzw. des Abschnitts */
-  const restingNote = () => {
-    const from = section ? section.from : 0;
-    return song.notes.find((n) => n.bar >= from) ?? song.notes[0];
+  /** vor dem Start: erste Note des Lieds */
+  const restingNote = () => song.notes[0];
+
+  // ------------------------------------------------------------ Hinweis, Umschalter, Statuszeile
+  const updateHint = () => {
+    const running = follow.running;
+    let text = "";
+    if (mode === "listen") text = "Tippe einen Takt an, um ab dort zu hören.";
+    else if (!running) {
+      text = !section
+        ? "Ohne Auswahl spielst du das ganze Lied. Tippe einen Takt an, um nur ihn zu üben – ein zweiter Tipp erweitert die Auswahl."
+        : extendable
+          ? "Tippe einen weiteren Takt an, um die Auswahl bis dorthin zu erweitern."
+          : "Ein neuer Tipp auf einen Takt beginnt eine neue Auswahl.";
+    }
+    hint.textContent = text;
+    hint.classList.toggle("gone", !text);
+    for (const t of modeTabs) {
+      t.setAttribute("aria-selected", String(t.dataset.mode === mode));
+      t.disabled = running;
+    }
+    main.classList.toggle("modes-off", running);
+    main.dataset.mode = mode;
   };
 
-  // ------------------------------------------------------------ Statuszeile
-  const barRange = (s: Section) => (s.from === s.to ? `Takt ${s.from + 1}` : `Takt ${s.from + 1}–${s.to + 1}`);
   const updateStatus = () => {
-    let text = "";
-    if (section) text = `${barRange(section)} in Schleife`;
-    else if (selStart != null) text = `Ab Takt ${selStart + 1} – tippe den Endtakt`;
-    else if (playingTl && lastPos?.bar != null) text = `Takt ${playingTl.bars[lastPos.bar].index + 1}`;
-    pstat.textContent = text;
-    clearBtn.hidden = !section && selStart == null;
-    clearBtn.textContent = section ? "Schleife aufheben" : "Auswahl aufheben";
-    hint.classList.toggle("gone", !!section || selStart != null);
-    main.classList.toggle("looping", !!section);
+    pstat.textContent = playingTl && lastPos?.bar != null ? `Takt ${playingTl.bars[lastPos.bar].index + 1}` : "";
   };
 
   const showCount = (k: number | null) => {
@@ -378,7 +514,7 @@ export const songView: View = (root, ctx) => {
     if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "].includes(e.key) && e.target === document.body) userScrolled();
   };
 
-  // ------------------------------------------------------------ Wiedergabe
+  // ------------------------------------------------------------ Anhören
   const setPlayingUi = (on: boolean) => {
     playBtn.innerHTML = on ? ICON_STOP : ICON_PLAY;
     playBtn.setAttribute("aria-label", on ? "Stopp" : "Abspielen");
@@ -390,6 +526,7 @@ export const songView: View = (root, ctx) => {
   const resetUi = () => {
     playingTl = null;
     lastPos = null;
+    fromBar = null;
     followedSys = -1;
     setCur([]);
     playhead.hide();
@@ -398,6 +535,7 @@ export const songView: View = (root, ctx) => {
     shownMidi = undefined;
     showNote(restingNote());
     updateStatus();
+    markBars();
     keepAwake(false);
   };
 
@@ -419,21 +557,23 @@ export const songView: View = (root, ctx) => {
     updateStatus();
   };
 
-  /** Starten (direkt aus dem Tippen heraus: legt den AudioContext an). */
-  const start = (opts: { countIn: boolean }) => {
-    const tl = section ? sectionTimeline(song, section.from, section.to) : full;
+  /** Vorspielen starten, vom Anfang oder ab einem Takt (direkt aus dem Tippen heraus: legt den AudioContext an). */
+  const start = (opts: { from: number | null; countIn: boolean }) => {
+    const tl = opts.from == null ? full : fromBarTimeline(song, opts.from);
     playingTl = tl;
+    fromBar = opts.from;
     lastPos = null;
     followedSys = -1;
     userScrollUntil = 0;
     setPlayingUi(true);
     keepAwake(true);
+    markBars();
+    if (opts.from != null && tl.bars.length) keepVisible(tl.bars[0].index, true);
     songPlayer.play(tl, {
       secPerQuarter: secPerQuarter(song, percent),
       a4: ctx.data.settings.tuningHz,
       countIn: opts.countIn,
       metronome,
-      loop: !!section,
       onPosition,
       onFrame: (p) => {
         if (playingTl === tl) playhead.show(tl, p.quarter);
@@ -446,7 +586,7 @@ export const songView: View = (root, ctx) => {
 
   playBtn.addEventListener("click", () => {
     if (playingTl) stop();
-    else start({ countIn: true });
+    else start({ from: null, countIn: true });
   });
 
   metroBtn.addEventListener("click", () => {
@@ -469,91 +609,54 @@ export const songView: View = (root, ctx) => {
     ctx.save();
   });
 
-  // ------------------------------------------------------------ Abschnitt wählen
-  /** Abschnitt steht fest: läuft gerade etwas, sofort dorthin umstellen (ohne neues Einzählen) */
-  const applySection = () => {
-    selStart = null;
+  // ------------------------------------------------------------ Takt antippen
+  /** Mitspielen: Auswahl hat sich geändert – alte Farben gelten nicht mehr */
+  const selectionChanged = () => {
+    clearPaint();
     markBars();
-    updateStatus();
-    if (follow.active) follow.refresh();
-    else if (playingTl) start({ countIn: false });
-    else showNote(restingNote());
+    follow.refresh();
   };
 
   const tapBar = (i: number) => {
-    if (follow.running) return; // beim Mitspielen gilt der Abschnitt erst beim nächsten Start
-
-    if (section) {
-      // neue Auswahl beginnt; die alte Schleife läuft weiter, bis der Endtakt feststeht
-      section = null;
-      selStart = i;
-    } else if (selStart == null) {
-      selStart = i;
-    } else {
-      section = { from: Math.min(selStart, i), to: Math.max(selStart, i) };
-      applySection();
+    if (mode === "listen") {
+      // ab hier: beim Spielen sofort dorthin (ohne neues Einzählen), sonst mit Einzählen starten
+      if (playingTl) start({ from: i, countIn: false });
+      else start({ from: i, countIn: true });
       return;
     }
-    markBars();
-    updateStatus();
+    if (follow.running) return; // beim Mitspielen gilt die Auswahl erst beim nächsten Start
+    if (section && extendable) {
+      section = { from: Math.min(section.from, i), to: Math.max(section.from, i) };
+      extendable = false;
+    } else {
+      section = { from: i, to: i };
+      extendable = true;
+    }
+    selectionChanged();
   };
 
-  const pressLine = (i: number) => {
-    if (!score || follow.running) return;
-    const bars = score.systems[score.systemOfBar(i)].bars;
-    section = { from: bars[0], to: bars[bars.length - 1] };
-    applySection();
-  };
-
-  clearBtn.addEventListener("click", () => {
-    section = null;
-    selStart = null;
-    markBars();
-    // Läuft die Schleife gerade, wird der laufende Durchgang noch zu Ende gespielt. Das gilt auch, wenn
-    // schon ein neuer Anfangstakt angetippt war (dann ist section schon null, die alte Schleife läuft aber).
-    if (playingTl && playingTl !== full) songPlayer.setLoop(false);
-    updateStatus();
-    if (!playingTl) showNote(restingNote());
-  });
-
-  // Tippen von Wischen unterscheiden; langes Tippen ohne Kontextmenü
-  let press: { id: number; x: number; y: number; bar: number; scrollY: number; timer: number; long: boolean } | null = null;
-  const endPress = () => {
-    if (press) clearTimeout(press.timer);
-    press = null;
-  };
+  // Tippen von Wischen unterscheiden
+  let press: { id: number; x: number; y: number; bar: number; scrollY: number } | null = null;
   box.addEventListener("pointerdown", (e) => {
     const t = (e.target as Element).closest?.("rect.takt") as SVGRectElement | null;
-    if (!t || (e.pointerType === "mouse" && e.button !== 0)) return;
-    endPress();
-    const bar = Number(t.dataset.bar);
-    const p = {
-      id: e.pointerId,
-      x: e.clientX,
-      y: e.clientY,
-      bar,
-      scrollY: window.scrollY,
-      long: false,
-      timer: window.setTimeout(() => {
-        if (press !== p) return;
-        p.long = true;
-        pressLine(bar);
-      }, LONG_PRESS_MS),
-    };
-    press = p;
+    if (!t || (e.pointerType === "mouse" && e.button !== 0)) {
+      press = null;
+      return;
+    }
+    press = { id: e.pointerId, x: e.clientX, y: e.clientY, bar: Number(t.dataset.bar), scrollY: window.scrollY };
   });
   box.addEventListener("pointermove", (e) => {
     if (!press || e.pointerId !== press.id) return;
-    if (Math.hypot(e.clientX - press.x, e.clientY - press.y) > TAP_SLOP) endPress();
+    if (Math.hypot(e.clientX - press.x, e.clientY - press.y) > TAP_SLOP) press = null;
   });
   box.addEventListener("pointerup", (e) => {
     if (!press || e.pointerId !== press.id) return;
     const p = press;
-    endPress();
-    if (p.long || Math.abs(window.scrollY - p.scrollY) > TAP_SLOP) return;
+    press = null;
+    if (Math.abs(window.scrollY - p.scrollY) > TAP_SLOP) return;
     tapBar(p.bar);
   });
-  box.addEventListener("pointercancel", endPress);
+  box.addEventListener("pointercancel", () => (press = null));
   box.addEventListener("contextmenu", (e) => e.preventDefault());
 
   // ------------------------------------------------------------ Größe, Hintergrund, Verlassen
@@ -580,12 +683,10 @@ export const songView: View = (root, ctx) => {
     full,
     noteById,
     section: () => section,
-    setSection: (s) => {
-      section = s;
-      selStart = null;
-      markBars();
-      updateStatus();
-      follow.refresh();
+    clearSection: () => {
+      section = null;
+      extendable = false;
+      selectionChanged();
     },
     percent: () => percent,
     setPercent: (p, save) => {
@@ -606,37 +707,44 @@ export const songView: View = (root, ctx) => {
       if (force) followedSys = -1;
       keepVisible(bar, force);
     },
-    changed: () => {
-      hint.classList.toggle("gone", !!section || selStart != null || follow.running);
-    },
+    changed: () => updateHint(),
   });
-  main.querySelector('[data-act="follow"]')!.addEventListener("click", () => {
-    stop();
-    userScrollUntil = 0;
-    followedSys = -1;
-    follow.enter();
-  });
-  main.querySelector('[data-act="fexit"]')!.addEventListener("click", () => {
-    followedSys = -1;
-    resetUi();
-  });
+
+  // ------------------------------------------------------------ Umschalter „Anhören | Mitspielen“
+  const setMode = (m: SongMode) => {
+    if (m === mode || follow.running) return;
+    mode = m;
+    if (m === "follow") {
+      stop();
+      userScrollUntil = 0;
+      followedSys = -1;
+      follow.enter();
+    } else {
+      follow.exit();
+      followedSys = -1;
+      resetUi();
+    }
+    markBars();
+    updateHint();
+  };
+  for (const t of modeTabs) t.addEventListener("click", () => setMode(t.dataset.mode as SongMode));
 
   if (ownEntry) mountOwnBox(main.querySelector(".ownbox") as HTMLElement, ctx, ownEntry, () => {
     stop();
     follow.exit();
   });
   draw();
-  if (follow.active) {
-    showNote(restingNote());
-    updateStatus();
-  } else resetUi();
+  resetUi();
+  if (follow.active) mode = "follow"; // nach erteilter Mikrofon-Erlaubnis gleich wieder im Mitspielen
+  markBars();
+  updateHint();
   // Für automatische Tests
   (window as unknown as { __lied: unknown }).__lied = { song, full, player: songPlayer, timeline: () => playingTl, follow: () => follow.debug() };
 
   return () => {
     follow.destroy();
     stop();
-    endPress();
+    press = null;
     ro.disconnect();
     document.removeEventListener("visibilitychange", onVisibility);
     window.removeEventListener("wheel", userScrolled);
