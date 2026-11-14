@@ -196,5 +196,79 @@ for (const s of SIZES) {
       await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
       await page.screenshot({ path: p("e7-lied-abc-hinweise") });
     });
+    test("Mitspielen", async ({ page }) => {
+      await page.addInitScript(FAKE_AUDIO);
+      await page.addInitScript(FAKE_MIC);
+      await seed(page);
+      const p = (x: string) => `${OUT}/${scheme}-${s.name}-${x}.png`;
+      type Dbg = { started: boolean; startMs: number | null; timeline: { tones: { start: number; dur: number; midi: number }[] } | null; index: number | null };
+      const dbg = () => page.evaluate(() => (window as unknown as { __lied: { follow(): Dbg } }).__lied.follow());
+      const schedule = (list: [number, number | null][]) =>
+        page.evaluate((l) => (window as unknown as { __osc: { schedule(l: [number, number | null][]): void } }).__osc.schedule(l), list);
+      const now = () => page.evaluate(() => performance.now());
+      // Wahl: Warte-Modus, ohne Kopfhörer
+      await page.goto("./#/lied/jingle-bells");
+      await page.evaluate(() => document.fonts.ready);
+      await page.screenshot({ path: p("f0-lied-mitspielen-knopf") });
+      await page.getByRole("button", { name: "Mitspielen" }).click();
+      await page.waitForTimeout(200);
+      await page.screenshot({ path: p("f1-mitspielen-wahl") });
+      // Warte-Modus mitten im Lied: fünf Noten, eine davon erst falsch; dann ein falscher Ton für die sechste
+      await page.getByRole("button", { name: "Start" }).click();
+      await page.waitForFunction(() => (window as unknown as { __lied: { follow(): Dbg } }).__lied.follow().started);
+      await page.waitForFunction(() => (window as unknown as { __osc: unknown }).__osc !== null);
+      const tl = (await dbg()).timeline!;
+      let t = (await now()) + 150;
+      const list: [number, number | null][] = [];
+      tl.tones.slice(0, 6).forEach((n, i) => {
+        if (i === 2) {
+          list.push([t, soundingFreq(n.midi + 2)], [t + 300, null]);
+          t += 450;
+        }
+        list.push([t, soundingFreq(n.midi)], [t + 300, null]);
+        t += 450;
+      });
+      list.push([t, soundingFreq(tl.tones[6].midi - 2)], [t + 1500, null]);
+      await schedule(list);
+      await page.waitForFunction(() => (window as unknown as { __lied: { follow(): Dbg } }).__lied.follow().index === 6, null, { timeout: 8000 });
+      await expect(page.getByTestId("follow-wrong")).toBeVisible({ timeout: 4000 });
+      await page.waitForTimeout(300);
+      await page.screenshot({ path: p("f2-warte-modus") });
+      await page.getByRole("button", { name: "Stopp" }).click();
+      await page.waitForTimeout(300);
+      // Takt-Modus: Abschnitt Takt 5–8, mit zwei falschen Tönen; Bild mitten im Durchgang, dann Auswertung
+      await page.getByRole("button", { name: "Takt-Modus" }).click();
+      await page.locator('rect.takt[data-bar="4"]').click();
+      await page.locator('rect.takt[data-bar="7"]').click();
+      await page.getByRole("button", { name: "Start" }).click();
+      await page.waitForFunction(() => (window as unknown as { __lied: { follow(): Dbg } }).__lied.follow().startMs !== null);
+      const d = await dbg();
+      const spq = await page.evaluate(() => (window as unknown as { __lied: { player: { secPerQuarter: number } } }).__lied.player.secPerQuarter);
+      const beat: [number, number | null][] = [];
+      d.timeline!.tones.forEach((n, i) => {
+        const on = d.startMs! + n.start * spq * 1000;
+        const off = d.startMs! + (n.start + n.dur) * spq * 1000 - 60;
+        beat.push([on, soundingFreq(i === 3 || i === 8 ? n.midi + 1 : n.midi)], [off, null]);
+      });
+      await schedule(beat);
+      const endMs = d.startMs! + (d.timeline as unknown as { total: number }).total * spq * 1000;
+      await page.waitForTimeout(Math.max(0, d.startMs! + 16 * spq * 1000 * 0.55 - (await now())));
+      await page.screenshot({ path: p("f3-takt-modus") });
+      await page.waitForTimeout(Math.max(0, endMs + 600 - (await now())));
+      await page.getByRole("button", { name: "Stopp" }).click();
+      await expect(page.getByTestId("follow-result")).toContainText("getroffen");
+      await page.waitForTimeout(200);
+      await page.screenshot({ path: p("f4-auswertung") });
+      // Kopfhörer an (Hinweis ändert sich)
+      await page.getByRole("button", { name: "Schleife aufheben" }).click();
+      await page.getByRole("switch", { name: /Kopfhörer/ }).click();
+      await page.waitForTimeout(200);
+      await page.screenshot({ path: p("f5-mitspielen-kopfhoerer") });
+      // Einstellungen: „Ich trage Kopfhörer“
+      await page.goto("./#/einstellungen");
+      await page.getByRole("heading", { name: "Mitspielen" }).scrollIntoViewIfNeeded();
+      await page.evaluate(() => window.scrollBy(0, -60));
+      await page.screenshot({ path: p("f6-einstellungen-kopfhoerer") });
+    });
   });
 }

@@ -566,3 +566,85 @@ describe("Abspieler: Zeitplan ohne Ton", () => {
     expect(h.ctx.tones().length).toBe(0);
   });
 });
+
+describe("Abspieler: fürs Mitspielen", () => {
+  const four = () => timeline([[0, 1, 60], [1, 1, 62], [2, 1, 64], [3, 1, 65]]);
+
+  it("melody: false – keine Flötentöne, aber Einzählen, Metronom, Markierung und Ende wie sonst", () => {
+    const { h, positions, ended } = setup(four(), { melody: false, metronome: true });
+    h.advance(S + 2 + 2 + 0.5);
+    expect(h.ctx.tones()).toEqual([]);
+    const clicks = h.ctx.clicks();
+    expect(clicks.length).toBe(8); // 4 Einzählen + 4 Metronom
+    clicks.forEach((c, i) => close(c.start, S + i * 0.5));
+    expect(positions.filter((p) => p.tone != null).map((p) => p.tone)).toEqual([0, 1, 2, 3]);
+    expect(ended()).toBe(1);
+  });
+
+  it("melody als Zahl: Töne über einen leiseren Regler, Klicks unverändert laut", () => {
+    const quiet = setup(four(), { melody: 0.3, metronome: true, countIn: false });
+    quiet.h.advance(1.2); // noch nicht zu Ende (danach wird der Ausgang abgehängt)
+    const loud = setup(four(), { metronome: true, countIn: false });
+    loud.h.advance(1.2);
+    expect(quiet.h.ctx.tones().length).toBe(3);
+    // Weg eines Tons: Oszillator → Hüllkurve → Melodie-Regler (0,3) → Ausgang
+    const env = quiet.h.ctx.oscs.find((o) => o.type === "custom")!.outs[0] as FakeGain;
+    const mel = env.outs[0] as FakeGain;
+    expect(mel.gain.value).toBeCloseTo(0.3, 6);
+    const out = mel.outs[0] as FakeGain;
+    expect(out.outs[0]).toBe(quiet.h.ctx.destination);
+    // Klick: direkt an den Ausgang, wie ohne Melodie-Option
+    const click = quiet.h.ctx.oscs.find((o) => o.type === "sine")!.outs[0] as FakeGain;
+    expect(click.outs[0]).toBe(out);
+    const loudEnv = loud.h.ctx.oscs.find((o) => o.type === "custom")!.outs[0] as FakeGain;
+    expect((loudEnv.outs[0] as FakeGain).outs[0]).toBe(loud.h.ctx.destination);
+    // melody: 0 heißt wie false: keine Töne
+    const none = setup(four(), { melody: 0, countIn: false });
+    none.h.advance(2.5);
+    expect(none.h.ctx.tones()).toEqual([]);
+  });
+
+  it("timelineStart: Audiozeit nach dem Einzählen; setTempo meldet, ab wann das neue Tempo gilt", () => {
+    const h = new Harness();
+    const player = new SongPlayer(h.env);
+    expect(player.timelineStart).toBeNull();
+    expect(player.setTempo(0.4)).toBeNull();
+    player.play(four(), { secPerQuarter: 0.5 });
+    close(player.timelineStart!, S + 4 * 0.5);
+    h.advance(1);
+    const at = player.setTempo(0.25)!;
+    // eingeplant ist bis in die Vorausschau hinein; erst danach gilt das neue Tempo
+    expect(at).toBeGreaterThanOrEqual(1);
+    expect(at).toBeLessThan(1.5);
+    h.advance(3);
+    const c = h.ctx.clicks().filter((x) => x.start > at + 1e-6);
+    for (let i = 1; i < c.length; i++) close(c[i].start - c[i - 1].start, 0.25);
+    player.stop();
+    expect(player.timelineStart).toBeNull();
+  });
+
+  it("prepare legt den AudioContext an und setzt ihn fort, ohne etwas zu spielen", () => {
+    const h = new Harness();
+    const player = new SongPlayer(h.env);
+    player.prepare();
+    expect(h.created).toBe(1);
+    expect(h.ctx.state).toBe("running");
+    expect(player.playing).toBe(false);
+    player.play(four(), { secPerQuarter: 0.5 });
+    expect(h.created).toBe(1);
+  });
+
+  it("idle hält den AudioContext nach prepare ohne play wieder an, nicht aber während des Spielens", () => {
+    const h = new Harness();
+    const player = new SongPlayer(h.env);
+    player.idle(); // noch kein AudioContext: nichts zu tun
+    expect(h.created).toBe(0);
+    player.prepare();
+    player.idle();
+    expect(h.ctx.state).toBe("suspended");
+    player.play(four(), { secPerQuarter: 0.5 });
+    expect(h.ctx.state).toBe("running");
+    player.idle();
+    expect(h.ctx.state).toBe("running");
+  });
+});

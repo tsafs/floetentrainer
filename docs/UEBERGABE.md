@@ -36,7 +36,7 @@ Silben, Atemzeichen, Seitenumbrüche.
    Veröffentlichung über `.github/workflows/pages.yml` auf https://tsafs.github.io/floetentrainer/.
 3. Lieder-Erweiterung (`docs/app-lieder.md`): **Runde 1 umgesetzt** (Liederliste `#/lieder`, Liedseite
    `#/lied/<kennung>` mit Notensatz, Vorspielen, Tempo je Lied, Einzählen, Metronom, Abschnitt in
-   Schleife, Griffbild). Runde 2 (ABC-Dateien) umgesetzt, Runde 3 (Mitspielen) ist offen.
+   Schleife, Griffbild). Runde 2 (ABC-Dateien) und Runde 3 (Mitspielen) umgesetzt.
    - Wo was liegt: `app/src/songs/` (Leser `parse.ts`, Modell, Zeitplan, Tempo, Spielbarkeit,
      Notensatz `layout.ts`/`engrave.ts`), Klang `app/src/audio/flute-synth.ts` und `song-player.ts`,
      Seiten `app/src/ui/songs.ts`, Tests `app/tests/unit/songs*.test.ts`, `timeline.test.ts`,
@@ -60,3 +60,17 @@ Silben, Atemzeichen, Seitenumbrüche.
      Version 2** (Umwandlung aus 1): eine ältere App hätte die eigenen Lieder sonst beim Speichern still
      verworfen, so lehnt sie die Daten ab. Kommen mit in die Sicherung; Tests `own-songs.test.ts`,
      `app/tests/e2e/abc.spec.ts`, Bildschirmfotos `*-e1…e7-*.png`.
+   - **Runde 3, Mitspielen:** Liedseite → Knopf „Mitspielen“ → Bedienleiste wechselt (Vorspielen aus):
+     Wahl Warte-/Takt-Modus (gemerkt in `settings.followMode`), Schalter „Ich trage Kopfhörer“
+     (`settings.headphones`, derselbe wie in den Einstellungen), Start/Stopp, im Takt-Modus Tempo,
+     „Mitspielen beenden“. Gewählter Abschnitt läuft in Schleife, jeder Durchgang einzeln gewertet.
+     Noten werden grün/rot (`.hit`/`.miss`), danach Auswertung „x von y Noten getroffen“ mit
+     schwierigsten Takten (antippen = Abschnitt). Bestwert je Lied und Art in `songs[id].best`
+     (optional, ohne Versionssprung; nur vollständige Durchgänge des ganzen Lieds). Lernspuren bleiben
+     unberührt. Wertung `app/src/audio/follow.ts`, Oberfläche `app/src/ui/song-follow.ts`, Abspieler-
+     Option `melody` (false = nur Klicks, Zahl = leise) in `song-player.ts`. Ohne Kopfhörer: Takt-Modus
+     nur Klicks, Warte-Modus still; mit Kopfhörern Melodie leise bzw. im Warte-Modus nach einem falschen
+     Ton kurz der richtige. Tests `follow.test.ts`, `app/tests/e2e/follow.spec.ts` (echtes Audio in
+     Echtzeit, Mikrofon-Attrappe plant Töne auf der Audio-Uhr), Bildschirmfotos `*-f0…f6-*.png`.
+     Verzögerung: fest 50 ms für Mikrofon und Erkennung, dazu die vom Browser gemeldete Ausgabe-Verzögerung
+     (wie bei der Markierung; ohne Meldung 30 ms). Offen: Abgleich-Knopf für Kopfhörer, die zu knapp gemeldet werden.

@@ -85,6 +85,13 @@ export const settingsView: View = (root, ctx) => {
 <main class="screen page settings">
   ${topbar("Einstellungen")}
   ${sections}
+  <section><h2>Mitspielen</h2>
+    <div class="setting"><span class="lab" id="phones-lab">Ich trage Kopfhörer<small>${
+      s.headphones
+        ? "Beim Mitspielen klingt die Melodie leise mit."
+        : "Ohne Kopfhörer bleibt beim Mitspielen die Melodie aus, sonst würde das Mikrofon das Handy mithören."
+    }</small></span><button class="switch" role="switch" aria-checked="${s.headphones}" aria-labelledby="phones-lab" data-act="phones"><i></i></button></div>
+  </section>
   <section><h2>Darstellung</h2>
     <div class="seg" role="group" aria-label="Darstellung">${THEME_OPTIONS.map(
       ([v, label]) => `<button data-theme-opt="${v}" aria-pressed="${s.theme === v}">${label}</button>`,
@@ -148,6 +155,12 @@ export const settingsView: View = (root, ctx) => {
       }),
     );
     const on = (act: string, fn: () => void) => root.querySelector(`[data-act="${act}"]`)?.addEventListener("click", fn);
+    on("phones", () => {
+      d.settings.headphones = !d.settings.headphones;
+      message = null;
+      ctx.save();
+      render();
+    });
     on("export", () => {
       const blob = new Blob([backupJson(ctx.data)], { type: "application/json" });
       const url = URL.createObjectURL(blob);

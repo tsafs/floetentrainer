@@ -1637,6 +1637,341 @@ ul.songs li + li {
   }
 }
 
+/* ---------------------------------------------------------------- Mitspielen (src/ui/song-follow.ts)
+   Knopf „Mitspielen“ oben auf der Liedseite; im Zustand .following ersetzt .fpin die Leiste fürs
+   Vorspielen. Noten im Notensatz: .hit getroffen, .miss verfehlt/falsch (die aktuelle bleibt markiert). */
+.score .hit {
+  fill: var(--ok);
+  stroke: var(--ok);
+}
+.score .miss {
+  fill: var(--err);
+  stroke: var(--err);
+}
+.score .cur.hit,
+.score .cur.miss {
+  fill: var(--mark);
+  stroke: var(--mark);
+}
+.songtools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.followbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 4px 20px 4px 15px;
+  border: 1.2px solid var(--line);
+  border-radius: 24px;
+  background: var(--btn);
+  color: var(--ink);
+  font-size: 1.05rem;
+}
+.followbtn svg {
+  stroke: currentColor;
+  flex: none;
+}
+.songpage.following .songtools,
+.songpage.following .pin {
+  display: none;
+}
+.fpin {
+  max-width: 720px;
+  margin: 0 auto;
+  display: grid;
+  gap: 8px;
+}
+.fset {
+  display: grid;
+  gap: 6px;
+}
+.fmode {
+  grid-template-columns: repeat(2, 1fr);
+  margin-bottom: 2px;
+}
+.fexpl,
+.fbest,
+.fgo {
+  margin: 0;
+  font-size: 0.92rem;
+  font-style: italic;
+  color: var(--soft);
+  line-height: 1.3;
+}
+.fres {
+  display: grid;
+  gap: 4px;
+}
+.fres p {
+  margin: 0;
+}
+.fscore {
+  font-size: 1.15rem;
+  line-height: 1.3;
+}
+.fscore b {
+  font-weight: 500;
+}
+.fscore .flab {
+  display: block;
+  font-size: 0.9rem;
+  font-style: italic;
+  color: var(--soft);
+}
+.fnew {
+  font-style: italic;
+  color: var(--ok);
+}
+.fhard {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-style: italic;
+  color: var(--soft);
+  font-size: 0.92rem;
+}
+.barbtn {
+  min-height: 40px;
+  padding: 2px 14px;
+  border: 1px solid var(--err);
+  border-radius: 20px;
+  background: var(--err-tint);
+  color: var(--err);
+  font-size: 0.95rem;
+  font-style: normal;
+}
+.fphones {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+.fphones .lab,
+.setting .lab {
+  display: grid;
+  line-height: 1.25;
+}
+.fphones .lab small {
+  font-style: italic;
+  color: var(--soft);
+  font-size: 0.85rem;
+}
+/* Schalter (Kopfhörer) */
+.switch {
+  position: relative;
+  width: 58px;
+  height: 48px;
+  flex: none;
+}
+.switch::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: 10px;
+  height: 28px;
+  border-radius: 14px;
+  background: var(--track);
+  border: 1px solid var(--line);
+  transition: background 0.15s, border-color 0.15s;
+}
+.switch i {
+  position: absolute;
+  top: 13px;
+  left: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--btn);
+  border: 1.2px solid var(--soft);
+  transition: transform 0.15s;
+}
+.switch[aria-checked="true"]::before {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+.switch[aria-checked="true"] i {
+  transform: translateX(24px);
+  border-color: var(--ink);
+}
+.switch:focus-visible {
+  outline: 2px solid var(--wood-line);
+  outline-offset: -2px;
+  border-radius: 16px;
+}
+.frun {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 14px;
+  align-items: center;
+}
+.ffl {
+  height: 108px;
+  width: 21px;
+}
+.ffl.none {
+  border-left: 1px dashed var(--line);
+  width: 1px;
+  margin: 0 10px;
+}
+.finfo {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  min-height: 48px;
+  min-width: 0;
+}
+.fwrong {
+  font-style: italic;
+  color: var(--err);
+  font-size: 0.95rem;
+  line-height: 1.2;
+}
+.fwrong:empty {
+  display: none;
+}
+.fctl {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+.fctl .playbtn {
+  flex: none;
+}
+.fctl .tempo {
+  flex: 1 1 150px;
+}
+.fctl .fgo {
+  flex: 1 1 120px;
+}
+.fgo:empty,
+.fpin.beat .fgo {
+  display: none;
+}
+.ffoot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: -4px;
+}
+.ffoot .clear:first-child {
+  padding-left: 0;
+}
+.fxs {
+  display: none;
+}
+/* Während des Mitspielens im Hochformat (und am Desktop) so knapp wie die Leiste fürs Vorspielen:
+   Griffbild links über zwei Zeilen, oben Name und Hinweise, darunter Stopp, Tempo und „Beenden“
+   (an der Stelle des Metronoms). Die Gruppen .frun/.fctl/.ffoot lösen sich dafür ins Raster auf. */
+@media (orientation: portrait), (min-height: 521px) {
+  .fpin.running {
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "fl info info info"
+      "fl play mid exit";
+    column-gap: 14px;
+    row-gap: 4px;
+    align-items: center;
+  }
+  .fpin.running .frun,
+  .fpin.running .fctl,
+  .fpin.running .ffoot {
+    display: contents;
+  }
+  .fpin.running .ffl {
+    grid-area: fl;
+  }
+  .fpin.running .finfo {
+    grid-area: info;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 12px;
+  }
+  .fpin.running .finfo .pstat {
+    flex: 1 1 auto;
+  }
+  .fpin.running .playbtn {
+    grid-area: play;
+  }
+  .fpin.running .ftempo {
+    grid-area: mid;
+  }
+  .fpin.running [data-act="fexit"] {
+    grid-area: exit;
+    padding-left: 4px;
+  }
+  .fpin.running .fxl {
+    display: none;
+  }
+  .fpin.running .fxs {
+    display: inline;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .songpage.following {
+    padding-right: calc(280px + max(24px, env(safe-area-inset-right)));
+  }
+  /* Bedienung bleibt sichtbar; nur Wahl, Erklärung und Auswertung scrollen, wenn es eng wird */
+  .songpage.following .player {
+    width: 280px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .fpin {
+    gap: 10px;
+    width: 100%;
+    min-height: 0;
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  .fset {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .fset,
+  .fctl,
+  .ffoot,
+  .frun {
+    flex: none;
+  }
+  .fset {
+    flex: 0 1 auto;
+  }
+  .fmode button {
+    font-size: 0.95rem;
+  }
+  .ffl {
+    height: min(150px, calc(100vh - 230px));
+    width: auto;
+    aspect-ratio: 26.5 / 136;
+  }
+  .frun .pname {
+    font-size: 2.2rem;
+  }
+  .ffoot {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    column-gap: 18px;
+  }
+  .ffoot .clear {
+    padding-left: 0;
+    min-height: 40px;
+  }
+  .fphones .lab small {
+    font-size: 0.8rem;
+  }
+}
+
 /* ---------------------------------------------------------------- Eigene Lieder (ABC)
    Liederliste (Kapitel „Eigene Lieder“), Seite „Lied hinzufügen“ (src/ui/own-songs.ts), Kasten auf der
    Liedseite. Nur dieser Abschnitt gehört zur Erweiterung „Eigene Lieder“. */
