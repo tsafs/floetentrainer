@@ -145,9 +145,69 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   - **Erkennung, damit nichts ungerecht gewertet wird:**
     - Tonhöhe nur, wenn pitchy eine Klarheit von mindestens etwa 0,9 meldet und die Lautstärke über
       einer Schwelle liegt.
+    - Messfenster (`app/src/audio/mic.ts`): die jüngsten 1024 Samples (≈ 21 ms bei 48 kHz), Messung
+      alle 25 ms. Bis zum 14.11.2026 waren es 2048 Samples (≈ 43 ms); Rückmeldung: „Wenn ich G, A und H
+      schnell im Wechsel spiele, wird oft GIS oder eine andere Zwischennote erkannt“ (im Stimmgerät kurz
+      nach dem Wechsel, dann der richtige Ton). Ein Fenster, das einen Tonwechsel überspannt, liefert
+      einen Wert zwischen beiden Tönen, mit voller Klarheit. Weil das kürzere Fenster kürzer ist als der
+      Messabstand, kann ein Wechsel nur noch eine Messung verfälschen, nie zwei in Folge.
+      - Synthetisch gemessen (Flötenklang mit Obertönen und Rauschen, Wechsel an zufälliger Stelle):
+        Wechsel mit Zwischenwert 61 % → 31 %, mit zwei Zwischenwerten in Folge 2 % → 0 %.
+        In Chromium über den echten Audio-Weg: etwa halb so viele Zwischenwerte, keine zwei in Folge
+        mehr (vorher bei 6–30 % der Wechsel).
+      - Genauigkeit und Klarheit bleiben für c¹–d³: Die Sopranflöte klingt ab 523 Hz, also mindestens
+        11 Perioden im Fenster. Fehler höchstens wenige Cent (bei starkem Rauschen bis 7 statt 6),
+        Klarheit eines Flötentons weiter über 0,97. Die Klarheit fällt bei beiden Fenstern erst bei sehr
+        starkem Rauschen unter 0,9, an derselben Stelle – die Schwelle 0,9 bleibt.
+      - Messabstand und Verzögerungsausgleich im Takt (50 ms) bleiben. Der Messwert liegt jetzt etwa
+        10 ms weniger zurück; das liegt in der Spanne, die der Takt-Modus verträgt.
     - Nur Frequenzen zwischen etwa 480 und 2300 Hz gelten.
     - Ein Oktavfehler, also derselbe Ton eine Oktave daneben, wird erst bei besonders hoher Klarheit
       als falsch gewertet.
+    - Glättung (`app/src/audio/smooth.ts`, Rückmeldung vom 14.11.2026: „der Ton wackelt zu viel“):
+      Klarheit und Bereich werden weiter je Messung geprüft; unklare Messungen zählen als „kein Ton“.
+      - Stabilitätsprüfung vor dem Median (Rückmeldung „GIS zwischen G und A“): Eine gültige Messung
+        zählt nur, wenn sie mit mindestens einer direkt benachbarten (davor oder danach) auf etwa
+        35 Cent übereinstimmt. Sonst gilt sie als unstet und wie eine unklare Messung, also „kein Ton“
+        (und kann wie ein Aussetzer überbrückt werden, siehe unten). Ein einzelner Übergangswert beim
+        Tonwechsel verschwindet so, ein echter Ton (mindestens zwei Messungen) nicht.
+        - Vibrato ±30 Cent bei 5 Hz ändert sich von Messung zu Messung um höchstens 24 Cent und geht
+          durch.
+        - Sind beide Nachbarn ungültig (eine Messung zwischen zwei Aussetzern), gibt es nichts zu
+          vergleichen; sie zählt wie bisher. Ein Übergangswert liegt immer zwischen zwei Tönen.
+        - Ohne zusätzliche Verzögerung: Der Median wartet ohnehin auf die Messungen danach. Nur die
+          jüngste Messung im Median-Fenster hat noch keinen Nachfolger und zählt dort vorläufig.
+        - Im Mitspielen und in der Übung ist ein Übergangswert damit weder ein falscher Ton noch ein
+          neuer Einsatz (25 ms Lücke) und erscheint nicht als „Du spielst gis¹“. Die erkannte Zeit im
+          Takt ändert sich nicht (der Übergangswert lag ohnehin außerhalb der Toleranz).
+      Die gültigen Messungen gehen durch einen Median über mehrere Messungen (mittig, entfernt
+      Ausreißer wie einzelne Oktavsprünge, statt sie zu mitteln), danach je nach Anzeige durch eine
+      Zeitkonstante.
+      - Spielen-Übung: Median über 5 Messungen (≈ 125 ms), keine Zeitkonstante.
+      - Mitspielen (beide Arten): Median über 3 Messungen (≈ 75 ms), keine Zeitkonstante, damit auch
+        Sechzehntel erkannt werden.
+      - Stimmgerät: Median über 5 Messungen und Zeitkonstante 175 ms für Zeiger und Cent. Der Zeiger
+        gleitet zusätzlich 0,1 s nach.
+        - Notenname: Er wechselt nur, wenn der neue Ton ununterbrochen anliegt. Bei einem klaren
+          Wechsel (mehr als 60 Cent vom angezeigten Ton) sind das 3 Messungen in Folge (≈ 50 ms), knapp
+          an der Mitte zwischen zwei Tönen (bis 60 Cent) 100 ms. Früher galt ein klarer Wechsel sofort,
+          dadurch erschien jeder kurze Übergangswert als Name.
+        - Ein echter Tonwechsel erscheint so zwei Messungen (50 ms) nach seiner ersten Messung.
+        - Solange ein klarer Wechsel abgewartet wird, bleiben Zeiger und Cent stehen und werden nicht
+          an den Rand gezogen.
+        - Nach Stille (ab 50 ms ohne Ton) gilt der nächste Ton sofort.
+      - Neubeginn nach 50 ms ohne Ton und bei einem klaren Tonwechsel (über 70 Cent): Der Wert
+        springt sofort, Töne verschmieren nicht ineinander.
+      - Einzelne Aussetzer werden überbrückt: Eine Messung ohne gültigen Ton (unklar, zu leise oder
+        außerhalb des Bereichs, z. B. ein Oktavsprung über 2300 Hz bei d²), also eine Lücke unter
+        50 ms, zählt als der umgebende Ton, wenn davor und danach derselbe Ton klingt. Sie startet
+        weder die Haltedauer noch die Anzeige neu und unterbricht im Takt die erkannte Zeit nicht.
+        Ab 50 ms ohne Ton gilt es wie bisher als Stille bzw. neuer Einsatz. Für den neuen Einsatz
+        über einen Lautstärke-Einbruch zählt eine überbrückte Messung nicht.
+      - Die geglätteten Messungen behalten ihren Zeitpunkt und kommen nur um den halben Median
+        später an (25 bzw. 50 ms). Haltedauer, neuer Einsatz, Nachklang-Schutz und der
+        Verzögerungsausgleich im Takt bleiben dadurch unverändert. Lautstärke und Stille gehen
+        ungeglättet durch.
   - Laufend wird angezeigt, welchen Ton die App hört, mit Abweichung in Cent.
   - Einstellbar sind Toleranz, Haltedauer und Stimmton (Standard a = 440 Hz).
 - **Hinweis nach einem Fehler:** ein Satz aus festen Vorlagen. Je nach Verwechslung geht es um

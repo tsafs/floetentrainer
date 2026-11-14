@@ -2,16 +2,22 @@
 // Rein rechnerisch, ohne Mikrofon – dadurch automatisch testbar.
 
 import { freqToWrittenMidi } from "../music/notes";
+import { DEFAULT_SMOOTH, Smoother } from "./smooth";
 
 export interface Frame {
   /** Zeitpunkt in ms */
   t: number;
-  /** gemessene Frequenz in Hz, null bei Stille oder zu leise */
+  /** gemessene Frequenz in Hz, null bei Stille oder zu leise (nach dem Glätter auch bei einem unsteten Übergangswert) */
   freq: number | null;
   /** Klarheit laut pitchy (0–1) */
   clarity: number;
   /** Lautstärke (Effektivwert des Messfensters, 0–1); optional, das Mitspielen erkennt daran neue Einsätze */
   rms?: number;
+  /**
+   * Vom Glätter überbrückter Einzelaussetzer (./smooth.ts): roh ohne gültigen Ton, Tonhöhe und
+   * Klarheit von den Nachbarn. Seine Lautstärke zählt nicht für die Einsatz-Erkennung (../follow.ts).
+   */
+  filled?: boolean;
 }
 
 export interface JudgeConfig {
@@ -27,6 +33,12 @@ export interface JudgeConfig {
   silenceMs: number;
   /** Frühestens so lange nach der Kartenanzeige wird gewertet. */
   armDelayMs: number;
+  /** Glättung (./smooth.ts): Median über so viele Frames (ungerade, 1 = keiner) … */
+  medianFrames: number;
+  /** … und Zeitkonstante in ms (0 = keine) */
+  tauMs: number;
+  /** Stabilitätsprüfung vor dem Median (./smooth.ts): Nachbar höchstens so viele Cent entfernt; 0 = aus */
+  stableCents: number;
 }
 
 export const DEFAULT_JUDGE: JudgeConfig = {
@@ -39,6 +51,13 @@ export const DEFAULT_JUDGE: JudgeConfig = {
   maxFreq: 2300,
   silenceMs: 90,
   armDelayMs: 400,
+  // Median über 5 Frames (≈ 125 ms, Ausgabe 50 ms später): einzelne Ausreißer, auch zwei in Folge,
+  // unterbrechen die 0,3 s Haltedauer nicht mehr. Keine Zeitkonstante – die Toleranz von ±40 Cent
+  // fängt das Wackeln eines gehaltenen Tons schon ab, und die Anzeige soll Tonwechseln sofort folgen.
+  medianFrames: 5,
+  tauMs: 0,
+  // Übergangswerte beim schnellen Tonwechsel (gis¹ zwischen g¹ und a¹) gelten als „kein Ton“
+  stableCents: DEFAULT_SMOOTH.stableCents,
 };
 
 export interface Heard {
@@ -62,9 +81,15 @@ interface Segment {
   minClarity: number;
 }
 
-/** Über eine ganze Sitzung bestehende Wertung; newCard() setzt den gesuchten Ton. */
+/**
+ * Über eine ganze Sitzung bestehende Wertung; newCard() setzt den gesuchten Ton.
+ * Die Frames laufen zuerst durch den Glätter (./smooth.ts); gewertet und angezeigt wird der geglättete
+ * Ton. Er kommt um den halben Median später an, behält aber seinen Zeitpunkt t – Haltedauer, Einsatz
+ * nach der Kartenanzeige und armDelayMs gelten also weiter in der Zeit, in der gespielt wurde.
+ */
 export class PlayJudge {
   cfg: JudgeConfig;
+  private smoother: Smoother;
   private seg: Segment | null = null;
   private gapStart: number | null = null;
   private inTolStart: number | null = null;
@@ -78,6 +103,7 @@ export class PlayJudge {
 
   constructor(cfg: Partial<JudgeConfig> = {}) {
     this.cfg = { ...DEFAULT_JUDGE, ...cfg };
+    this.smoother = new Smoother(this.cfg);
   }
 
   /** Neue Karte: gesuchter Ton als notierte MIDI-Nummer. */
@@ -104,7 +130,10 @@ export class PlayJudge {
     return f.freq !== null && f.clarity >= this.cfg.minClarity && f.freq >= this.cfg.minFreq && f.freq <= this.cfg.maxFreq;
   }
 
-  push(f: Frame): JudgeOutput {
+  /** Roher Frame vom Mikrofon; die Ausgabe gehört zum geglätteten Frame von vor ein paar Frames. */
+  push(raw: Frame): JudgeOutput {
+    const f = this.smoother.push(raw);
+    if (!f) return { heard: null, event: null };
     if (!this.valid(f)) {
       this.gapStart ??= f.t;
       if (f.t - this.gapStart >= this.cfg.silenceMs) this.seg = null;

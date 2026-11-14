@@ -75,10 +75,21 @@ export async function stored(page: Page) {
  * Audio-Uhr ein (ms = Zeitpunkt auf der Uhr von performance.now, null = Stille) – genauer als einzelne
  * Aufrufe aus dem Test. Läuft mit FAKE_AUDIO zusammen: Der Oszillator lebt in einem echten AudioContext
  * (window.__RealAudioContext), erscheint also nicht in __audioLog und folgt der echten Audio-Uhr.
+ * Wackelnder Ton: __osc.wobble(cent, hz) legt ein Vibrato (±cent, Sinus mit hz Schwingungen je
+ * Sekunde, Standard 5) über alles, was erklingt; wobble(0) schaltet es ab.
+ * Flötenklang: __osc.flute(noise) macht aus dem Sinus einen Ton mit leisen Obertönen (wie die
+ * Flötenstimme, flute-synth.ts) und legt weißes Rauschen (Anblasgeräusch, Effektivwert noise relativ zum
+ * Grundton) darüber, das mit dem Ton ein- und ausgeht. Tonwechsel bleiben abrupt (setValueAtTime).
  * window.__micStopped wird true, sobald die App das Mikrofon wieder freigibt.
  */
 export const FAKE_MIC = () => {
-  type Osc = { play(f: number): void; silence(): void; schedule(list: [number, number | null][]): void };
+  type Osc = {
+    play(f: number): void;
+    silence(): void;
+    schedule(list: [number, number | null][]): void;
+    wobble(cents: number, rate?: number): void;
+    flute(noise?: number): void;
+  };
   const w = window as unknown as { __osc: Osc | null; __micStopped: boolean; __RealAudioContext?: typeof AudioContext };
   w.__osc = null;
   w.__micStopped = false;
@@ -91,7 +102,14 @@ export const FAKE_MIC = () => {
     const dest = ctx.createMediaStreamDestination();
     osc.connect(gain).connect(dest);
     osc.start();
+    // Vibrato: ein langsamer Oszillator verstimmt den Ton (detune in Cent)
+    const lfo = ctx.createOscillator();
+    const depth = ctx.createGain();
+    depth.gain.value = 0;
+    lfo.connect(depth).connect(osc.detune);
+    lfo.start();
     await ctx.resume();
+    let noiseSrc: AudioBufferSourceNode | null = null;
     w.__micStopped = false;
     w.__osc = {
       play(f: number) {
@@ -100,6 +118,25 @@ export const FAKE_MIC = () => {
       },
       silence() {
         gain.gain.setValueAtTime(0, ctx.currentTime);
+      },
+      flute(noise = 0.03) {
+        const harm = [0, 1, 0.1, 0.06, 0.02, 0.01];
+        osc.setPeriodicWave(ctx.createPeriodicWave(new Float32Array(harm.length), Float32Array.from(harm), { disableNormalization: true }));
+        const len = ctx.sampleRate * 2;
+        const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+        const d = buf.getChannelData(0);
+        // gleichverteilt in ±√3·noise: Effektivwert noise; Grundton mit Amplitude 1 hat Effektivwert 0,71
+        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.sqrt(3) * noise * Math.SQRT1_2;
+        noiseSrc?.stop(); // erneuter Aufruf ersetzt das Rauschen, statt es zu verdoppeln
+        noiseSrc = ctx.createBufferSource();
+        noiseSrc.buffer = buf;
+        noiseSrc.loop = true;
+        noiseSrc.connect(gain);
+        noiseSrc.start();
+      },
+      wobble(cents, rate = 5) {
+        lfo.frequency.setValueAtTime(rate, ctx.currentTime);
+        depth.gain.setValueAtTime(cents, ctx.currentTime);
       },
       schedule(list) {
         const now = performance.now();

@@ -16,9 +16,20 @@
 //   Höchstwerts dieses Tons und danach wieder deutlich lauter (mindestens das 1,5-fache des Tiefpunkts).
 // Begründung: Frames kommen alle 25 ms; 40 ms verlangen also mindestens zwei Aussetzer in Folge, ein
 // einzelner Messfehler mitten im gehaltenen Ton zählt nicht. Beim Anstoßen mit der Zunge bricht
-// das Signal meist kürzer ein, als das 43-ms-Messfenster von pitchy auflöst – dann bleibt die Tonhöhe
-// erkennbar, aber die Lautstärke sinkt deutlich; dafür ist der Einbruch-Weg da. Das Wiederansteigen
-// ist nötig, damit ein bloßes Leiserwerden (Ausklingen) keinen Einsatz vortäuscht.
+// das Signal meist kürzer ein, als das Messfenster von pitchy (≈ 21 ms, ./mic.ts) auflöst – dann
+// bleibt die Tonhöhe erkennbar, aber die Lautstärke sinkt deutlich; dafür ist der Einbruch-Weg da.
+// Das Wiederansteigen ist nötig, damit ein bloßes Leiserwerden (Ausklingen) keinen Einsatz vortäuscht.
+//
+// Glättung: Beide Arten schicken die Frames zuerst durch den Glätter (./smooth.ts), knapp eingestellt:
+// nur ein Median über 3 Frames (≈ 75 ms, Ausgabe 25 ms später), keine Zeitkonstante. Das entfernt
+// einzelne Ausreißer (Oktavsprung, Nachbarton), lässt aber auch Sechzehntel durch. Vor dem Median
+// prüft der Glätter, ob ein Frame zu einem Nachbarn passt: Übergangswerte beim schnellen Tonwechsel
+// (gis¹ zwischen g¹ und a¹) kommen als „kein Ton“ an, sind also weder falscher Ton noch neuer Einsatz
+// (eine Lücke von 25 ms liegt unter reattackGapMs). Ein einzelner
+// Frame ohne gültigen Ton zwischen zwei gleichen Tönen wird überbrückt (zählt als dieser Ton, seine
+// Lautstärke aber nicht für den Einbruch-Weg); ab 50 ms ohne Ton bleibt es Stille. Lautstärke und
+// Stille gehen sonst unverändert durch – der neue Einsatz (oben) wird also genauso erkannt wie roh. Die geglätteten Frames behalten ihren Zeitpunkt; der Median
+// verschiebt keinen Tonwechsel, deshalb braucht der Takt-Modus keinen zusätzlichen Ausgleich.
 //
 // Schleife: Beide Arten werten je Durchgang getrennt (Ergebnis je Durchgang). Die Liedseite nutzt die
 // Schleife seit der Nachsteuerung vom 14.11.2026 nicht mehr (ein Durchgang, danach bleiben die Farben
@@ -29,6 +40,7 @@ import { freqToWrittenMidi } from "../music/notes";
 import type { Settings } from "../store/data";
 import type { Timeline } from "../songs/timeline";
 import { DEFAULT_JUDGE, type Frame, type Heard } from "./judge";
+import { Smoother } from "./smooth";
 
 export interface FollowConfig {
   tuning: number;
@@ -48,25 +60,42 @@ export interface FollowConfig {
   reattackRise: number;
   /** Takt-Modus: Verzögerung von Mikrofon und Erkennung in ms (Frames werden so viel früher einsortiert) */
   latencyMs: number;
-  /** Takt-Modus: nötiger Anteil der Notendauer mit erkanntem Ton */
+  /** Takt-Modus: nötiger Anteil der klingbaren Notendauer (Dauer minus articulationMs) mit erkanntem Ton */
   minCoverage: number;
   /** Takt-Modus: mindestens so viele ms erkannt (bei sehr kurzen Noten höchstens 80 % der Dauer) */
   minHitMs: number;
+  /**
+   * Takt-Modus: so viel jeder Note ist beim abgesetzten Spielen gar nicht als Ton messbar
+   * (Zungen-Lücke vor dem nächsten Ton und unklarer Einsatz). Wird vor dem Anteil abgezogen,
+   * sonst wären schnelle Sechzehntel kaum zu treffen.
+   */
+  articulationMs: number;
   /** Takt-Modus: übliches Frame-Intervall in ms (Mikrofon: 25); größere Lücken zählen nur bis 2×. */
   frameMs: number;
+  /** Glättung (./smooth.ts): Median über so viele Frames (ungerade, 1 = keiner) … */
+  medianFrames: number;
+  /** … und Zeitkonstante in ms (0 = keine) */
+  tauMs: number;
+  /** Stabilitätsprüfung vor dem Median (./smooth.ts): Nachbar höchstens so viele Cent entfernt; 0 = aus */
+  stableCents: number;
 }
 
 /**
  * Standardwerte. Toleranz, Klarheit, Oktavregel und Frequenzbereich wie beim Üben (DEFAULT_JUDGE).
  * Haltedauer 120 ms statt 300 ms: Achtel bei 100 Schlägen dauern 300 ms, die Note muss deutlich
  * vorher grün werden.
- * Verzögerung 50 ms (Mikrofon und Erkennung): Messfenster von pitchy 2048 Samples (≈ 43 ms bei
- * 48 kHz; der Messwert gehört im Mittel zur Fenstermitte, also ≈ 20 ms zurück) + Mikrofon-Eingang auf
- * Android typisch 20–40 ms. Die Ausgabe der Klicks, nach denen sie spielt, kommt nicht hierher: Die
- * Oberfläche legt startMs auf den Zeitpunkt, zu dem sie den Zeitplan-Beginn *hört* (mit der vom
- * Browser gemeldeten Ausgabe-Verzögerung, wie die Markierung des Abspielers; ohne Meldung üblich
+ * Verzögerung 50 ms (Mikrofon und Erkennung): Messfenster von pitchy + Mikrofon-Eingang auf Android
+ * typisch 20–40 ms. Der Messwert gehört im Mittel zur Fenstermitte: bei 2048 Samples (bis 14.11.2026)
+ * ≈ 20 ms zurück, bei jetzt 1024 Samples (./mic.ts) ≈ 10 ms. Zusammen also 30–50 ms statt 40–60 ms;
+ * die 50 ms bleiben (oberer Rand, ohne Messung am Gerät nicht verschoben – die Wertung verträgt ±30 ms
+ * Versatz, siehe Test „angestoßene Sechzehntel“). Die Ausgabe der Klicks, nach denen sie spielt,
+ * kommt nicht hierher: Die Oberfläche legt startMs auf den Zeitpunkt, zu dem sie den Zeitplan-Beginn
+ * *hört* (mit der vom Browser gemeldeten Ausgabe-Verzögerung, wie die Markierung des Abspielers; ohne Meldung üblich
  * 30 ms, zusammen also wie bisher 80 ms). Bluetooth-Kopfhörer, die der Browser zu knapp meldet,
- * brauchen mehr – dafür später ein Abgleich-Knopf (latencyMs ist einstellbar).
+ * brauchen mehr – dafür später ein Abgleich-Knopf (latencyMs ist einstellbar). Der Median der
+ * Glättung kommt nicht hinzu: Die geglätteten Frames behalten ihren Zeitpunkt (siehe Kopfkommentar).
+ * Median über 3 Frames statt 5 wie beim Üben: Schnelle Noten (Sechzehntel ≈ 150 ms) sollen erkannt
+ * werden, und ein Ausreißer kostet hier höchstens die kurze Haltedauer bzw. 25 ms erkannte Zeit.
  */
 export const DEFAULT_FOLLOW: FollowConfig = {
   tuning: DEFAULT_JUDGE.tuning,
@@ -81,8 +110,12 @@ export const DEFAULT_FOLLOW: FollowConfig = {
   reattackRise: 1.5,
   latencyMs: 50,
   minCoverage: 0.5,
-  minHitMs: 80,
+  minHitMs: 50,
+  articulationMs: 50,
   frameMs: 25,
+  medianFrames: 3,
+  tauMs: 0,
+  stableCents: DEFAULT_JUDGE.stableCents,
 };
 
 /**
@@ -181,7 +214,8 @@ class Onsets {
         this.prev = seg;
         seg = this.begin(midi, f);
       }
-    } else if (rms !== undefined) {
+    } else if (rms !== undefined && !f.filled) {
+      // überbrückter Einzelaussetzer (./smooth.ts): seine Lautstärke zählt nicht, wie bisher bei einer Lücke
       if (seg.trough === null) {
         if (rms < cfg.reattackDip * seg.peak) seg.trough = rms;
         else seg.peak = Math.max(seg.peak, rms);
@@ -243,6 +277,7 @@ export class WaitFollower {
   wrongMidi: number | null = null;
   done = false;
   private onsets: Onsets;
+  private smoother: Smoother;
   private inTolStart: number | null = null;
   /** Zeitpunkt des letzten Treffers: nur spätere Einsätze zählen */
   private armedAt = -Infinity;
@@ -253,6 +288,7 @@ export class WaitFollower {
   ) {
     this.cfg = { ...DEFAULT_FOLLOW, ...opts.cfg };
     this.onsets = new Onsets(this.cfg);
+    this.smoother = new Smoother(this.cfg);
     this.done = tl.tones.length === 0;
   }
 
@@ -262,8 +298,11 @@ export class WaitFollower {
     this.inTolStart = null;
   }
 
-  push(f: Frame): Heard | null {
+  /** Roher Frame vom Mikrofon; gibt den gehörten (geglätteten) Ton zurück. */
+  push(raw: Frame): Heard | null {
     const cfg = this.cfg;
+    const f = this.smoother.push(raw);
+    if (!f) return null;
     if (!isValid(cfg, f)) {
       this.onsets.gap(f.t);
       this.inTolStart = null;
@@ -357,7 +396,9 @@ interface PassState {
  * latencyMs früher einsortiert. Jeder gültige Frame steht für ein Frame-Intervall um seinen
  * (korrigierten) Zeitpunkt; liegt der Ton in der Toleranz der Note, deren Fenster dieses Intervall
  * überlappt, zählt die Überlappung als erkannte Zeit. Getroffen: erkannte Zeit ≥ minCoverage der
- * Dauer und ≥ minHitMs (bei Noten unter 100 ms höchstens 80 % der Dauer).
+ * klingbaren Dauer (Dauer minus articulationMs für Zungen-Lücke und Einsatz) und ≥ minHitMs
+ * (bei Noten unter 100 ms höchstens 80 % der Dauer). So bleiben angestoßene Sechzehntel bis
+ * etwa ♩ = 120 messbar.
  * Tonwiederholungen brauchen hier keinen neuen Einsatz: Es zählt nur die erkannte Zeit im Fenster
  * der jeweiligen Note; wer eine Wiederholung durchhält, hat beide getroffen (das Tempo gibt die
  * Notengrenzen vor). Oktavfehler und Töne knapp außerhalb der Toleranz zählen einfach nicht.
@@ -374,6 +415,7 @@ export class BeatFollower {
   private cur: PassState;
   private lastTc: number | null = null;
   private readonly L: number;
+  private smoother: Smoother;
 
   constructor(
     readonly tl: Timeline,
@@ -382,6 +424,7 @@ export class BeatFollower {
     this.cfg = { ...DEFAULT_FOLLOW, ...opts.cfg };
     this.anchor = { t: opts.startMs, g: 0, spq: opts.secPerQuarter };
     this.L = tl.total;
+    this.smoother = new Smoother(this.cfg);
     this.cur = this.newPass();
     this.done = tl.tones.length === 0 || this.L <= 0;
   }
@@ -415,7 +458,13 @@ export class BeatFollower {
     this.anchor = { t, g: this.quarterAt(t), spq: secPerQuarter };
   }
 
-  push(f: Frame): Heard | null {
+  /** Roher Frame vom Mikrofon; gibt den gehörten (geglätteten) Ton zurück. */
+  push(raw: Frame): Heard | null {
+    const f = this.smoother.push(raw);
+    return f ? this.take(f) : null;
+  }
+
+  private take(f: Frame): Heard | null {
     const cfg = this.cfg;
     const tc = f.t - cfg.latencyMs;
     const dt = this.lastTc === null ? cfg.frameMs : Math.min(Math.max(tc - this.lastTc, 0), 2 * cfg.frameMs);
@@ -438,6 +487,9 @@ export class BeatFollower {
    * Ende, die Auswertung des letzten Durchgangs.
    */
   finish(t: number): FollowSummary | null {
+    if (this.done) return this.passes[this.passes.length - 1] ?? null;
+    // was der Glätter noch zurückhält, zählt mit
+    for (const f of this.smoother.flush()) this.take(f);
     if (this.done) return this.passes[this.passes.length - 1] ?? null;
     const g = this.quarterAt(t - this.cfg.latencyMs);
     this.settle(g);
@@ -500,7 +552,8 @@ export class BeatFollower {
   private enough(i: number): boolean {
     const n = this.tl.tones[i];
     const durMs = n.dur * this.anchor.spq * 1000;
-    const need = Math.min(Math.max(this.cfg.minCoverage * durMs, this.cfg.minHitMs), 0.8 * durMs);
+    const playable = Math.max(durMs - this.cfg.articulationMs, 0);
+    const need = Math.min(Math.max(this.cfg.minCoverage * playable, this.cfg.minHitMs), 0.8 * durMs);
     return this.cur.ms[i] >= need - 1e-6;
   }
 

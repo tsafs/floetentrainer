@@ -13,6 +13,7 @@ import { soundingFreq } from "../../src/music/notes";
 import { songById } from "../../src/songs/library";
 import { buildTimeline, sectionTimeline, type Timeline } from "../../src/songs/timeline";
 import { song } from "./songs-helpers";
+import { fastChanges, UP_DOWN, type Played } from "./transition-helpers";
 
 const STEP = 25;
 /** klingende Frequenz zu einer notierten MIDI-Nummer, ggf. mit Cent-Abweichung */
@@ -225,6 +226,80 @@ describe("Mitspielen: Warte-Modus", () => {
     });
   });
 
+  describe("wackelnder Ton (Glättung)", () => {
+    /**
+     * Jeden Ton ms lang mit Vibrato ±30 Cent (5 Hz), jeder 6. Frame ein Ausreißer um outlier Halbtöne
+     * (Oktave höher; wo die über 2300 Hz läge – bei d² –, eine tiefer, sonst wäre es ein ungültiger
+     * Frame statt eines Ausreißers), danach gap ms Stille.
+     */
+    const wobbly = (tl: Timeline, ms = 300, gap = 60, outlier = 12): Frame[] => {
+      const out: Frame[] = [];
+      let t = 0;
+      for (const n of tl.tones) {
+        for (let k = 0; k < ms / STEP; k++, t += STEP) {
+          const o = hz(n.midi + outlier) <= DEFAULT_FOLLOW.maxFreq ? n.midi + outlier : n.midi - outlier;
+          const freq = k % 6 === 5 ? hz(o) : hz(n.midi, 30 * Math.sin((2 * Math.PI * 5 * t) / 1000));
+          out.push({ t, freq, clarity: 0.95, rms: 0.1 });
+        }
+        for (let k = 0; k < gap / STEP; k++, t += STEP) out.push({ t, freq: null, clarity: 0, rms: 0.001 });
+      }
+      return out;
+    };
+
+    it("±30 Cent mit einzelnen Ausreißern: alles grün, nichts rot", () => {
+      const tl = melody();
+      const wrongs: number[] = [];
+      const w = new WaitFollower(tl, { onWrong: (i) => wrongs.push(i) });
+      feed(w, wobbly(tl));
+      expect(w.done).toBe(true);
+      expect(w.results.map((r) => r?.ok)).toEqual([true, true, true, true, true]);
+      expect(wrongs).toEqual([]);
+      // auch mit Ausreißern auf den Nachbarton (sonst „Du spielst …“)
+      const w2 = new WaitFollower(tl, { onWrong: (i) => wrongs.push(i) });
+      feed(w2, wobbly(tl, 300, 60, 2));
+      expect(w2.summary()).toMatchObject({ hits: 5, total: 5 });
+      expect(wrongs).toEqual([]);
+    });
+
+    it("Einzelaussetzer (jeder 6. Frame unklar): alles grün; Tonwiederholung braucht trotzdem einen echten neuen Einsatz", () => {
+      const tl = melody();
+      const unclear = (fs: Frame[], n = 1) => fs.map((f, k) => (f.freq !== null && k % 6 >= 6 - n ? { ...f, clarity: 0.6 } : f));
+      const w = new WaitFollower(tl);
+      feed(w, unclear(frames(playAll(tl, 300, 60))));
+      expect(w.results.map((r) => r?.ok)).toEqual([true, true, true, true, true]);
+      // ohne Überbrücken (kein Median) wäre jede Note an den Aussetzern hängen geblieben
+      const raw = new WaitFollower(tl, { cfg: { medianFrames: 1 } });
+      feed(raw, unclear(frames(playAll(tl, 300, 60))));
+      expect(raw.index).toBe(0);
+      // Einzelaussetzer im gehaltenen Ton sind kein neuer Einsatz, auch mit Lautstärke-Einbruch
+      const rep = buildTimeline(song("g'4 g'4 a'2 ||"));
+      const held = new WaitFollower(rep);
+      feed(held, unclear(frames([tone(G, 2000, { rms: 0.1 })])).map((f) => (f.clarity === 0.6 ? { ...f, freq: null, rms: 0.01 } : f)));
+      expect(held.index).toBe(1);
+      // zwei Aussetzer in Folge (50 ms) dagegen schon
+      const twice = new WaitFollower(rep);
+      feed(twice, frames([tone(G, 200), tone(G, 50, { clarity: 0.6 }), tone(G, 200), tone(A, 300)]));
+      expect(twice.done).toBe(true);
+    });
+
+    it("ohne Glättung hätte jeder Ausreißer die Haltedauer neu beginnen lassen", () => {
+      const tl = melody();
+      const w = new WaitFollower(tl, { cfg: { medianFrames: 1 } });
+      feed(w, wobbly(tl));
+      expect(w.index).toBe(0);
+    });
+
+    it("Tonwiederholung braucht weiterhin einen neuen Einsatz (Stille und Lautstärke-Einbruch kommen durch)", () => {
+      const rep = buildTimeline(song("g'4 g'4 a'2 ||"));
+      const held = new WaitFollower(rep);
+      feed(held, wobbly(buildTimeline(song("g'1 ||")), 2000, 0));
+      expect(held.index).toBe(1);
+      const dip = new WaitFollower(rep);
+      feed(dip, frames([tone(G, 300, { rms: 0.1 }), tone(G, 25, { rms: 0.04 }), tone(G, 200, { rms: 0.09 }), tone(A, 200, { rms: 0.1 })]));
+      expect(dip.done).toBe(true);
+    });
+  });
+
   it("Schleife: Bewertung je Durchgang, die erste Note braucht nach gleicher letzter einen neuen Einsatz", () => {
     const tl = buildTimeline(song("g'2 a'2 | g'1 ||"));
     const passes: FollowSummary[] = [];
@@ -335,7 +410,8 @@ describe("Mitspielen: Takt-Modus", () => {
   it("verspätet: innerhalb des Ausgleichs getroffen, ohne Ausgleich bei kurzen Noten nicht", () => {
     const tl = buildTimeline(song("g'16 a'16 h'16 c''16 d''16 c''16 h'16 a'16 g'2. ||"));
     const spq = 0.6; // Sechzehntel = 150 ms
-    const fs = beatFrames(tl, { spq, latency: 80, gap: 0 });
+    // 110 ms Verzögerung: ohne Ausgleich bleiben nur 40 ms im eigenen Fenster (nötig: 50 ms)
+    const fs = beatFrames(tl, { spq, latency: 110, gap: 0 });
     const withComp = new BeatFollower(tl, { secPerQuarter: spq, startMs: START });
     feed(withComp, fs);
     expect(withComp.passes[0].hits).toBe(9);
@@ -356,16 +432,47 @@ describe("Mitspielen: Takt-Modus", () => {
     expect(tooLate.passResults[0].map((r) => r?.ok)).toEqual([false, false, false, false, true, true]);
   });
 
-  it("sehr kurze Noten: mindestens 80 ms erkannt nötig", () => {
+  it("sehr kurze Noten: mindestens 50 ms erkannt nötig, staccato zählt noch", () => {
     const tl = buildTimeline(song("g'16 a'16 h'16 c''16 d''4 r2 ||"));
-    const spq = 0.6; // Sechzehntel = 150 ms → 80 ms nötig (mehr als die Hälfte)
+    const spq = 0.6; // Sechzehntel = 150 ms → nötig: Hälfte von (150 − 50) = 50 ms
+    // nur 25 ms je Sechzehntel klingen (Rest Stille): zu wenig
     const b = new BeatFollower(tl, { secPerQuarter: spq, startMs: START });
-    // nur 75 ms je Sechzehntel klingen (Rest Stille)
-    feed(b, beatFrames(tl, { spq, gap: 75 }));
+    feed(b, beatFrames(tl, { spq, gap: 125 }));
     expect(b.passResults[0].map((r) => r?.ok)).toEqual([false, false, false, false, true]);
+    // 75 ms (staccato) reichen
     const b2 = new BeatFollower(tl, { secPerQuarter: spq, startMs: START });
-    feed(b2, beatFrames(tl, { spq, gap: 50 }));
+    feed(b2, beatFrames(tl, { spq, gap: 75 }));
     expect(b2.passes[0].hits).toBe(5);
+  });
+
+  it("angestoßene Sechzehntel mit Zungen-Lücke, unklarem Einsatz und Wackeln: bis ♩ = 120 messbar", () => {
+    const tl = buildTimeline(song("g'16 a'16 g'16 a'16 h'16 c''16 h'16 c''16 d''16 c''16 h'16 a'16 g'16 a'16 h'16 c''16 | g'2 r2 ||"));
+    for (const bpm of [70, 90, 108, 120]) {
+      for (const late of [-30, 0, 30]) {
+        const spq = 60 / bpm;
+        const ms = spq * 1000;
+        const fs: Frame[] = [];
+        for (let t = START - 300; t < START + tl.total * ms + 600; t += STEP) {
+          const g = (t - DEFAULT_FOLLOW.latencyMs - late - START) / ms;
+          const i = tl.tones.findIndex((n) => g >= n.start && (g - n.start) * ms < n.dur * ms - 35);
+          if (i < 0) fs.push({ t, freq: null, clarity: 0, rms: 0.001 });
+          else if ((g - tl.tones[i].start) * ms < 25) fs.push({ t, freq: 300, clarity: 0.5, rms: 0.05 }); // Einsatz unklar
+          else fs.push({ t, freq: hz(tl.tones[i].midi, 20 * Math.sin(t / 40)), clarity: 0.95, rms: 0.1 });
+        }
+        const b = new BeatFollower(tl, { secPerQuarter: spq, startMs: START });
+        feed(b, fs);
+        b.finish(START + tl.total * ms + 2000);
+        expect(b.passResults[0].slice(0, 16).every((r) => r?.ok), `♩ = ${bpm}, versetzt ${late} ms`).toBe(true);
+      }
+    }
+  });
+
+  it("falsch gespielte Sechzehntel bleiben trotz kleinerer Schwelle falsch", () => {
+    const tl = buildTimeline(song("g'16 a'16 h'16 c''16 d''4 r2 ||"));
+    const spq = 0.5; // ♩ = 120, Sechzehntel = 125 ms
+    const b = new BeatFollower(tl, { secPerQuarter: spq, startMs: START });
+    feed(b, beatFrames(tl, { spq, gap: 35, wrong: { 1: H, 2: C2 } }));
+    expect(b.passResults[0].map((r) => r?.ok)).toEqual([true, false, false, true, true]);
   });
 
   it("Tonwiederholung: ohne neuen Einsatz zählt die erkannte Zeit im jeweiligen Fenster", () => {
@@ -390,6 +497,45 @@ describe("Mitspielen: Takt-Modus", () => {
     feed(b, beatFrames(tl, { clarity: 0.6 }));
     expect(b.passes[0].hits).toBe(0);
     expect(b.passResults[0].every((r) => r?.coverage === 0)).toBe(true);
+  });
+
+  it("wackelnder Ton (±30 Cent, einzelne Oktav-Ausreißer): alles getroffen", () => {
+    const tl = melody();
+    const b = new BeatFollower(tl, { secPerQuarter: SPQ, startMs: START });
+    const fs = beatFrames(tl).map((f, k) =>
+      f.freq === null ? f : { ...f, freq: k % 6 === 5 ? f.freq * 2 : f.freq * Math.pow(2, (30 * Math.sin((2 * Math.PI * 5 * f.t) / 1000)) / 1200) },
+    );
+    feed(b, fs);
+    expect(b.passes[0]).toMatchObject({ hits: 6, total: 6 });
+    expect(b.passResults[0].every((r) => r!.coverage > 0.8)).toBe(true);
+  });
+
+  it("Einzelaussetzer (jeder 6. Frame unklar) unterbrechen die erkannte Zeit nicht; zwei in Folge schon", () => {
+    const tl = melody();
+    const unclear = (n: number) => beatFrames(tl).map((f, k) => (f.freq !== null && k % 6 >= 6 - n ? { ...f, clarity: 0.6 } : f));
+    const clean = new BeatFollower(tl, { secPerQuarter: SPQ, startMs: START });
+    feed(clean, beatFrames(tl));
+    const one = new BeatFollower(tl, { secPerQuarter: SPQ, startMs: START });
+    feed(one, unclear(1));
+    expect(one.passes[0]).toMatchObject({ hits: 6, total: 6 });
+    const cov = (b: BeatFollower) => b.passResults[0].reduce((a, r) => a + r!.coverage, 0);
+    // fast so viel erkannte Zeit wie ohne Aussetzer (nur Aussetzer direkt an Tonenden fehlen)
+    expect(cov(one)).toBeGreaterThan(cov(clean) - 0.15);
+    const two = new BeatFollower(tl, { secPerQuarter: SPQ, startMs: START });
+    feed(two, unclear(2));
+    expect(cov(two)).toBeLessThan(cov(clean) * 0.75);
+  });
+
+  it("Glättung verschiebt nichts: Sechzehntel legato wie ohne Median erkannt, kein zusätzlicher Ausgleich nötig", () => {
+    const tl = buildTimeline(song("g'16 a'16 h'16 c''16 d''16 c''16 h'16 a'16 g'2. ||"));
+    const spq = 0.6; // Sechzehntel = 150 ms
+    const fs = beatFrames(tl, { spq, gap: 0 });
+    const smooth = new BeatFollower(tl, { secPerQuarter: spq, startMs: START });
+    const raw = new BeatFollower(tl, { secPerQuarter: spq, startMs: START, cfg: { medianFrames: 1 } });
+    feed(smooth, fs);
+    feed(raw, fs);
+    expect(smooth.passes[0].hits).toBe(9);
+    expect(smooth.passResults[0].map((r) => r!.coverage)).toEqual(raw.passResults[0].map((r) => r!.coverage));
   });
 
   it("Heft-Lied „Alle meine Entchen“: Treffer im ganzen Lied", () => {
@@ -476,5 +622,91 @@ describe("Mitspielen: Zusammenfassung eines Durchgangs", () => {
     const r = tl.tones.map((n) => ({ ok: n.midi === A }));
     expect(summarize(tl, r)).toEqual({ hits: 4, total: tl.tones.length, complete: true });
     expect(summarize(tl, r.slice(0, 5))).toEqual({ hits: 1, total: 5, complete: false });
+  });
+});
+
+// ---------------------------------------------------------------- schneller Tonwechsel
+
+describe("Mitspielen: schneller Tonwechsel mit Übergangswerten (Rückmeldung: „GIS zwischen G und A“)", () => {
+  const upDown = (n: number) => buildTimeline(song(`${Array.from({ length: n }, (_, i) => ["g'", "a'", "h'", "a'"][i % 4] + "16").join(" ")} | r1 ||`));
+  const between = (m: number) => ![G, A, H].includes(m);
+  /** Dieselben Frames, die Übergangswerte aber als unklare Frames (Klarheit 0,6) */
+  const asUnclear = (p: Played) => {
+    const tr = new Set(p.transitions);
+    return p.frames.map((f) => (tr.has(f.t) ? { ...f, clarity: 0.6 } : f));
+  };
+
+  it("Warte-Modus: Übergangswerte sind weder falscher Ton noch Zwischenton (6–10 Töne je Sekunde, auf- und abwärts)", () => {
+    for (const rate of [6, 7, 8, 9, 10]) {
+      const tl = buildTimeline(song("g'4 a'4 h'4 a'4 g'4 a'4 h'4 a'4 g'4 ||"));
+      const p = fastChanges(UP_DOWN, rate, { count: 9 });
+      const wrongs: number[] = [];
+      const heard: number[] = [];
+      const w = new WaitFollower(tl, { onWrong: (_i, m) => wrongs.push(m) });
+      p.frames.forEach((f) => {
+        const h = w.push(f);
+        if (h) heard.push(h.midi);
+      });
+      expect(heard.filter(between), `${rate} Töne/s`).toEqual([]);
+      expect(wrongs.filter(between), `${rate} Töne/s`).toEqual([]);
+      // genau wie ein unklarer Frame an derselben Stelle (der Wechsel selbst bleibt sichtbar)
+      const ref = new WaitFollower(tl);
+      feed(ref, asUnclear(p));
+      expect(w.results, `${rate} Töne/s`).toEqual(ref.results);
+      expect(w.index).toBe(ref.index);
+    }
+  });
+
+  it("Warte-Modus: schnell, aber lang genug für die Haltedauer (5 Töne je Sekunde) – alles grün, nichts rot", () => {
+    const tl = buildTimeline(song("g'4 a'4 h'4 a'4 g'4 a'4 h'4 a'4 g'4 ||"));
+    for (const seed of [1, 2, 3, 4]) {
+      const p = fastChanges(UP_DOWN, 5, { count: 9, seed });
+      const wrongs: number[] = [];
+      const w = new WaitFollower(tl, { onWrong: (_i, m) => wrongs.push(m) });
+      feed(w, p.frames);
+      expect(w.results.map((r) => r?.ok)).toEqual(Array(9).fill(true));
+      expect(wrongs).toEqual([]);
+    }
+    // früher (ohne Stabilitätsprüfung) hörte die App bei jedem Wechsel kurz einen Zwischenton
+    const p = fastChanges(UP_DOWN, 5, { count: 9 });
+    const old = new WaitFollower(tl, { cfg: { stableCents: 0 } });
+    expect(p.frames.map((f) => old.push(f)?.midi).filter((m) => m !== undefined && between(m)).length).toBeGreaterThan(4);
+  });
+
+  it("Takt-Modus: Sechzehntel g¹–a¹–h¹–a¹ legato mit Übergangswerten, 6–10 Töne je Sekunde: alle getroffen", () => {
+    const tl = upDown(16);
+    for (const bpm of [90, 108, 120, 150]) {
+      const spq = 60 / bpm;
+      const rate = 4 / spq;
+      // bei ♩ = 150 (Sechzehntel 100 ms) nur bis ±10 ms versetzt: weiter daneben bleiben nach Übergangs-
+      // Frame und Versatz manchmal unter 50 ms im Fenster – mit und ohne Stabilitätsprüfung gleich (unten)
+      for (const late of bpm > 120 ? [-10, 0, 10] : [-30, -20, -10, 0, 10, 20, 30]) {
+        for (const shift of [0, 8, 17]) {
+          // Töne ab dem Zeitplan-Beginn (+ Verzögerung, + zu spät/früh), Frames in einem davon unabhängigen Raster
+          const p = fastChanges(UP_DOWN, rate, { t0: START - 300 + shift, start: START + LAT + late, count: 16, t1: START + 4 * spq * 1000 + 600 });
+          const b = new BeatFollower(tl, { secPerQuarter: spq, startMs: START });
+          feed(b, p.frames);
+          b.finish(START + 8 * spq * 1000);
+          expect(b.passResults[0].map((r) => r?.ok), `♩ = ${bpm}, versetzt ${late} ms, Raster +${shift} ms`).toEqual(Array(16).fill(true));
+        }
+      }
+    }
+  });
+
+  it("Takt-Modus: die Stabilitätsprüfung kostet keine erkannte Zeit (gleiche Wertung wie ohne)", () => {
+    const tl = upDown(16);
+    for (const bpm of [90, 120, 150]) {
+      const spq = 60 / bpm;
+      for (const late of [-30, 0, 30]) {
+        const p = fastChanges(UP_DOWN, 4 / spq, { t0: START - 300, start: START + LAT + late, count: 16, t1: START + 4 * spq * 1000 + 600 });
+        const cov = (stableCents: number) => {
+          const b = new BeatFollower(tl, { secPerQuarter: spq, startMs: START, cfg: { stableCents } });
+          feed(b, p.frames);
+          b.finish(START + 8 * spq * 1000);
+          return b.passResults[0].map((r) => r!.coverage);
+        };
+        expect(cov(DEFAULT_FOLLOW.stableCents)).toEqual(cov(0));
+      }
+    }
   });
 });
