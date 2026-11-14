@@ -12,6 +12,8 @@ import { settingsView } from "./ui/settings";
 import { songAddView } from "./ui/own-songs";
 import { songListView, songView } from "./ui/songs";
 import { installMenu } from "./ui/menu";
+import { startpointView, welcomeView } from "./ui/startpoint";
+import { needsWelcome } from "./srs/startpoint";
 import { applyTheme } from "./ui/theme";
 import { tunerView } from "./ui/tuner";
 import { defaultData } from "./store/data";
@@ -33,6 +35,7 @@ const ROUTES: Record<string, View> = {
   lieder: songListView,
   lied: songView, // #/lied/<Kennung>
   "lied-hinzufuegen": songAddView,
+  startpunkt: startpointView, // #/startpunkt bzw. #/startpunkt/neu (aus der Willkommensseite)
 };
 
 function routeName(): string {
@@ -45,7 +48,9 @@ function render(ctx: Ctx) {
   cleanup?.();
   cleanup = undefined;
   const name = routeName();
-  const view = ROUTES[name] ?? homeView;
+  const page = ROUTES[name] ?? homeView;
+  // Allererster Start (noch nichts gewählt): Willkommensseite statt Startseite
+  const view = page === homeView && needsWelcome(ctx.data) ? welcomeView : page;
   window.scrollTo(0, 0);
   cleanup = view(root, ctx);
   if (name === "" || !ROUTES[name]) applyWaitingUpdate();

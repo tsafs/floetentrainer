@@ -8,6 +8,17 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:4173/floetentrainer/",
     trace: "off",
+    // Ohne eigene Daten beginnt jeder Test wie nach „Von vorn beginnen“ (sonst käme die Willkommensseite,
+    // docs/app-startpunkt.md). Tests mit seed(page, null) sehen sie wie beim allerersten Start.
+    storageState: {
+      cookies: [],
+      origins: [
+        {
+          origin: "http://localhost:4173",
+          localStorage: [{ name: "floetentrainer", value: JSON.stringify({ version: 2, app: "floetentrainer", start: { lesen: "erste-toene", spielen: "erste-toene" } }) }],
+        },
+      ],
+    },
     launchOptions: { args: ["--autoplay-policy=no-user-gesture-required"] },
   },
   projects: [{ name: "chromium", use: { browserName: "chromium" } }],

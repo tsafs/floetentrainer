@@ -120,3 +120,16 @@ Silben, Atemzeichen, Seitenumbrüche.
    `sequences.test.ts`, `session.test.ts` („Tonfolgen“), `app/tests/e2e/folge.spec.ts`; feste Folgen für
    Browser-Tests über `window.__folgen`. Bildschirmfotos `*-t1…t7-*.png`. Abweichungen vom Plan am Ende von
    `docs/app-tonfolgen.md`.
+5. **Startpunkt im Lernplan** (`docs/app-startpunkt.md`, umgesetzt 14.11.2026): Willkommensseite beim
+   allerersten Start, Seite `#/startpunkt` mit sechs benannten Meilensteinen (über Fortschritt und
+   Einstellungen). Töne vor dem Startpunkt gelten als bekannt (Fach 3, gestaffelt höchstens 3 je Tag und
+   Spur, keine Vorstellung), fürs Freischalten zählen nur die Töne ab dem Startpunkt. Logik
+   `app/src/srs/startpoint.ts` (dazu `startLevel`/`countedNotes` in `progress.ts`), Seiten
+   `app/src/ui/startpoint.ts` mit eigenem `startpoint.css`, Datenfeld `start` (optional, kein
+   Versionssprung). Tests `app/tests/unit/startpoint.test.ts`, `app/tests/e2e/startpunkt.spec.ts`,
+   Bildschirmfotos `SHOTS=1 npx playwright test shots-startpunkt` (`*-w1…w6-*.png`).
+   **Für Browser-Tests wichtig:** `playwright.config.ts` legt per `storageState` Daten mit gewähltem
+   Startpunkt an, sonst käme in jedem Test ohne eigene Daten die Willkommensseite; `seed(page, null)`
+   entfernt sie (dann wie beim allerersten Start). Nicht angefasst: `session.ts`, `practice.ts`, Startseite.
+   Bekannte Grenze: Zusatzkarten verteilen sich auf alle Töne, auf hohen Stufen kommen die neuen darum
+   langsam auf 10 Antworten; Abhilfe (aktuelle Stufe stärker gewichten) erst nach den Tonfolgen.

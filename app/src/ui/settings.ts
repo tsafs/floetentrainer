@@ -236,6 +236,8 @@ export const settingsView: View = (root, ctx) => {
   </section>
   <section><h2>Stufen</h2>${lvRow("lesen")}${lvRow("spielen")}
     <p class="help">Spielen ist höchstens so hoch wie Lesen. Nach dem Senken zählen für das Freischalten nur neue Antworten; die bisherigen Daten bleiben erhalten.</p>
+    <a class="big alt" href="#/startpunkt">Startpunkt wählen</a>
+    <p class="help">Bei einem benannten Abschnitt einsteigen: Die Töne davor gelten als bekannt.</p>
   </section>
   <section><h2>Sicherung</h2>
     <p class="help">Alle Daten liegen nur in diesem Browser. Eine Sicherung ist eine kleine Datei, die du aufheben und später wieder einlesen kannst.</p>

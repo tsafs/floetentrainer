@@ -61,10 +61,20 @@ export function levelCap(data: AppData, track: Track): number {
   return Math.min(maxLevel("spielen"), level(data, "lesen"));
 }
 
+/** Stufe des Startpunkts (ohne Wahl: 1), höchstens die aktuelle Stufe. */
+export function startLevel(data: AppData, track: Track): number {
+  return Math.min(data.start ? levelOf(track, data.start[track]) : 1, level(data, track));
+}
+
+/** Töne, die fürs Freischalten zählen: die freigeschalteten ab dem Startpunkt (davor gelten sie als bekannt). */
+export function countedNotes(data: AppData, track: Track): string[] {
+  return unlockedNotes(track, level(data, track)).slice(unlockedNotes(track, startLevel(data, track) - 1).length);
+}
+
 export function readyForNext(data: AppData, track: Track): boolean {
   const lv = level(data, track);
   if (lv >= levelCap(data, track)) return false;
-  return unlockedNotes(track, lv).every((n) => noteMastered(data.history[track][n], data.countFrom[track]));
+  return countedNotes(data, track).every((n) => noteMastered(data.history[track][n], data.countFrom[track]));
 }
 
 export interface Unlock {
@@ -86,19 +96,28 @@ export function checkUnlocks(data: AppData): Unlock[] {
   return out;
 }
 
+/** Senken unter den Startpunkt zieht ihn mit (sonst zählte nach dem Wiederaufstieg nur die oberste Stufe). */
+function clampStart(data: AppData, track: Track): void {
+  if (data.start) data.start[track] = stageId(track, startLevel(data, track));
+}
+
 /** Stufe von Hand setzen. Senken: Zählung für das Freischalten beginnt neu. */
 export function setLevel(data: AppData, track: Track, target: number, now: number): void {
   const cap = track === "lesen" ? maxLevel("lesen") : levelCap(data, "spielen");
   const lv = Math.max(1, Math.min(target, cap));
   const before = level(data, track);
   data.stages[track] = stageId(track, lv);
-  if (lv < before) data.countFrom[track] = now;
+  if (lv < before) {
+    data.countFrom[track] = now;
+    clampStart(data, track);
+  }
   if (track === "lesen") {
     const sp = level(data, "spielen");
     const spCap = Math.min(maxLevel("spielen"), lv);
     if (sp > spCap) {
       data.stages.spielen = stageId("spielen", spCap);
       data.countFrom.spielen = now;
+      clampStart(data, "spielen");
     }
   }
 }

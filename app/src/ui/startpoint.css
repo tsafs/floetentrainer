@@ -1,0 +1,132 @@
+/* Willkommensseite und Startpunkt (docs/app-startpunkt.md) */
+.welcome h1 {
+  font-size: 2rem;
+  margin-top: 8px;
+}
+.welcome .lead {
+  font-size: 1.2rem;
+  line-height: 1.4;
+}
+.welcome > .staff.preview {
+  height: 92px;
+  width: auto;
+  max-width: 100%;
+  margin: 8px auto 0;
+}
+.welcome .big small,
+.startpoint .big small {
+  display: block;
+  font-size: 0.9rem;
+  font-style: italic;
+  opacity: 0.8;
+  margin-top: 2px;
+}
+.welcome .big {
+  min-height: 68px;
+}
+.startpoint .cur-info {
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+.milestones {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.ms {
+  display: grid;
+  gap: 10px;
+}
+.msbtn {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "head head"
+    "known staff";
+  align-items: center;
+  gap: 6px 14px;
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--btn);
+  color: var(--ink);
+}
+.ms.cur .msbtn {
+  border-color: var(--ink);
+  border-width: 1.6px;
+}
+.ms.picked .msbtn {
+  border-color: var(--ink);
+  background: var(--track);
+}
+.msbtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.mshead {
+  grid-area: head;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+.mst {
+  font-size: 1.25rem;
+  font-weight: 500;
+}
+.mshead .soft {
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+.msbtn .staff.preview {
+  grid-area: staff;
+  height: 76px;
+  width: auto;
+  max-width: 52vw;
+}
+.msknown {
+  grid-area: known;
+  font-size: 0.95rem;
+  line-height: 1.3;
+  color: var(--soft);
+  font-style: italic;
+}
+.msknown + .msknown {
+  grid-column: 1 / -1;
+  grid-area: auto;
+}
+.ms .confirm {
+  background: var(--track);
+}
+.ms .confirm p + p {
+  margin-top: -4px;
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .milestones {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+  .welcome {
+    gap: 12px;
+  }
+  .welcome h1 {
+    margin-top: 0;
+  }
+  .welcome > .staff.preview {
+    height: 56px;
+    margin-top: 0;
+  }
+  .welcome .btnrow {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+a.big {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  text-decoration: none;
+}

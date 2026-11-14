@@ -7,6 +7,8 @@ test.describe("Startseite", () => {
   test("erster Start: neue Töne, keine Serie", async ({ page }) => {
     await seed(page, null);
     await page.goto("./");
+    // allererster Start: Willkommensseite (startpunkt.spec.ts)
+    await page.getByRole("button", { name: /Von vorn beginnen/ }).click();
     await expect(page.getByRole("heading", { name: "Flötentrainer" })).toBeVisible();
     await expect(page.getByTestId("streak")).toHaveText("0");
     await expect(page.getByRole("button", { name: /Üben/ })).toContainText("Neue Töne warten");
@@ -44,6 +46,7 @@ test.describe("Üben", () => {
   test("Vorstellung, richtig, falsch, Wiederholung", async ({ page }) => {
     await seed(page, null);
     await page.goto("./");
+    await page.getByRole("button", { name: /Von vorn beginnen/ }).click();
     await page.getByRole("button", { name: /Üben/ }).click();
     // Vorstellung
     let i = await info(page);
@@ -160,7 +163,8 @@ test.describe("Daten", () => {
     expect(await page.evaluate(() => localStorage.getItem("floetentrainer"))).toBe("{kaputt");
     await page.getByRole("button", { name: "Neu beginnen" }).click();
     await page.getByRole("button", { name: "Ja, neu beginnen" }).click();
-    await expect(page.getByRole("heading", { name: "Flötentrainer" })).toBeVisible();
+    // ganz neue Daten: wie beim allerersten Start die Willkommensseite
+    await expect(page.getByRole("heading", { name: "Willkommen" })).toBeVisible();
     const keys = await page.evaluate(() => Object.keys(localStorage));
     expect(keys.some((k) => k.startsWith("floetentrainer-beschaedigt-"))).toBe(true);
   });

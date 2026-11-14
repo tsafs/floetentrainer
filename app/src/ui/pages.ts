@@ -6,7 +6,7 @@ import { maxLevel, stagesOf, TRACK_LABEL, unlockedNotes, type Track } from "../m
 import { joinNames, nameHtml, nameText } from "../music/names";
 import { CHART, NOTES } from "../music/notes";
 import { staffRange, staffSvg } from "../music/staff";
-import { isWeak, level, noteAccuracy } from "../srs/progress";
+import { isWeak, level, noteAccuracy, startLevel } from "../srs/progress";
 import { topbar, type View } from "./common";
 
 export const summaryView: View = (root, ctx) => {
@@ -63,12 +63,13 @@ export const progressView: View = (root, ctx) => {
       <div class="rows">${rows}</div>
       <p class="help">${
         next
-          ? `Als Nächstes: ${joinNames(next.notes)}. Dafür braucht jeder Ton mindestens 10 Antworten, davon 90 % richtig.`
+          ? `Als Nächstes: ${joinNames(next.notes)}. Dafür braucht jeder Ton${startLevel(ctx.data, track) > 1 ? ` ab deinem Startpunkt (Stufe ${startLevel(ctx.data, track)})` : ""} mindestens 10 Antworten, davon 90 % richtig.`
           : "Alle Stufen sind freigeschaltet."
       }${track === "spielen" && next ? " Spielen kann Lesen nicht überholen." : ""}</p>
     </section>`;
   };
-  root.innerHTML = `<main class="screen page">${topbar("Fortschritt")}<p class="help">Trefferquote der letzten 20 Antworten je Ton.</p>${sec("lesen")}${sec("spielen")}</main>`;
+  const start = `<section aria-label="Startpunkt"><p class="help">Zu leicht oder zu schwer? Du kannst bei einem anderen Abschnitt einsteigen – weiter hinten oder wieder vorn.</p><a class="big alt" href="#/startpunkt" data-testid="to-startpoint">Startpunkt ändern</a></section>`;
+  root.innerHTML = `<main class="screen page">${topbar("Fortschritt")}<p class="help">Trefferquote der letzten 20 Antworten je Ton.</p>${sec("lesen")}${sec("spielen")}${start}</main>`;
 };
 
 export const chartView: View = (root, ctx) => {
