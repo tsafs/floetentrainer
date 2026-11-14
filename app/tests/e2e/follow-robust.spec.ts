@@ -155,10 +155,13 @@ test("Flöte etwa 30 Cent zu tief (ohne Einstellen): in beiden Modi grün; Werte
   await playWait(page, cents);
   await finished(page, 9000);
   expect((await colors(page)).filter((c) => c === "hit").length).toBeGreaterThanOrEqual(6);
-  // nach dem vollständigen Durchgang sind die nachgeführten Werte in der Flöte
+  // nach dem vollständigen Durchgang sind die nachgeführten Werte in der Flöte, und ihr (unbekannter)
+  // Stimmton ist mit ermittelt: unter 440 Hz (das Nachführen ist langsam), die Werte liegen um ihn
   const fl = (await stored(page)).flutes[0];
   expect(Object.keys(fl.offsets).length).toBeGreaterThan(0);
-  expect(Object.values(fl.offsets as Record<string, number>).every((v) => v < 0)).toBe(true);
+  expect(fl.tuning.known).toBe(false);
+  expect(fl.tuning.hz).toBeLessThan(439);
+  expect(Object.values(fl.offsets as Record<string, number>).every((v) => Math.abs(v) < 20)).toBe(true);
   // im Takt
   await page.getByRole("button", { name: "Im Takt" }).click();
   await go(page).click();
@@ -180,7 +183,7 @@ test("Diagnose: nach einem Durchgang „Diagnose speichern“ – JSON mit Kopf,
   const f = JSON.parse(readFileSync((await dl.path())!, "utf8"));
   expect(f.info).toContain("kein Ton und keine Aufnahme");
   expect(f).toMatchObject({ format: 1, kind: "warten" });
-  expect(f.meta).toMatchObject({ songId: SONG, tuningHz: 440, headphones: false, latencyMs: 120, latencyCalibrated: false });
+  expect(f.meta).toMatchObject({ songId: SONG, tuningHz: 440, tuningKnown: false, headphones: false, latencyMs: 120, latencyCalibrated: false });
   expect(f.meta.flute).toMatchObject({ name: "Meine Flöte" });
   expect(f.meta.tones.map((t: { midi: number }) => t.midi)).toEqual(MELODY);
   expect(f.meta.mic.trackSettings).toBeTruthy();
@@ -200,40 +203,45 @@ test("Flöte einstellen mit verstimmten Tönen → Werte gespeichert → Mitspie
   await page.goto("./#/einstellungen");
   await expect(page.getByRole("heading", { name: "Flöte" })).toBeVisible();
   await expect(page.getByRole("radio", { name: /Meine Flöte/ })).toHaveAttribute("aria-checked", "true");
-  await expect(page.getByRole("radio", { name: /Meine Flöte/ })).toContainText("noch nicht eingestellt");
+  await expect(page.getByRole("radio", { name: /Meine Flöte/ })).toContainText("Stimmton unbekannt · noch nicht eingestellt");
   await page.getByRole("button", { name: "„Meine Flöte“ einstellen" }).click();
   await expect(page.getByRole("heading", { name: "Flöte einstellen" })).toBeVisible();
   await page.waitForFunction(() => (window as unknown as { __osc: unknown }).__osc !== null);
   expect(await page.evaluate(() => (window as unknown as { __floete: { ids: string[] } }).__floete.ids)).toEqual(["g1", "a1", "h1"]);
   await expect(page.getByTestId("cal-sub")).toContainText("Ton 1 von 3");
   await expect(page.getByTestId("cal-q")).toHaveText("Spiel diesen Ton ruhig etwa 2 Sekunden.");
-  // je Ton 2,2 s, verstimmt: g¹ −40, a¹ −46, h¹ −42 (ohne Profil läge das an der Halbton-Grenze)
+  // je Ton 2,2 s, verstimmt: g¹ −40, a¹ −46, h¹ −42 (ohne Profil läge das an der Halbton-Grenze). Der
+  // Stimmton ist unbekannt: Er rückt nach jedem Ton auf die Mitte, am Ende −42 Cent ≈ 429,5 Hz.
   const plan: [number, number][] = [[67, -40], [69, -46], [71, -42]];
   const now = await page.evaluate(() => performance.now());
   await schedule(page, plan.flatMap(([m, c], k): [number, number | null][] => [[now + 200 + k * 4000, hz(m, c)], [now + 2400 + k * 4000, null]]));
-  await expect(page.getByTestId("cal-status")).toContainText("g1: −40 Cent", { timeout: 5000 });
+  await expect(page.getByTestId("cal-status")).toContainText(/g1: ±0 Cent · Stimmton etwa (429,5|430) Hz/, { timeout: 5000 });
   await expect(page.getByTestId("cal-status")).toContainText("Fertig – alle Töne sind eingestellt.", { timeout: 15000 });
-  for (const [id, c] of [["g1", -40], ["a1", -46], ["h1", -42]] as const) {
-    await expect(page.getByTestId(`cal-val-${id}`)).toHaveText(`−${-c}`);
+  for (const [id, c] of [["g1", "+2"], ["a1", "−4"], ["h1", "±0"]] as const) {
+    await expect(page.getByTestId(`cal-val-${id}`)).toHaveText(c);
   }
+  await expect(page.getByTestId("cal-tuning")).toHaveText("Stimmton unbekannt – etwa 429,5 Hz (ermittelt)");
+  await expect(page.getByTestId("cal-sub")).toHaveText("Meine Flöte · etwa 429,5 Hz");
   const fl = (await stored(page)).flutes[0];
-  expect(fl.offsets).toEqual({ g1: -40, a1: -46, h1: -42 });
+  expect(fl.offsets).toEqual({ g1: 2, a1: -4, h1: 0 });
+  expect(fl.tuning.known).toBe(false);
+  expect(fl.tuning.hz).toBeCloseTo(440 * 2 ** (-42 / 1200), 1);
   // ein Ton nachträglich, und ein falscher Ton: Hinweis
   await page.locator('.calcell[data-note="a1"]').click();
   await expect(page.getByTestId("cal-sub")).toContainText("einzelner Ton");
   const t2 = await page.evaluate(() => performance.now());
   await schedule(page, [[t2 + 150, hz(72)], [t2 + 2400, null]]);
   await expect(page.getByTestId("cal-status")).toContainText("Das war wohl ein anderer Ton (c2) – nochmal.", { timeout: 5000 });
-  expect((await stored(page)).flutes[0].offsets.a1).toBe(-46);
+  expect((await stored(page)).flutes[0].offsets.a1).toBe(-4);
   // Mitspielen: dieselben Abweichungen werden herausgerechnet
   await page.goto(`./#/lied/${SONG}`);
   await page.getByRole("tab", { name: "Mitspielen" }).click();
   await expect(page.getByTestId("flute-line")).toContainText("Meine Flöte");
-  await expect(page.getByTestId("flute-line")).toContainText("etwa 40 Cent tief, wird ausgeglichen");
+  await expect(page.getByTestId("flute-line")).toContainText("Meine Flöte · etwa 429,5 Hz, wird ausgeglichen");
   await go(page).click();
   await page.waitForFunction(() => (window as unknown as { __lied: { follow(): Dbg } }).__lied.follow().started);
   await page.waitForFunction(() => (window as unknown as { __osc: unknown }).__osc !== null);
-  expect((await dbg(page)).tuning).toMatchObject({ g1: -40, a1: -46, h1: -42 });
+  expect((await dbg(page)).tuning).toMatchObject({ g1: 2, a1: -4, h1: 0 });
   const off: Record<number, number> = { 67: -40, 69: -46, 71: -42, 72: -42 };
   await playWait(page, MELODY.map((m, i) => off[m] + (i % 2 ? 6 : -6)));
   await finished(page, 9000);
@@ -241,8 +249,8 @@ test("Flöte einstellen mit verstimmten Tönen → Werte gespeichert → Mitspie
   // Flöte wechseln: neue Flöte ohne Werte, dann zurück
   await page.goto("./#/einstellungen");
   await page.getByRole("button", { name: "Flöte hinzufügen" }).click();
-  await page.getByTestId("flute-name-input").fill("Holzflöte");
-  await page.getByRole("button", { name: "Übernehmen" }).click();
+  await page.getByTestId("flute-new-name").fill("Holzflöte");
+  await page.getByRole("button", { name: "Flöte anlegen" }).click();
   await expect(page.getByRole("radio", { name: /Holzflöte/ })).toHaveAttribute("aria-checked", "true");
   let d = await stored(page);
   expect(d.flutes.map((f: { name: string }) => f.name)).toEqual(["Meine Flöte", "Holzflöte"]);
@@ -261,13 +269,14 @@ test("Flöte einstellen mit verstimmten Tönen → Werte gespeichert → Mitspie
   expect(d.flutes.length).toBe(2);
 });
 
-test("Stimmgerät: echte Abweichung, dazu klein der Wert der Flöte", async ({ page }) => {
+test("Stimmgerät: Abweichung zum Stimmton der Flöte, dazu klein der Wert des Tons in der Flöte", async ({ page }) => {
   await page.addInitScript(FAKE_MIC);
-  await seed(page, data({ flutes: [{ id: "floete-1", name: "Meine Flöte", offsets: { a1: -25 }, updated: 1 }], activeFlute: "floete-1" }));
+  await seed(page, data({ flutes: [{ id: "floete-1", name: "Meine Flöte", tuning: { hz: 440, known: true }, offsets: { a1: -25 }, updated: 1 }], activeFlute: "floete-1" }));
   await page.goto("./");
   await page.getByRole("link", { name: "Stimmgerät" }).click();
   await page.waitForFunction(() => (window as unknown as { __osc: unknown }).__osc !== null);
   await page.evaluate((f) => (window as unknown as { __osc: { play(f: number): void } }).__osc.play(f), hz(69, -25));
+  await expect(page.getByTestId("tuner-tuning")).toHaveText("Flöte: Meine Flöte · 440 Hz");
   await expect(page.getByTestId("tuner-name")).toHaveText("a1");
   await expect(page.getByTestId("tuner-cents")).toHaveText(/−2[3-7] Cent/);
   await expect(page.getByTestId("tuner-flute")).toHaveText("Deine Flöte bei a1: −25");

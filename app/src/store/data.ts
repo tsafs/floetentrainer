@@ -46,7 +46,7 @@ export interface InputLatency {
 
 /**
  * Eine Flöte mit ihren Eigenheiten: ihr Stimmton (bekannt oder aus den Messungen ermittelt) und je Ton
- * die Abweichung von diesem Stimmton in Cent (Kennung der Grifftabelle → Cent, auf 0,1 genau), gemessen
+ * die Abweichung von diesem Stimmton in Cent (Kennung der Grifftabelle → Cent, auf 0,01 genau), gemessen
  * mit „Flöte einstellen“ oder beim Mitspielen nachgeführt (../audio/flute-profile.ts; Rechnung in
  * ../music/tuning.ts). Gehört zum Gegenstand Flöte, der mit ihr umzieht – kommt deshalb mit in die
  * Sicherung (anders als die Verzögerung des Geräts).

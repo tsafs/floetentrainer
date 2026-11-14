@@ -1,5 +1,17 @@
 // „Flöte einstellen“ (#/floete, einzelner Ton: #/floete/<kennung>): misst Ton für Ton, wie weit die aktive
-// Flöte vom Stimmton der Einstellungen abweicht (../audio/flute-profile.ts, FluteCalibrator).
+// Flöte vom Stimmton *dieser Flöte* abweicht (../audio/flute-profile.ts, FluteCalibrator; Stimmton und
+// Umrechnung ../music/tuning.ts).
+//
+// Stimmton (seit 14.11.2026 je Flöte):
+// - unbekannt: Er wird hier ermittelt. Nach jedem gemessenen Ton rückt er auf den Median der absoluten
+//   Lagen aller gemessenen Töne (recenter), die Werte liegen dann um 0. Das Ergebnis zeigt deshalb den
+//   Wert relativ zum neuen Stimmton und diesen dazu („a¹: −4 Cent · Stimmton etwa 432,5 Hz“). Die nächste
+//   Messung bezieht sich schon auf den neuen Stimmton (so wird auch eine sehr tiefe Flöte nicht für „ein
+//   anderer Ton“ gehalten).
+// - bekannt (z. B. 442 laut Hersteller): Die Angabe ist der Bezug und wird nicht überschrieben; die Werte
+//   je Ton werden genauso gemessen und angewandt. Unten steht zur Information „angegeben 442 Hz · gemessen
+//   etwa 442,5 Hz“ (Median der absoluten Lagen); ab 10 Cent Abstand dezent das Angebot, den gemessenen Wert
+//   als Stimmton zu übernehmen (die absoluten Lagen bleiben, die Werte werden umgerechnet).
 //
 // Geführt durch die in der Lesen-Spur freigeschalteten Töne, nach Tonhöhe. Je Ton: Notenbild und Name,
 // „Spiel diesen Ton ruhig etwa 2 Sekunden“, ein Fortschrittsbalken über die stabile Phase, dann das Ergebnis
@@ -17,6 +29,19 @@ import { levelOf, unlockedNotes } from "../music/levels";
 import { midiNameHtml, nameHtml, nameText } from "../music/names";
 import { note } from "../music/notes";
 import { staffRange, staffSvg } from "../music/staff";
+import {
+  calibrationReference,
+  centsBetween,
+  hzRoundText,
+  hzText,
+  measuredHz,
+  MEASURED_HINT_CENTS,
+  offsetFromReference,
+  recenter,
+  roundHalfHz,
+  setKnownTuning,
+  tuningShort,
+} from "../music/tuning";
 import { activeFlute } from "../store/data";
 import { esc, topbar, type View } from "./common";
 
@@ -27,20 +52,29 @@ const QUIET_MS = 60;
 
 /** „−25“, „+3“, „±0“ */
 export function centsText(c: number): string {
-  return `${c > 0 ? "+" : c < 0 ? "−" : "±"}${Math.abs(Math.round(c))}`;
+  const r = Math.round(c);
+  return `${r > 0 ? "+" : r < 0 ? "−" : "±"}${Math.abs(r)}`;
 }
 
 export const fluteView: View = (root, ctx) => {
   const d = ctx.data;
   const flute = activeFlute(d);
-  const tuning = d.settings.tuningHz;
   const ids = calibrationNotes(unlockedNotes("lesen", levelOf("lesen", d.stages.lesen)));
   const range = staffRange(ids);
   const single = location.hash.split("/")[2] ?? null;
   /** geführt (alle der Reihe nach) oder ein einzelner Ton */
   let guided = !(single && ids.includes(single));
   let idx = guided ? 0 : ids.indexOf(single!);
-  let cal = new FluteCalibrator(note(ids[idx]).midi, tuning);
+  /**
+   * Messung je Ton gegen die gemessene Mitte der Flöte (unbekannt: ihr Stimmton, der mitwandert; bekannt
+   * und noch nichts gemessen: die Angabe), Ergebnis dann relativ zum Stimmton (calibrationReference)
+   */
+  let calRef = 0;
+  const newCal = () => {
+    calRef = calibrationReference(flute);
+    return new FluteCalibrator(note(ids[idx]).midi, calRef);
+  };
+  let cal = newCal();
   let quietSince: number | null = null;
   let needQuiet = false;
   let timer: number | null = null;
@@ -69,7 +103,9 @@ export const fluteView: View = (root, ctx) => {
   <section aria-label="Werte je Ton">
     <h2>Werte je Ton</h2>
     <div class="calgrid" data-testid="cal-grid"></div>
-    <p class="help">Abweichung vom Stimmton a = ${tuning} Hz in Cent (minus = zu tief). Antippen misst einen Ton neu. Beim Mitspielen verfeinern sich die Werte von selbst.</p>
+    <p class="calhz" data-testid="cal-tuning"></p>
+    <div class="caladopt" data-testid="cal-adopt" hidden><p></p><button class="clear" data-act="adopt">Gemessenen Wert als Stimmton übernehmen</button></div>
+    <p class="help" data-testid="cal-help"></p>
   </section>
 </main>`;
   const main = root.querySelector("main")!;
@@ -85,6 +121,29 @@ export const fluteView: View = (root, ctx) => {
   const doneBtn = $<HTMLButtonElement>('[data-act="done"]');
   const againBtn = $<HTMLButtonElement>('[data-act="again"]');
   const skipBtn = $<HTMLButtonElement>('[data-act="skip"]');
+  const hzEl = $<HTMLElement>('[data-testid="cal-tuning"]');
+  const adoptBox = $<HTMLElement>('[data-testid="cal-adopt"]');
+  const helpEl = $<HTMLElement>('[data-testid="cal-help"]');
+
+  /** Stimmton-Zeile, Angebot zum Übernehmen und Erklärung unter der Übersicht */
+  const drawTuning = () => {
+    const t = flute.tuning;
+    const meas = measuredHz(flute);
+    adoptBox.hidden = true;
+    if (t.known) {
+      hzEl.innerHTML = meas === null ? `Stimmton ${hzText(t)} (angegeben)` : `Stimmton angegeben ${hzText(t)} · gemessen etwa ${hzRoundText(meas)}`;
+      const diff = meas === null ? 0 : centsBetween(meas, t.hz);
+      if (Math.abs(diff) > MEASURED_HINT_CENTS && Math.abs(roundHalfHz(meas!) - t.hz) >= 0.5) {
+        adoptBox.hidden = false;
+        adoptBox.querySelector("p")!.textContent = `Deine Flöte klingt insgesamt etwa ${Math.round(Math.abs(diff))} Cent ${diff < 0 ? "tiefer" : "höher"} als angegeben.`;
+      }
+      helpEl.textContent = `Abweichung vom Stimmton deiner Flöte in Cent (minus = tiefer, als ${hzText(t)} erwarten lässt). Antippen misst einen Ton neu. Beim Mitspielen verfeinern sich die Werte von selbst.`;
+    } else {
+      const est = tuningShort(flute);
+      hzEl.innerHTML = est ? `Stimmton unbekannt – ${est} (ermittelt)` : "Stimmton unbekannt – wird beim Einstellen ermittelt";
+      helpEl.textContent = "Abweichung vom Stimmton deiner Flöte in Cent (minus = tiefer). Den Stimmton ermittelt die App aus allen Tönen (ihre Mitte). Antippen misst einen Ton neu. Beim Mitspielen verfeinern sich die Werte von selbst.";
+    }
+  };
 
   const clearTimer = () => {
     if (timer !== null) window.clearTimeout(timer);
@@ -99,11 +158,18 @@ export const fluteView: View = (root, ctx) => {
         return `<button class="calcell${cur ? " cur" : ""}${v === undefined ? " none" : ""}" data-note="${id}" aria-label="${nameText(id)} ${v === undefined ? "noch nicht eingestellt" : `${centsText(v)} Cent`}"><span class="nm">${nameHtml(id)}</span><span class="v" data-testid="cal-val-${id}">${v === undefined ? "–" : centsText(v)}</span></button>`;
       })
       .join("");
+    drawTuning();
+  };
+
+  /** „Kinderflöte · etwa 432,5 Hz“ */
+  const subHead = () => {
+    const hz = tuningShort(flute);
+    return `${esc(flute.name)}${hz ? ` · ${hz}` : ""}`;
   };
 
   const drawNote = () => {
     const id = ids[idx];
-    sub.innerHTML = `${esc(flute.name)} · ${guided ? `Ton ${idx + 1} von ${ids.length}` : "einzelner Ton"}`;
+    sub.innerHTML = `${subHead()} · ${guided ? `Ton ${idx + 1} von ${ids.length}` : "einzelner Ton"}`;
     stage.innerHTML = staffSvg(id, { range, label: `Note ${nameText(id)}` });
     nm.innerHTML = nameHtml(id);
     main.dataset.note = id;
@@ -125,7 +191,9 @@ export const fluteView: View = (root, ctx) => {
     } else if (s.phase === "done") {
       bar.style.width = "100%";
       stat.classList.add("ok");
-      stat.innerHTML = `${nameHtml(ids[idx])}: ${centsText(s.cents)} Cent`;
+      // gespeicherter Wert (bei unbekanntem Stimmton relativ zum neu ermittelten)
+      const v = flute.offsets[ids[idx]] ?? s.cents;
+      stat.innerHTML = `${nameHtml(ids[idx])}: ${centsText(v)} Cent${flute.tuning.known ? "" : ` · Stimmton ${tuningShort(flute)}`}`;
     } else {
       bar.style.width = "0";
       stat.classList.add("err");
@@ -138,7 +206,7 @@ export const fluteView: View = (root, ctx) => {
     guided = keepGuided;
     finished = false;
     idx = i;
-    cal = new FluteCalibrator(note(ids[idx]).midi, tuning);
+    cal = newCal();
     needQuiet = true;
     quietSince = null;
     lastShown = "";
@@ -153,7 +221,7 @@ export const fluteView: View = (root, ctx) => {
     clearTimer();
     finished = true;
     main.dataset.phase = "fertig";
-    sub.innerHTML = esc(flute.name);
+    sub.innerHTML = subHead();
     stat.className = "calstat ok";
     stat.textContent = "Fertig – alle Töne sind eingestellt.";
     qEl.hidden = true;
@@ -183,12 +251,17 @@ export const fluteView: View = (root, ctx) => {
     }
     const before = cal.state.phase;
     const s = cal.push(f);
+    if (s.phase === "done" && before !== "done") {
+      // speichern, unbekannten Stimmton neu ermitteln, dann erst zeigen
+      flute.offsets[ids[idx]] = offsetFromReference(flute, s.cents, calRef);
+      recenter(flute);
+      flute.updated = Date.now();
+      ctx.save();
+    }
     show(s);
     if (s.phase === before) return;
     if (s.phase === "done") {
-      flute.offsets[ids[idx]] = s.cents;
-      flute.updated = Date.now();
-      ctx.save();
+      if (!finished) sub.innerHTML = `${subHead()} · ${guided ? `Ton ${idx + 1} von ${ids.length}` : "einzelner Ton"}`;
       drawGrid();
       if (guided) timer = window.setTimeout(next, NEXT_MS);
     } else if (s.phase === "wrong") {
@@ -208,6 +281,18 @@ export const fluteView: View = (root, ctx) => {
     else goTo(idx);
   });
   doneBtn.addEventListener("click", () => ctx.go("#/einstellungen"));
+  adoptBox.querySelector("button")!.addEventListener("click", () => {
+    const meas = measuredHz(flute);
+    if (meas === null) return;
+    // gemessener Stimmton (auf 0,5 Hz) wird die Angabe; die absoluten Lagen bleiben
+    setKnownTuning(flute, roundHalfHz(meas));
+    flute.updated = Date.now();
+    ctx.save();
+    if (finished) {
+      sub.innerHTML = subHead();
+      drawGrid();
+    } else drawNote();
+  });
   grid.addEventListener("click", (e) => {
     const b = (e.target as Element).closest?.("button[data-note]") as HTMLButtonElement | null;
     if (!b) return;

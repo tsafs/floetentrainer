@@ -17,8 +17,15 @@ export const A4 = 440;
 export const TUNING_LIMITS: [number, number] = [415, 466];
 /** Gängige Stimmtöne als schnelle Wahl */
 export const COMMON_TUNINGS = [440, 442, 443];
-/** Größter Wert je Ton: mehr als ein halber Halbton wäre schon der Nachbarton */
+/** Größter gemessener bzw. nachgeführter Wert je Ton: mehr als ein halber Halbton wäre schon der Nachbarton */
 export const MAX_OFFSET = 49;
+/**
+ * Grenze der gespeicherten Werte. Weiter als MAX_OFFSET, damit ein Wechsel des Stimmtons (bekannt ↔
+ * unbekannt, andere Angabe) die absoluten Lagen erhält: Sagt sie „442“ zu einer Flöte, die gemessen bei
+ * 432 Hz liegt, sind ihre Töne relativ zu 442 etwa −38 ± 15 Cent, einzelne also über −50. Die Wertung
+ * kommt damit zurecht (correctPitch sucht den nächsten Ton *dieser* Flöte); 415–466 Hz sind ±100 Cent.
+ */
+export const OFFSET_LIMIT = 120;
 
 /** Abstand von hz zu refHz in Cent (positiv = höher) */
 export function centsBetween(hz: number, refHz: number): number {
@@ -32,8 +39,8 @@ export function shiftHz(hz: number, cents: number): number {
 
 export const clampTuning = (hz: number) => Math.max(TUNING_LIMITS[0], Math.min(TUNING_LIMITS[1], hz));
 export const clampOffset = (c: number) => Math.max(-MAX_OFFSET, Math.min(MAX_OFFSET, c));
-/** Werte je Ton werden auf 0,1 Cent genau gespeichert (Umrechnungen sollen nichts verschieben) */
-export const roundOffset = (c: number) => Math.round(clampOffset(c) * 10) / 10 + 0;
+/** Werte je Ton werden auf 0,01 Cent genau gespeichert (auch mehrere Umrechnungen verschieben nichts Hörbares) */
+export const roundOffset = (c: number) => Math.round(Math.max(-OFFSET_LIMIT, Math.min(OFFSET_LIMIT, c)) * 100) / 100 + 0;
 
 /** Median einer Zahlenliste (leer: null) */
 export function median(xs: number[]): number | null {
@@ -122,6 +129,21 @@ export function measuredHz(f: Tuned): number | null {
   return med === null ? null : shiftHz(f.tuning.hz, med);
 }
 
+/**
+ * Bezug beim Einstellen eines Tons: die gemessene Mitte der Flöte (ohne Werte ihr Stimmton). Bei
+ * unbekanntem Stimmton ist das der Stimmton selbst; bei einem bekannten, der deutlich danebenliegt, hält
+ * das die Prüfung „ein anderer Ton?“ (50 Cent) an der wirklichen Lage. Das Ergebnis wird mit
+ * offsetFromReference in einen Wert relativ zum Stimmton umgerechnet.
+ */
+export function calibrationReference(f: Tuned): number {
+  return measuredHz(f) ?? f.tuning.hz;
+}
+
+/** Gemessene Cent gegen den Bezug refHz → Wert relativ zum Stimmton der Flöte */
+export function offsetFromReference(f: Tuned, cents: number, refHz: number): number {
+  return roundOffset(cents + centsBetween(refHz, f.tuning.hz));
+}
+
 /** Ab so vielen Cent Abstand zwischen Angabe und Messung bietet die App an, den gemessenen Wert zu übernehmen */
 export const MEASURED_HINT_CENTS = 10;
 
@@ -157,7 +179,7 @@ export function tuningShort(f: Tuned): string | null {
  * Alte Daten (bis 14.11.2026): ein Stimmton für alle (settings.tuningHz), die Werte je Ton waren relativ
  * dazu gemessen. Absolute Lage je Ton = tuningHz + Wert. Daraus wird eine Flöte mit unbekanntem Stimmton
  * = Median der absoluten Lagen (ohne Werte: tuningHz), Werte = absolute Lage − Stimmton. Verlustfrei bis
- * auf 0,1 Cent (und die Grenzen von Stimmton und Werten).
+ * auf 0,01 Cent (und die Grenzen von Stimmton und Werten).
  */
 export function fromLegacy(offsets: Record<string, number>, tuningHz: number): Tuned {
   const f: Tuned = { tuning: { hz: tuningHz, known: false }, offsets: { ...offsets } };

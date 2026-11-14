@@ -134,6 +134,7 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
 - **Spielen:**
   - Die Note wird gezeigt, die App hört zu (Bibliothek „pitchy“).
   - Die Sopranflöte klingt eine Oktave höher als notiert: notiertes c¹ ≈ 523,25 Hz bei a = 440 Hz.
+    Erwartet wird im Stimmton der aktiven Flöte (seit 14.11.2026, siehe „Stimmton je Flöte“ unten).
   - **Richtig:** Der gesuchte Ton klingt 0,3 s stabil innerhalb der Toleranz (Standard ±40 Cent).
   - **Falsch:** Ein anderer Ton klingt 0,3 s stabil.
     - Gewertet wird erst ab einem neuen Toneinsatz nach der Kartenanzeige, also nach Stille oder einem
@@ -211,19 +212,41 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
         ungeglättet durch.
   - **Flötenprofil** (seit 14.11.2026, Befund am Gerät: günstige Flöte etwa 30 Cent zu tief, die
     Stimmton-Einstellung half nur bedingt – 437 Hz „zu hoch“, 436 „zu tief“, weil die Töne einzeln
-    verschieden abweichen): Je Flöte wird je Ton gespeichert, wie weit er vom Stimmton abweicht („Flöte
-    einstellen“, siehe 6.; beim Mitspielen langsam nachgeführt). In der Spielen-Übung wird die Abweichung
-    des gesuchten Tons herausgerechnet: Die Toleranz (±40 Cent) gilt relativ zu diesem Wert, und „Ich höre
-    a¹ ±0 Cent“ heißt „genau wie a¹ auf deiner Flöte“. Der gehörte Ton ist der nächste Ton *dieser* Flöte
-    (`correctPitch` in `app/src/audio/flute-profile.ts`). Für noch nicht gemessene Töne gilt der Median der
-    gemessenen, ohne Werte 0 (also wie bisher). Die Übung führt selbst nichts nach (zu wenige, zu kurze
-    Töne).
+    verschieden abweichen): Je Flöte wird je Ton gespeichert, wie weit er vom Stimmton *der Flöte* abweicht
+    („Flöte einstellen“, siehe 6.; beim Mitspielen langsam nachgeführt). In der Spielen-Übung wird die
+    Abweichung des gesuchten Tons herausgerechnet: Die Toleranz (±40 Cent) gilt relativ zu diesem Wert, und
+    „Ich höre a¹ ±0 Cent“ heißt „genau wie a¹ auf deiner Flöte“. Der gehörte Ton ist der nächste Ton
+    *dieser* Flöte (`correctPitch` in `app/src/audio/flute-profile.ts`). Noch nicht gemessene Töne liegen
+    beim Stimmton der Flöte (0). Die Übung führt selbst nichts nach (zu wenige, zu kurze Töne).
+  - **Stimmton je Flöte** (seit 14.11.2026, Wunsch der Nutzerin: „Was ist, wenn ich weiß, dass meine neue
+    Flöte auf 442 Hertz gestimmt ist, aber nicht weiß, auf welchen Stimmton genau meine Kinderflöte gestimmt
+    ist?“). Die frühere Einstellung „Stimmton“ für alle (`settings.tuningHz`) entfällt; jede Flöte hat
+    `tuning: { hz, known }` (Rechnung an einer Stelle: `app/src/music/tuning.ts`).
+    - **Bekannt:** Sie trägt ihn ein (Wahl 440/442/443 Hz, sonst mit + und − in 1-Hz-Schritten, 415–466 Hz).
+      Die Angabe ist der Bezug und wird nie von selbst überschrieben – sie ist aber nur der Startwert: Die
+      Werte je Ton werden genauso gemessen, gespeichert und angewandt wie bei „unbekannt“ (eine „442er“ kann
+      real 442,5 Hz haben, einzelne Töne ±10–20 Cent).
+    - **Unbekannt:** „wird beim Einstellen ermittelt“ – der Stimmton ist der Median der absoluten Lagen aller
+      gemessenen Töne (die Werte liegen dann um 0), angezeigt auf 0,5 Hz gerundet („etwa 432,5 Hz“). Er wird
+      nach jeder Messung beim Einstellen und nach jedem vollständigen Mitspiel-Durchgang neu ermittelt.
+      Solange nichts gemessen ist, nimmt die App 440 Hz an.
+    - **Werte je Ton** sind relativ zum Stimmton der Flöte („e¹ −15“ = 15 Cent tiefer, als der Stimmton der
+      Flöte erwarten lässt), auf 0,01 Cent gespeichert, gemessen und nachgeführt höchstens ±49, gespeichert
+      bis ±120 (damit ein Wechsel des Stimmtons die absoluten Lagen erhält). Ungemessene Töne: 0. Der frühere
+      Rückfall „Median der gemessenen“ entfällt, weil der Stimmton ihn abdeckt: Bei unbekanntem Stimmton ist er
+      genau dieser Median; bei bekanntem gilt ihre Angabe. Nur beim Nachführen eines unbekannten Stimmtons
+      folgen ungemessene Töne während des Durchgangs dem Median (dorthin rückt der Stimmton danach).
+    - **Absolute Lage** eines Tons = Stimmton + Wert. Jeder Wechsel (andere Angabe, bekannt ↔ unbekannt,
+      gemessenen Wert übernehmen) rechnet die Werte so um, dass die absoluten Lagen bleiben.
+    - Der Stimmton der aktiven Flöte gilt **überall**: Übung (Spielen-Karten), Stimmgerät, Mitspielen,
+      Vorspielen (Synth – passt mit Kopfhörern zu ihrem Spiel), Verzögerungs-Abgleich, Diagnose.
   - **Mitspielen** wertet seit dem 14.11.2026 nach eigenen, großzügigeren Regeln (nächster Halbton,
     Klarheit ab 0,85, „falsch“ erst nach 250 ms, im Takt Verzögerung 120 ms bzw. abgeglichen, Wertung nach
     Anteil im mittleren Teil der Note oder Einsatz am Notenbeginn): siehe `docs/app-lieder.md`, Abschnitt
     „Mitspielen robuster“. Übung und Stimmgerät behalten Toleranz, Haltedauer und Klarheit 0,9.
   - Laufend wird angezeigt, welchen Ton die App hört, mit Abweichung in Cent.
-  - Einstellbar sind Toleranz, Haltedauer und Stimmton (Standard a = 440 Hz).
+  - Einstellbar sind Toleranz und Haltedauer; der Stimmton gehört seit 14.11.2026 zur Flöte (Einstellungen →
+    Flöte).
 - **Hinweis nach einem Fehler:** ein Satz aus festen Vorlagen. Je nach Verwechslung geht es um
   Hilfslinien, Linie oder Zwischenraum, die Oktave (Daumen), ♯/♭ oder die Nachbarnote. Beispiel:
   „Du hast d¹ gewählt. c¹ hat eine eigene Hilfslinie, d¹ hängt unter der untersten Linie.“
@@ -260,27 +283,53 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
 - **Fortschritt:** Trefferquote je Ton, getrennt nach Lesen und Spielen. Erreichbar durch Tippen auf
   die Spuren.
 - **Stimmgerät:** freies Spielen mit laufender Anzeige der gehörten Note (auf den Linien, als Name und
-  Griffbild) und der Abweichung in Cent. Die Abweichung ist immer die echte zum Stimmton (so sieht sie
-  ehrlich, wie ihre Flöte klingt); ist für den Ton auf der aktiven Flöte ein Wert gespeichert, steht klein
-  darunter „Deine Flöte bei a¹: −25“ (seit 14.11.2026).
+  Griffbild) und der Abweichung in Cent. Die Abweichung ist die echte zum Stimmton der aktiven Flöte (so
+  sieht sie ehrlich, wie ihre Flöte klingt, ohne die Werte je Ton herauszurechnen); ist für den Ton auf der
+  aktiven Flöte ein Wert gespeichert, steht klein darunter, wie er innerhalb der Flöte liegt („Deine Flöte bei
+  e¹: −15“, bei mehreren Flöten mit ihrem Namen). Oben dezent „Flöte: Kinderflöte · etwa 432,5 Hz“ (bekannt
+  „· 442 Hz“, noch nicht ermittelt „· Stimmton unbekannt, 440 Hz angenommen“). Eine andere Flöte wählen
+  ändert den Bezug.
 - **Grifftabelle:** alle Töne c¹–c³ mit Note, Name und Griffbild. Noch nicht freigeschaltete Töne
   (Lesen-Spur) erscheinen blass.
 - **Einstellungen:**
   - Sitzungslänge
-  - Toleranz, Haltedauer und Stimmton
+  - Toleranz und Haltedauer (Abschnitt „Spielen“)
   - **Flöte** (seit 14.11.2026): Liste der Flöten (Standard eine, „Meine Flöte“), eine ist aktiv; je Flöte
-    „7 Töne eingestellt“ bzw. „noch nicht eingestellt“. Großer Knopf „„Meine Flöte“ einstellen“, darunter
-    „Umbenennen“ (Eingabefeld in der Seite), „Flöte hinzufügen“ (heißt zunächst „Flöte 2“, Eingabefeld gleich
-    offen) und „Löschen“ (nur bei mehr als einer, Bestätigung in der Seite).
+    zwei kleine Zeilen: „Stimmton 442 Hz“ bzw. „Stimmton unbekannt – etwa 432,5 Hz (ermittelt)“ (noch nicht
+    ermittelt: „Stimmton unbekannt“) und „7 Töne eingestellt“ bzw. „noch nicht eingestellt“. Darunter der
+    **Stimmton der aktiven Flöte**: Zeile „Stimmton“ mit Erklärung – bekannt „angegeben“ (ohne Werte:
+    „angegeben – für genauere Wertung Ton für Ton einstellen“; mit Werten „angegeben · gemessen etwa 438 Hz“,
+    ab 10 Cent Abstand mit „übernehmen“) und rechts − / 442 Hz / +; unbekannt „unbekannt – wird beim
+    Einstellen ermittelt“ bzw. „… ermittelt aus 7 Tönen“ und rechts „etwa 432,5 Hz“. Darunter die Wahl
+    „440 Hz · 442 Hz · 443 Hz · Weiß nicht“ (Umschalten bekannt/unbekannt; die Werte werden umgerechnet, die
+    absoluten Lagen bleiben). Dann der große Knopf „„Meine Flöte“ einstellen“, darunter „Umbenennen“
+    (Eingabefeld in der Seite), „Flöte hinzufügen“ und „Löschen“ (nur bei mehr als einer, Bestätigung in der
+    Seite).
+  - **Flöte hinzufügen:** Feld in der Seite „Neue Flöte“: Name (zunächst „Flöte 2“), dann die Frage „Weißt du,
+    auf welchen Stimmton die Flöte gestimmt ist?“ mit dem Hinweis „Steht oft auf der Flöte oder der
+    Verpackung, z. B. 442 Hz.“ und derselben Wahl 440 · 442 · 443 · Weiß nicht (vorgewählt „Weiß nicht“:
+    „Kein Problem – die App ermittelt ihn, wenn du die Flöte einstellst.“). Mit Zahl: − / + für andere Werte
+    und die Ermunterung „Für eine genauere Wertung danach trotzdem Ton für Ton einstellen“. „Flöte anlegen“
+    macht sie zur aktiven, „Abbrechen“.
   - **Flöte einstellen** (`#/floete`, einzelner Ton `#/floete/<kennung>`): geführt Ton für Ton durch die in der
     Lesen-Spur freigeschalteten Töne, nach Tonhöhe. Notenbild und Name, „Spiel diesen Ton ruhig etwa
     2 Sekunden.“, Balken über die stabile Phase, Ergebnis „a¹: −25 Cent“ (sofort gespeichert), nach 1,4 s der
-    nächste Ton. „Nochmal“, „Überspringen“. Gemessen wird der Median der Cent-Abweichung (relativ zum
-    Stimmton) über 1,5 s stabile Phase (die ersten 150 ms Einsatz nicht; bricht der Ton nach mindestens 1 s
+    nächste Ton. „Nochmal“, „Überspringen“. Gemessen wird der Median der Cent-Abweichung über 1,5 s stabile
+    Phase (Bezug: die gemessene Mitte der Flöte, ohne Werte ihr Stimmton; gespeichert relativ zum Stimmton der
+    Flöte) (die ersten 150 ms Einsatz nicht; bricht der Ton nach mindestens 1 s
     ab, zählt es auch), nur klare, stabile Messungen, Wackler über 40 Cent vom laufenden Median nicht. Liegt
     der Median 50 Cent oder mehr vom Zielton weg: „Das war wohl ein anderer Ton (h¹) – nochmal.“ Darunter die
     Übersicht „Werte je Ton“; Antippen misst diesen Ton neu. Nach einem Ergebnis wartet die Messung des
     nächsten Tons auf kurze Stille (60 ms), damit der ausklingende vorige Ton nicht als falscher gilt.
+    Stimmton dabei (seit 14.11.2026): Oben „Kinderflöte · etwa 432,5 Hz · Ton 2 von 7“. **Unbekannt:** Nach
+    jedem Ton rückt der Stimmton auf die Mitte aller gemessenen; das Ergebnis zeigt den Wert relativ zum neuen
+    Stimmton und diesen dazu („a¹: −4 Cent · Stimmton etwa 432,5 Hz“; der erste Ton ist so immer ±0). Unter der
+    Übersicht „Stimmton unbekannt – etwa 432,5 Hz (ermittelt)“. **Bekannt:** Die Angabe bleibt; unter der
+    Übersicht „Stimmton angegeben 442 Hz · gemessen etwa 442,5 Hz“ (Median der absoluten Lagen, auf 0,5 Hz).
+    Liegt die Messung mehr als 10 Cent daneben, dezent „Deine Flöte klingt insgesamt etwa 16 Cent tiefer als
+    angegeben.“ mit „Gemessenen Wert als Stimmton übernehmen“ (auf 0,5 Hz; die absoluten Lagen bleiben). Dass
+    die Messung an der gemessenen Mitte ansetzt, hält bei einer falsch angegebenen Flöte (442 angegeben, real
+    432) die Prüfung „ein anderer Ton?“ an ihrer wirklichen Lage.
   - Mitspielen: „Ich trage Kopfhörer“; darunter die Verzögerung im Takt je Kopfhörer-Zustand (Abgleich im
     Mitspiel-Bereich, siehe `docs/app-lieder.md`)
   - beide Stufen von Hand
@@ -369,9 +418,19 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   - In `localStorage`, mit Versionsnummer im Datenformat und Umwandlung älterer Versionen.
   - Je Ton und Spur werden nur die letzten 20 Antworten gespeichert (richtig/falsch und Tag).
   - Die Stufen werden über ihre Kennungen gespeichert.
-  - Flöten (`flutes`, `activeFlute`; je Flöte Name und Cent je Ton) kamen ohne Versionssprung dazu (lassen
-    sich neu messen) und gehen mit in die Sicherung – die Flöte zieht mit ihr um, die Tonhöhe hängt nicht
-    vom Mikrofon ab. Die abgeglichene Verzögerung im Takt (`settings.inputLatencyMs`, je Kopfhörer-Zustand)
+  - Flöten (`flutes`, `activeFlute`; je Flöte Name, Stimmton `tuning: { hz, known }` und Cent je Ton relativ
+    dazu) kamen ohne Versionssprung dazu (lassen sich neu messen) und gehen mit in die Sicherung – die Flöte
+    zieht mit ihr um, die Tonhöhe hängt nicht vom Mikrofon ab.
+  - **Stimmton je Flöte statt `settings.tuningHz`** (14.11.2026), ebenfalls ohne Versionssprung. Umwandlung
+    beim Lesen (auch alter Sicherungen): absolute Lage je Ton = alter Stimmton + Wert; eine Flöte ohne
+    `tuning` wird „unbekannt“ mit Stimmton = Median ihrer absoluten Lagen und Werten = absolut − Stimmton
+    (verlustfrei bis auf 0,01 Cent). Ohne Werte bekommt die aktive Flöte den alten Stimmton, weitere Flöten
+    440 Hz; ganz alte Daten ohne Flöten geben ihn der Standard-Flöte. Bewertung des fehlenden Sprungs: Eine
+    noch nicht aktualisierte App fände kein `settings.tuningHz` und nähme 440 Hz; die Werte (jetzt relativ zum
+    Stimmton der Flöte) hielte sie für relativ zu 440 – bei einer 432er etwa 30 Cent daneben, was ihr
+    Nachführen beim Mitspielen ausgleicht –, und beim Speichern verlöre sie `tuning` (ein eingetragener
+    Stimmton wäre neu einzutragen, ein ermittelter neu zu messen). Das ist wiederherstellbar und betrifft nur
+    die kurze Zeit, bis das Update übernommen ist; ein Sprung würde dort dagegen alle Daten sperren. Die abgeglichene Verzögerung im Takt (`settings.inputLatencyMs`, je Kopfhörer-Zustand)
     gehört dagegen zum Gerät: Sie bleibt im Speicher dieses Browsers, geht nicht in die Sicherung, und beim
     Einlesen einer Sicherung behält das Gerät seinen Wert.
   - Mit `navigator.storage.persist()` um dauerhaften Speicher bitten.

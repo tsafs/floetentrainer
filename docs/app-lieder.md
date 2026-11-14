@@ -243,17 +243,36 @@ bleiben bei ihren Regeln, außer dem Flötenprofil in der Übung):
 - **Toleranz = nächster Halbton** (beide Arten): Ein Ton zählt als Zielton, wenn er näher am Zielton liegt
   als an jedem Nachbarton (|Abweichung| < 50 Cent) – gemessen an der Lage dieses Tons auf *ihrer* Flöte.
 - **Flötenprofile** (Wunsch der Nutzerin: mehrere Flöten, in den Einstellungen wechselbar und einstellbar):
-  Je Flöte je Ton die Abweichung vom Stimmton in Cent, gemessen mit „Flöte einstellen“ (Einstellungen →
-  Flöte, Ablauf in `docs/app-entscheidungen.md` Abschnitt 6). Angewandt beim Mitspielen und in der
-  Spielen-Übung; ungemessene Töne: Median der gemessenen, sonst 0. Beim Mitspielen wird jeder Ton langsam
+  Je Flöte ihr Stimmton und je Ton die Abweichung davon in Cent, gemessen mit „Flöte einstellen“
+  (Einstellungen → Flöte, Ablauf in `docs/app-entscheidungen.md` Abschnitt 6). Angewandt beim Mitspielen und
+  in der Spielen-Übung; ungemessene Töne: 0 relativ zum Stimmton der Flöte (bis zum Stimmton je Flöte: Median
+  der gemessenen, siehe unten). Beim Mitspielen wird jeder Ton langsam
   nachgeführt (je Messung 3 % des Abstands zum Median seiner letzten 40 Messungen, höchstens 0,5 Cent;
   gemessene Töne höchstens 15 Cent je Durchgang vom gespeicherten Wert). Gespeichert wird das nur nach
   einem *vollständigen* Durchgang und nur für Töne mit mindestens 10 Messungen – ein abgebrochener Versuch
   (oft gerade, weil es nicht klappte) soll das Profil nicht verschieben. So gleicht sich auch eine nie
-  eingestellte, insgesamt zu tiefe Flöte nach wenigen Noten an (Rückfall-Median). Eine eigene
-  Gesamtverschiebung gibt es nicht. Im Mitspiel-Bereich steht klein „Flöte: Meine Flöte · etwa 30 Cent tief,
-  wird ausgeglichen“ (Median der Werte, ab 8 Cent) bzw. „Tipp: Flöte einstellen, dann wird genauer gewertet.“;
-  der Name führt zu den Einstellungen.
+  eingestellte, insgesamt zu tiefe Flöte nach wenigen Noten an (ihr unbekannter Stimmton wandert mit, siehe
+  „Stimmton je Flöte“). Eine eigene Gesamtverschiebung gibt es nicht – das ist der Stimmton. Im
+  Mitspiel-Bereich steht klein die Flöte mit ihrem Stimmton bzw. „Tipp: Flöte einstellen, dann wird genauer
+  gewertet.“; der Name führt zu den Einstellungen.
+- **Stimmton je Flöte** (seit 14.11.2026, Wunsch der Nutzerin: „meine neue Flöte ist auf 442 Hertz gestimmt,
+  bei der Kinderflöte weiß ich es nicht“): Die Werte je Ton sind jetzt relativ zum *Stimmton der Flöte*
+  (bekannt, z. B. 442, oder unbekannt = Median der absoluten Lagen ihrer Töne), siehe
+  `docs/app-entscheidungen.md` Abschnitte 4 und 6. Mitspielen erwartet Stimmton der aktiven Flöte + Wert des
+  Tons; ungemessene Töne liegen beim Stimmton (der frühere Rückfall „Median der gemessenen“ entfällt, das
+  deckt der Stimmton ab). Beim Nachführen gilt:
+  - Stimmton **unbekannt**: Ungemessene Töne folgen während des Durchgangs dem Median aller Werte, und nach
+    dem Speichern rückt der Stimmton auf die neue Mitte (die absoluten Lagen bleiben). So gleicht sich eine nie
+    eingestellte, insgesamt zu tiefe Flöte weiter nach wenigen Noten an – der Stimmton sinkt mit.
+  - Stimmton **bekannt**: Die Angabe bleibt; ungemessene Töne werden beim Stimmton erwartet, gemessene
+    nachgeführt (gespeicherte höchstens 15 Cent je Durchgang von ihrem Wert, auch wenn er nach einem Wechsel
+    des Stimmtons über ±49 liegt).
+  - Klicks, mitklingende Melodie und der richtige Ton nach einem Fehler (Kopfhörer) klingen im Stimmton der
+    aktiven Flöte, ebenso das Vorspielen auf der Liedseite.
+  - Zeile im Mitspiel-Bereich: „Flöte: Kinderflöte · etwa 432,5 Hz, wird ausgeglichen“ (unbekannt, ab 8 Cent
+    von 440), „Flöte: Neue Flöte · 442 Hz, eingestellt“ bzw. ohne Werte „… · 442 Hz · Tipp: Flöte einstellen,
+    dann wird genauer gewertet.“ Die Diagnose-Datei nennt `tuningHz` (Stimmton der aktiven Flöte) und
+    `tuningKnown`.
 - **Klarheit ab 0,85** (nur Mitspielen, sonst 0,9): Synthetisch gemessen (Flötenklang mit Obertönen, weißes
   Rauschen und tiefes Atemgeräusch, 1024 Samples): Bei sehr starkem Rauschen fällt die Klarheit eines
   Flötentons auf etwa 0,86 – mit 0,9 käme kein Frame durch, mit 0,85 neun von zehn; die wenigen falschen
@@ -312,4 +331,11 @@ bleiben bei ihren Regeln, außer dem Flötenprofil in der Übung):
   ältere Tests: falsche Töne im Warte-Modus jetzt 300 statt 200 ms; „knapp außerhalb der Toleranz“ (45 Cent)
   ist jetzt ein Treffer; Oktave zu hoch nicht mehr rot; Klarheit 0,85 statt 0,9 „zu unklar“ → 0,8; im Takt
   „live grün“ schon nach gehaltenem Einsatz, eine abgebrochene, bis dahin richtig gespielte Note ist grün,
-  Verspätung im E2E 0,25 s grün statt 0,35 s rot (rot jetzt erst bei 0,7 s).
+  Verspätung im E2E 0,25 s grün statt 0,35 s rot (rot jetzt erst bei 0,7 s). Zum Stimmton je Flöte:
+  `tuning.test.ts`, E2E `stimmton.spec.ts` (neue Flöte mit 442 → Mitspielen mit 442-Attrappe grün;
+  Kinderflöte unbekannt mit −30-Attrappe einstellen → „etwa 432 Hz“, Mitspielen grün, bekannt/unbekannt
+  umschalten; bekannter Stimmton einstellen mit „gemessen etwa …“ und Übernehmen; Flöte wechseln im
+  Stimmgerät). Angepasst: `follow-robust.test.ts` (Rückfall 0 statt Median; Nachführen je nach bekannt/
+  unbekannt), `follow.test.ts`/`data.test.ts` (`followConfig(s, tuningHz)`, Flöten mit `tuning`, Grenze der
+  Werte ±120), `follow-robust.spec.ts` (Werte nach dem Einstellen relativ zum ermittelten Stimmton, z. B.
+  g¹ +2 bei etwa 429,5 Hz statt −40; Neuanlegen mit Stimmton-Frage; Stimmgerät-Bezug).

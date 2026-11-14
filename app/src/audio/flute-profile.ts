@@ -124,9 +124,10 @@ export class LiveTuning {
     const cur = this.values[n.id] ?? this.fallback();
     const med = median(list)!;
     const step = Math.max(-cfg.maxStep, Math.min(cfg.maxStep, cfg.rate * (med - cur)));
-    let v = clampOffset(cur + step);
+    // gespeicherte Töne höchstens maxDrift von ihrem Wert (der nach einem Wechsel des Stimmtons auch über
+    // ±49 liegen kann), neue höchstens einen halben Halbton vom Stimmton
     const s = this.stored[n.id];
-    if (s !== undefined) v = Math.max(s - cfg.maxDrift, Math.min(s + cfg.maxDrift, v));
+    const v = s !== undefined ? Math.max(s - cfg.maxDrift, Math.min(s + cfg.maxDrift, cur + step)) : clampOffset(cur + step);
     this.values[n.id] = v;
   }
 
