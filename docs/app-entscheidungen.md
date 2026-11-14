@@ -453,7 +453,7 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
     Source „GitHub Actions“.
 - **Tests:**
   - Vitest: alle 25 Griffe aus `app-prompt.md`, Namen, andere Schreibweisen, Frequenzen,
-    Leitner-Logik samt Randfällen, Freischalt-Regel (auch die 2-Tage-Bedingung), Zusammensetzung der
+    Leitner-Logik samt Randfällen, Freischalt-Regel (auch: alles an einem Tag reicht), Zusammensetzung der
     Sitzung, falsche Antworten (nie gleicher Griff, nie zwei Schreibweisen).
   - Playwright: die Übungsabläufe. Für Spielen wird `getUserMedia` per Init-Skript durch einen
     Oszillator ersetzt. Getestet werden richtig, falsch, dann richtig, Nachklang und Tonwechsel.

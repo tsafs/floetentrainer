@@ -60,9 +60,12 @@ describe("Freischalten", () => {
   it("alles an einem Tag reicht: fleißiges Üben wird nicht ausgebremst", () => {
     expect(noteMastered(answers(10, 1, [TODAY]), 0)).toBe(true);
     expect(noteMastered(answers(20, 0, [TODAY]), 0)).toBe(true);
-    // viele Antworten heute verdrängen die von gestern – das darf nicht schaden
-    const l = [...answers(1, 0, [Y]), ...answers(20, 0, [TODAY], 5000)];
+  });
+  it("es zählen nur die letzten 20: ältere Fehler fallen heraus", () => {
+    const l = [...answers(5, 5, [Y]), ...answers(20, 0, [TODAY], 5000)];
     expect(noteMastered(l, 0)).toBe(true);
+    const l2 = [...answers(5, 5, [Y]), ...answers(17, 0, [TODAY], 5000)]; // 3 Fehler noch drin: 17 von 20
+    expect(noteMastered(l2, 0)).toBe(false);
   });
   it("jeder freigeschaltete Ton muss es erfüllen", () => {
     const d = defaultData();
