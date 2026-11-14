@@ -53,8 +53,20 @@ export function backupFileName(): string {
   return `floetentrainer-sicherung-${dayKey()}.json`;
 }
 
+/**
+ * Die Sicherung enthält alles außer dem, was nur zu diesem Gerät gehört: der abgeglichenen
+ * Eingangs-Verzögerung (settings.inputLatencyMs, siehe ./data.ts). Beim Einlesen behält das Gerät
+ * seinen eigenen Wert (keepDeviceSettings).
+ */
 export function backupJson(data: AppData): string {
-  return JSON.stringify({ ...data, savedAt: new Date().toISOString() }, null, 1);
+  const settings: Partial<AppData["settings"]> = { ...data.settings };
+  delete settings.inputLatencyMs;
+  return JSON.stringify({ ...data, settings, savedAt: new Date().toISOString() }, null, 1);
+}
+
+/** Eingelesene Daten: Werte, die zum Gerät gehören, vom jetzigen Stand übernehmen */
+export function keepDeviceSettings(incoming: AppData, current: AppData): AppData {
+  return { ...incoming, settings: { ...incoming.settings, inputLatencyMs: current.settings.inputLatencyMs } };
 }
 
 /** Sicherung einlesen: prüfen und gegebenenfalls umwandeln. Wirft DataError mit verständlicher Meldung. */

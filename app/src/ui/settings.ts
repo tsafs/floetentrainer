@@ -5,7 +5,7 @@ import { joinNames } from "../music/names";
 import { level, levelCap, setLevel } from "../srs/progress";
 import { defaultData, SETTING_LIMITS, type NumSetting, type Theme } from "../store/data";
 import { applyTheme } from "./theme";
-import { backupFileName, backupJson, parseBackup } from "../store/storage";
+import { backupFileName, backupJson, keepDeviceSettings, parseBackup } from "../store/storage";
 import { esc, topbar, type Ctx, type View } from "./common";
 
 interface NumField {
@@ -189,7 +189,7 @@ export const settingsView: View = (root, ctx) => {
       render();
     });
     on("import-yes", () => {
-      if (pendingImport) replaceData(ctx, pendingImport);
+      if (pendingImport) replaceData(ctx, keepDeviceSettings(pendingImport, ctx.data));
       pendingImport = null;
       message = { ok: true, text: "Sicherung eingelesen." };
       render();

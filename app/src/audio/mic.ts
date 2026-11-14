@@ -120,6 +120,36 @@ class Mic {
     if (this.analyser) this.analyser.fftSize = n;
   }
 
+  /**
+   * Angaben zum Mikrofon für die Diagnose-Aufnahme (../audio/diagnose.ts): Einstellungen der Spur,
+   * deren Statistik (Chrome: MediaStreamTrack.stats mit Eingangs-Verzögerung, falls vorhanden) und die
+   * gemeldeten Verzögerungen des AudioContext. Nur Messwerte, kein Ton.
+   */
+  info(): Record<string, unknown> {
+    const track = this.stream?.getAudioTracks()[0];
+    const out: Record<string, unknown> = { windowSamples: this.size, intervalMs: INTERVAL_MS, minRms: MIN_RMS };
+    try {
+      if (track) {
+        out.trackSettings = track.getSettings();
+        out.trackLabel = track.label;
+        const stats = (track as unknown as { stats?: Record<string, unknown> }).stats;
+        if (stats) {
+          const s: Record<string, unknown> = {};
+          for (const k of ["deliveredFrames", "deliveredFramesDuration", "totalFrames", "totalFramesDuration", "latency", "averageLatency", "minimumLatency", "maximumLatency"]) {
+            if (k in stats) s[k] = stats[k];
+          }
+          out.trackStats = s;
+        }
+      }
+      if (this.ctx) {
+        out.context = { sampleRate: this.ctx.sampleRate, baseLatency: this.ctx.baseLatency, outputLatency: this.ctx.outputLatency, state: this.ctx.state };
+      }
+    } catch {
+      /* nicht unterstützt */
+    }
+    return out;
+  }
+
   listen(fn: Listener): () => void {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);

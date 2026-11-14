@@ -23,6 +23,36 @@ export interface Settings {
   headphones: boolean;
   /** Mitspielen: zuletzt gewählte Art */
   followMode: FollowMode;
+  /**
+   * Takt-Modus: Eingangs-Verzögerung (Mikrofon und Erkennung) in ms, am Gerät abgeglichen; null =
+   * Standard (DEFAULT_INPUT_LATENCY in ../audio/follow.ts). Gehört zum Gerät, nicht zu ihr: Sie steht im
+   * Speicher dieses Browsers (also dieses Geräts), geht aber nicht mit in die Sicherung, und beim Einlesen
+   * einer Sicherung bleibt der Wert des Geräts (../store/storage.ts, ../ui/settings.ts). Ein anderes Handy
+   * hört anders verzögert; ein übertragener Wert wäre dort still falsch.
+   */
+  inputLatencyMs: number | null;
+}
+
+/**
+ * Eine Flöte mit ihren Eigenheiten: je Ton die Abweichung vom Stimmton in Cent (Kennung der
+ * Grifftabelle → Cent), gemessen mit „Flöte einstellen“ oder beim Mitspielen nachgeführt
+ * (../audio/flute-profile.ts). Gehört zum Gegenstand Flöte, der mit ihr umzieht – kommt deshalb mit in die
+ * Sicherung (anders als die Verzögerung des Geräts).
+ */
+export interface Flute {
+  /** Kennung, z. B. "floete-1" */
+  id: string;
+  name: string;
+  offsets: Record<string, number>;
+  /** Zeitpunkt der letzten Änderung der Werte (ms), 0 = nie */
+  updated: number;
+}
+
+export const FLUTE_NAME_MAX = 40;
+export const DEFAULT_FLUTE_NAME = "Meine Flöte";
+
+export function defaultFlute(): Flute {
+  return { id: "floete-1", name: DEFAULT_FLUTE_NAME, offsets: {}, updated: 0 };
 }
 
 /** Art des Mitspielens: Warte-Modus oder Takt-Modus */
@@ -30,7 +60,7 @@ export type FollowMode = "wait" | "beat";
 export const FOLLOW_MODES: FollowMode[] = ["wait", "beat"];
 
 /** Einstellungen mit Zahlenwert */
-export type NumSetting = Exclude<keyof Settings, "theme" | "headphones" | "followMode">;
+export type NumSetting = Exclude<keyof Settings, "theme" | "headphones" | "followMode" | "inputLatencyMs">;
 
 export interface CardState {
   /** Fach 1–6 */
@@ -104,6 +134,14 @@ export interface AppData {
   songs: Record<string, SongPrefs>;
   /** eingelesene eigene Lieder (ab Version 2), in der Reihenfolge des Einlesens */
   ownSongs: OwnSong[];
+  /**
+   * Flöten (mindestens eine) und die aktive. Ohne Versionssprung dazugekommen: Die Werte lassen sich jederzeit
+   * neu messen (und werden beim Mitspielen ohnehin nachgeführt). Eine ältere App ließe das Feld beim
+   * Speichern weg – das kostet höchstens ein erneutes „Flöte einstellen“. Ein Sprung würde dagegen eine
+   * noch nicht aktualisierte App alle Daten ablehnen lassen.
+   */
+  flutes: Flute[];
+  activeFlute: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -115,6 +153,7 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: "auto",
   headphones: false,
   followMode: "wait",
+  inputLatencyMs: null,
 };
 
 export const SETTING_LIMITS: Record<NumSetting, [number, number]> = {
@@ -139,8 +178,18 @@ export function defaultData(): AppData {
     sessions: 0,
     songs: {},
     ownSongs: [],
+    flutes: [defaultFlute()],
+    activeFlute: "floete-1",
   };
 }
+
+/** Die aktive Flöte (gibt es immer) */
+export function activeFlute(d: Pick<AppData, "flutes" | "activeFlute">): Flute {
+  return d.flutes.find((f) => f.id === d.activeFlute) ?? d.flutes[0];
+}
+
+/** Grenzen der Eingangs-Verzögerung in ms (wie LATENCY_MIN/MAX in ../audio/follow.ts) */
+export const INPUT_LATENCY_LIMITS: [number, number] = [0, 400];
 
 export function cardKey(noteId: string, kind: Kind): string {
   return `${noteId}|${kind}`;
@@ -229,6 +278,8 @@ export function normalizeData(raw: unknown): AppData {
     if (typeof d.settings.headphones === "boolean") out.settings.headphones = d.settings.headphones;
     const fm = d.settings.followMode;
     if (typeof fm === "string" && (FOLLOW_MODES as string[]).includes(fm)) out.settings.followMode = fm as FollowMode;
+    const lat = d.settings.inputLatencyMs;
+    if (isNum(lat)) out.settings.inputLatencyMs = Math.round(Math.max(INPUT_LATENCY_LIMITS[0], Math.min(INPUT_LATENCY_LIMITS[1], lat)));
   }
   // Stufen
   if (d.stages !== undefined) {
@@ -323,5 +374,36 @@ export function normalizeData(raw: unknown): AppData {
       });
     });
   }
+  // Flöten: Messwerte, keine Eingabe von ihr außer dem Namen – Fehlerhaftes wird still übergangen,
+  // unbekannte Töne und Werte außerhalb ±49 Cent fallen weg bzw. werden begrenzt. Ohne gültige Flöte
+  // bleibt die Standard-Flöte.
+  if (Array.isArray(d.flutes)) {
+    const taken = new Set<string>();
+    const list: Flute[] = [];
+    for (const f of d.flutes) {
+      if (!isObj(f) || typeof f.id !== "string" || !FLUTE_ID_RE.test(f.id) || taken.has(f.id)) continue;
+      taken.add(f.id);
+      const offsets: Record<string, number> = {};
+      if (isObj(f.offsets)) {
+        for (const [k, v] of Object.entries(f.offsets)) {
+          if (NOTES[k] && !NOTES[k].partner && isNum(v)) offsets[k] = Math.round(Math.max(-49, Math.min(49, v)));
+        }
+      }
+      const name = typeof f.name === "string" && f.name.trim() ? f.name.trim().slice(0, FLUTE_NAME_MAX) : DEFAULT_FLUTE_NAME;
+      list.push({ id: f.id, name, offsets, updated: isNum(f.updated) ? f.updated : 0 });
+    }
+    if (list.length) out.flutes = list;
+  }
+  if (typeof d.activeFlute === "string" && out.flutes.some((f) => f.id === d.activeFlute)) out.activeFlute = d.activeFlute;
+  else out.activeFlute = out.flutes[0].id;
   return out;
+}
+
+/** Kennungen der Flöten */
+export const FLUTE_ID_RE = /^floete-[a-z0-9-]{1,40}$/;
+
+/** Neue Kennung für eine Flöte (floete-2, floete-3 …) */
+export function newFluteId(flutes: Flute[]): string {
+  const taken = new Set(flutes.map((f) => f.id));
+  for (let n = flutes.length + 1; ; n++) if (!taken.has(`floete-${n}`)) return `floete-${n}`;
 }
