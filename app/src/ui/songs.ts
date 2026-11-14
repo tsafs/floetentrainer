@@ -24,6 +24,7 @@ import { baseTempo, clampPercent, secPerQuarter, TEMPO_MAX, TEMPO_MIN } from "..
 import { buildTimeline, sectionTimeline, type Timeline } from "../songs/timeline";
 import { esc, ICON_BACK, type View } from "./common";
 import { brokenSongPage, mountOwnBox, takeListNote } from "./own-songs";
+import { followBarHtml, ICON_MIC, mountFollow } from "./song-follow";
 
 /** so lange (ms) gilt ein Finger auf dem Takt als langes Tippen */
 const LONG_PRESS_MS = 500;
@@ -191,6 +192,7 @@ export const songView: View = (root, ctx) => {
     </div>
     <span></span>
   </header>
+  <div class="songtools"><button class="followbtn" data-act="follow">${ICON_MIC}<span>Mitspielen</span></button></div>
   <p class="hint" data-testid="hint">Tippe einen Takt an, um einen Abschnitt zu wiederholen. Lange tippen wählt die ganze Zeile.</p>
   <div class="scorebox" data-testid="score"></div>
   ${stanzasHtml(song)}
@@ -211,7 +213,7 @@ export const songView: View = (root, ctx) => {
         <input type="range" min="${TEMPO_MIN}" max="${TEMPO_MAX}" step="5" value="${percent}" aria-label="Tempo in Prozent des Grundtempos" data-testid="tempo-range">
       </label>
       <button class="metro" data-act="metro" aria-pressed="false" aria-label="Metronom" title="Metronom">${ICON_METRO}</button>
-    </div>
+    </div>${followBarHtml()}
   </div>
 </main>`;
   const main = root.querySelector("main") as HTMLElement;
@@ -242,6 +244,8 @@ export const songView: View = (root, ctx) => {
   let followedSys = -1;
   let userScrollUntil = 0;
   let shownMidi: number | null | undefined;
+  /** Farben vom Mitspielen: Kennung → getroffen/verfehlt (bleibt beim Neuzeichnen erhalten) */
+  const painted = new Map<number, "hit" | "miss">();
 
   // ------------------------------------------------------------ Notenbild
   const draw = () => {
@@ -252,11 +256,12 @@ export const songView: View = (root, ctx) => {
     box.replaceChildren(score.el);
     // Zustand übernehmen
     for (const i of cur) score.noteEl(i)?.classList.add("cur");
+    for (const [i, c] of painted) score.noteEl(i)?.classList.add(c);
     markBars();
     main.dataset.systems = String(score.systems.length);
     if (playingTl && lastPos?.bar != null) {
       followedSys = -1;
-      follow(playingTl.bars[lastPos.bar].index, true);
+      keepVisible(playingTl.bars[lastPos.bar].index, true);
     }
   };
 
@@ -269,6 +274,18 @@ export const songView: View = (root, ctx) => {
       r.classList.toggle("sel", selStart === i);
     }
   };
+
+  const paint = (ids: number[], c: "hit" | "miss" | null) => {
+    for (const i of ids) {
+      const g = score?.noteEl(i);
+      g?.classList.remove("hit", "miss");
+      if (c) {
+        painted.set(i, c);
+        g?.classList.add(c);
+      } else painted.delete(i);
+    }
+  };
+  const clearPaint = () => paint([...painted.keys()], null);
 
   const setCur = (ids: number[]) => {
     for (const i of cur) score?.noteEl(i)?.classList.remove("cur");
@@ -334,7 +351,7 @@ export const songView: View = (root, ctx) => {
     return { top: 0, bottom };
   };
   /** Zeile des Takts sichtbar halten; force: auch während der Nutzer-Scroll-Pause */
-  const follow = (barIndex: number, force = false) => {
+  const keepVisible = (barIndex: number, force = false) => {
     if (!score) return;
     const k = score.systemOfBar(barIndex);
     if (k < 0 || k === followedSys) return;
@@ -391,8 +408,8 @@ export const songView: View = (root, ctx) => {
     const tone = p.tone != null ? tl.tones[p.tone] : null;
     setCur(tone ? tone.ids : []);
     if (tone) showNote(noteById.get(tone.ids[0]));
-    if (p.bar != null) follow(tl.bars[p.bar].index);
-    else if (p.countIn != null && tl.bars.length) follow(tl.bars[0].index, true);
+    if (p.bar != null) keepVisible(tl.bars[p.bar].index);
+    else if (p.countIn != null && tl.bars.length) keepVisible(tl.bars[0].index, true);
     updateStatus();
   };
 
@@ -449,11 +466,14 @@ export const songView: View = (root, ctx) => {
     selStart = null;
     markBars();
     updateStatus();
-    if (playingTl) start({ countIn: false });
+    if (follow.active) follow.refresh();
+    else if (playingTl) start({ countIn: false });
     else showNote(restingNote());
   };
 
   const tapBar = (i: number) => {
+    if (follow.running) return; // beim Mitspielen gilt der Abschnitt erst beim nächsten Start
+
     if (section) {
       // neue Auswahl beginnt; die alte Schleife läuft weiter, bis der Endtakt feststeht
       section = null;
@@ -470,7 +490,7 @@ export const songView: View = (root, ctx) => {
   };
 
   const pressLine = (i: number) => {
-    if (!score) return;
+    if (!score || follow.running) return;
     const bars = score.systems[score.systemOfBar(i)].bars;
     section = { from: bars[0], to: bars[bars.length - 1] };
     applySection();
@@ -535,20 +555,76 @@ export const songView: View = (root, ctx) => {
   ro.observe(box);
   ro.observe(player);
   const onVisibility = () => {
-    if (document.hidden) stop();
+    if (!document.hidden) return;
+    stop();
+    follow.stopRun();
   };
   document.addEventListener("visibilitychange", onVisibility);
   window.addEventListener("wheel", userScrolled, { passive: true });
   window.addEventListener("touchmove", userScrolled, { passive: true });
   window.addEventListener("keydown", onKey);
 
-  if (ownEntry) mountOwnBox(main.querySelector(".ownbox") as HTMLElement, ctx, ownEntry, stop);
+  // ------------------------------------------------------------ Mitspielen
+  const follow = mountFollow(main, {
+    ctx,
+    song,
+    full,
+    noteById,
+    section: () => section,
+    setSection: (s) => {
+      section = s;
+      selStart = null;
+      markBars();
+      updateStatus();
+      follow.refresh();
+    },
+    percent: () => percent,
+    setPercent: (p, save) => {
+      percent = p;
+      range.value = String(p);
+      showTempo();
+      if (save) {
+        prefs.tempo = percent;
+        ctx.data.songs[song.id] = prefs;
+        ctx.save();
+      }
+    },
+    setCur,
+    paint,
+    clearPaint,
+    scrollTo: (bar, force) => {
+      if (force) followedSys = -1;
+      keepVisible(bar, force);
+    },
+    changed: () => {
+      hint.classList.toggle("gone", !!section || selStart != null || follow.running);
+    },
+  });
+  main.querySelector('[data-act="follow"]')!.addEventListener("click", () => {
+    stop();
+    userScrollUntil = 0;
+    followedSys = -1;
+    follow.enter();
+  });
+  main.querySelector('[data-act="fexit"]')!.addEventListener("click", () => {
+    followedSys = -1;
+    resetUi();
+  });
+
+  if (ownEntry) mountOwnBox(main.querySelector(".ownbox") as HTMLElement, ctx, ownEntry, () => {
+    stop();
+    follow.exit();
+  });
   draw();
-  resetUi();
+  if (follow.active) {
+    showNote(restingNote());
+    updateStatus();
+  } else resetUi();
   // Für automatische Tests
-  (window as unknown as { __lied: unknown }).__lied = { song, player: songPlayer, timeline: () => playingTl };
+  (window as unknown as { __lied: unknown }).__lied = { song, player: songPlayer, timeline: () => playingTl, follow: () => follow.debug() };
 
   return () => {
+    follow.destroy();
     stop();
     endPress();
     ro.disconnect();

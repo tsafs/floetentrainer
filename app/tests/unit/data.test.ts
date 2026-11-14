@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { DATA_VERSION, defaultData, normalizeData } from "../../src/store/data";
-import { loadData, parseBackup, saveData, STORAGE_KEY } from "../../src/store/storage";
+import { DATA_VERSION, defaultData, normalizeData, recordBest } from "../../src/store/data";
+import type { FollowSummary } from "../../src/audio/follow";
+import { backupJson, loadData, parseBackup, saveData, STORAGE_KEY } from "../../src/store/storage";
 import { TODAY } from "./helpers";
 
 class MemStorage {
@@ -116,5 +117,77 @@ describe("Einstellungen je Lied", () => {
     expect(d.songs).toEqual({ "jingle-bells": { tempo: 80 }, "stille-nacht": { tempo: 120 } });
     const back = parseBackup(JSON.stringify({ ...d, savedAt: "x" }));
     expect(back.songs["jingle-bells"].tempo).toBe(80);
+  });
+});
+
+describe("Mitspielen: Einstellungen und Bestwerte", () => {
+  const sum = (hits: number, total: number, complete = true): FollowSummary => ({ hits, total, complete, hardestBars: [] });
+
+  it("Standard: keine Kopfhörer, Warte-Modus; ältere Daten ohne die Felder bekommen den Standard (ohne Versionssprung)", () => {
+    expect(defaultData().settings).toMatchObject({ headphones: false, followMode: "wait" });
+    const d = normalizeData({ version: 2, app: "floetentrainer", settings: { tuningHz: 442 } });
+    expect(d.version).toBe(DATA_VERSION);
+    expect(DATA_VERSION).toBe(2);
+    expect(d.settings).toMatchObject({ tuningHz: 442, headphones: false, followMode: "wait" });
+  });
+
+  it("Kopfhörer und Art werden übernommen, Fehlerhaftes fällt still auf den Standard zurück", () => {
+    const ok = normalizeData({ ...defaultData(), settings: { ...defaultData().settings, headphones: true, followMode: "beat" } });
+    expect(ok.settings).toMatchObject({ headphones: true, followMode: "beat" });
+    const bad = normalizeData({ ...defaultData(), settings: { ...defaultData().settings, headphones: "ja", followMode: "schnell" } });
+    expect(bad.settings).toMatchObject({ headphones: false, followMode: "wait" });
+  });
+
+  it("Bestwerte werden geprüft; Ungültiges wird still übergangen, das Tempo bleibt", () => {
+    const d = normalizeData({
+      ...defaultData(),
+      songs: {
+        a: { tempo: 90, best: { wait: { hits: 45, total: 48, at: 5 }, beat: { hits: 50, total: 48 } } },
+        b: { best: { beat: { hits: 3.4, total: 7 }, wait: "gut" } },
+        c: { best: { wait: { hits: 0, total: 0 } } },
+        e: { best: [1, 2] },
+      },
+    });
+    expect(d.songs).toEqual({
+      a: { tempo: 90, best: { wait: { hits: 45, total: 48, at: 5 } } },
+      b: { best: { beat: { hits: 3, total: 7, at: 0 } } },
+    });
+  });
+
+  it("Sicherung: Bestwerte und Kopfhörer kommen mit und wieder zurück", () => {
+    const d = defaultData();
+    d.settings.headphones = true;
+    d.settings.followMode = "beat";
+    d.songs["jingle-bells"] = { tempo: 80, best: { beat: { hits: 40, total: 48, at: 123 } } };
+    const back = parseBackup(backupJson(d));
+    expect(back.settings).toMatchObject({ headphones: true, followMode: "beat" });
+    expect(back.songs["jingle-bells"]).toEqual({ tempo: 80, best: { beat: { hits: 40, total: 48, at: 123 } } });
+  });
+
+  it("recordBest: nur vollständige Durchgänge des ganzen Lieds, nur Verbesserungen, je Art getrennt", () => {
+    const d = defaultData();
+    expect(recordBest(d, "lied", "wait", sum(5, 7), 7, 1)).toEqual({ saved: true, prev: null });
+    expect(d.songs.lied.best).toEqual({ wait: { hits: 5, total: 7, at: 1 } });
+    // schlechter oder gleich: bleibt
+    expect(recordBest(d, "lied", "wait", sum(4, 7), 7, 2).saved).toBe(false);
+    expect(recordBest(d, "lied", "wait", sum(5, 7), 7, 2).saved).toBe(false);
+    // abgebrochen oder nur ein Abschnitt: zählt nicht
+    expect(recordBest(d, "lied", "wait", sum(3, 3, false), 7, 3).saved).toBe(false);
+    expect(recordBest(d, "lied", "wait", sum(3, 3), 7, 3).saved).toBe(false);
+    // besser: ersetzt; der Takt-Modus hat seinen eigenen Bestwert
+    const r = recordBest(d, "lied", "wait", sum(7, 7), 7, 4);
+    expect(r).toEqual({ saved: true, prev: { hits: 5, total: 7, at: 1 } });
+    expect(recordBest(d, "lied", "beat", sum(2, 7), 7, 5).saved).toBe(true);
+    expect(d.songs.lied.best).toEqual({ wait: { hits: 7, total: 7, at: 4 }, beat: { hits: 2, total: 7, at: 5 } });
+    // Lied geändert (andere Notenzahl): alter Bestwert gilt als überholt
+    expect(recordBest(d, "lied", "wait", sum(6, 8), 8, 6)).toEqual({ saved: true, prev: null });
+  });
+
+  it("Mitspielen-Daten lassen die Lernspuren in Ruhe (recordBest ändert nur songs)", () => {
+    const d = defaultData();
+    d.history.spielen.h1 = [[1, TODAY, 5]];
+    const before = JSON.stringify({ ...d, songs: {} });
+    recordBest(d, "lied", "beat", sum(7, 7), 7, 1);
+    expect(JSON.stringify({ ...d, songs: {} })).toBe(before);
   });
 });

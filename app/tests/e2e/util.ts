@@ -69,12 +69,22 @@ export async function stored(page: Page) {
   return page.evaluate(() => JSON.parse(localStorage.getItem("floetentrainer")!));
 }
 
-/** Ersetzt das Mikrofon durch einen Oszillator, steuerbar über window.__osc.play(freq) / silence(). */
+/**
+ * Ersetzt das Mikrofon durch einen Oszillator, steuerbar über window.__osc.play(freq) / silence().
+ * Für das Mitspielen auch im Voraus: __osc.schedule([[ms, freq | null], …]) plant Tonwechsel auf der
+ * Audio-Uhr ein (ms = Zeitpunkt auf der Uhr von performance.now, null = Stille) – genauer als einzelne
+ * Aufrufe aus dem Test. Läuft mit FAKE_AUDIO zusammen: Der Oszillator lebt in einem echten AudioContext
+ * (window.__RealAudioContext), erscheint also nicht in __audioLog und folgt der echten Audio-Uhr.
+ * window.__micStopped wird true, sobald die App das Mikrofon wieder freigibt.
+ */
 export const FAKE_MIC = () => {
-  const w = window as unknown as { __osc: { play(f: number): void; silence(): void } | null };
+  type Osc = { play(f: number): void; silence(): void; schedule(list: [number, number | null][]): void };
+  const w = window as unknown as { __osc: Osc | null; __micStopped: boolean; __RealAudioContext?: typeof AudioContext };
   w.__osc = null;
+  w.__micStopped = false;
   navigator.mediaDevices.getUserMedia = async () => {
-    const ctx = new AudioContext();
+    const Ctx = w.__RealAudioContext ?? AudioContext;
+    const ctx = new Ctx();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     gain.gain.value = 0;
@@ -82,6 +92,7 @@ export const FAKE_MIC = () => {
     osc.connect(gain).connect(dest);
     osc.start();
     await ctx.resume();
+    w.__micStopped = false;
     w.__osc = {
       play(f: number) {
         osc.frequency.setValueAtTime(f, ctx.currentTime);
@@ -90,8 +101,26 @@ export const FAKE_MIC = () => {
       silence() {
         gain.gain.setValueAtTime(0, ctx.currentTime);
       },
+      schedule(list) {
+        const now = performance.now();
+        const t0 = ctx.currentTime;
+        for (const [ms, f] of list) {
+          const t = t0 + Math.max(0, ms - now) / 1000;
+          if (f === null) gain.gain.setValueAtTime(0, t);
+          else {
+            osc.frequency.setValueAtTime(f, t);
+            gain.gain.setValueAtTime(0.4, t);
+          }
+        }
+      },
     };
+    for (const tr of dest.stream.getTracks()) {
+      const stop = tr.stop.bind(tr);
+      tr.stop = () => {
+        w.__micStopped = true;
+        stop();
+      };
+    }
     return dest.stream;
   };
 };
-

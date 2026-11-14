@@ -80,6 +80,12 @@ export interface PlayOptions {
   metronome?: boolean;
   /** Bereich endlos wiederholen (Standard: nein); live mit setLoop. Eingezählt wird nur einmal. */
   loop?: boolean;
+  /**
+   * Melodie (Standard: true = volle Lautstärke). false: keine Töne, nur Einzählen und Klicks – für das
+   * Mitspielen mit Mikrofon, das sonst das Handy mithören würde. Eine Zahl (0–1): die Melodie leiser,
+   * Klicks unverändert (Mitspielen mit Kopfhörern). Markierung und onEnd laufen in jedem Fall.
+   */
+  melody?: boolean | number;
   /** wird aufgerufen, wenn sich Ton, Takt, Zählzeit oder Durchgang ändern */
   onPosition?: (p: PlayerPosition) => void;
   /** am Ende (nicht bei Schleife und nicht nach stop) */
@@ -199,11 +205,16 @@ interface Run {
   opts: PlayOptions;
   a4: number;
   bus: GainNode;
+  /** Klicks direkt an bus */
   synth: FluteSynth;
+  /** Flötentöne über einen eigenen Regler (Lautstärke der Melodie); null = keine Melodie */
+  toneSynth: FluteSynth | null;
   /** Länge eines Durchgangs in Vierteln */
   L: number;
   /** Länge des Einzähltakts (0 ohne Einzählen) */
   C: number;
+  /** Audiozeit des Zeitplan-Beginns (nach dem Einzählen), im Tempo beim Start */
+  startT: number;
   countEvs: Ev[];
   passOnce: Ev[];
   passWrap: Ev[];
@@ -256,6 +267,24 @@ export class SongPlayer {
   }
 
   /**
+   * AudioContext anlegen und fortsetzen, ohne etwas zu spielen. Direkt aus einem Tippen heraus aufrufen,
+   * wenn das eigentliche play erst später kommt (Mitspielen: erst nach der Mikrofon-Erlaubnis).
+   */
+  prepare(): void {
+    const ctx = (this.ctx ??= this.createContext());
+    if (ctx.state !== "running") ctx.resume().catch(() => {});
+  }
+
+  /**
+   * Audiozeit (s, Uhr des AudioContext), zu der der Zeitplan beginnt, also nach dem Einzählen; null,
+   * wenn nichts spielt. Gilt für das Tempo beim Start; spätere Tempowechsel meldet setTempo. Fürs
+   * Mitspielen im Takt (die Umrechnung auf die Uhr des Mikrofons macht der Aufrufer).
+   */
+  get timelineStart(): number | null {
+    return this.run ? this.run.startT : null;
+  }
+
+  /**
    * Spielt den Zeitplan. Muss beim ersten Mal direkt aus einem Tippen heraus aufgerufen werden
    * (dann darf der AudioContext anlaufen). Ein laufendes Vorspielen wird vorher beendet.
    */
@@ -272,6 +301,15 @@ export class SongPlayer {
     const bus = ctx.createGain();
     bus.gain.value = OUT_GAIN;
     bus.connect(ctx.destination);
+    const melody = opts.melody ?? true;
+    let toneSynth: FluteSynth | null = null;
+    if (melody === true) toneSynth = new FluteSynth(ctx, bus);
+    else if (typeof melody === "number" && melody > 0) {
+      const mel = ctx.createGain();
+      mel.gain.value = Math.min(1, melody);
+      mel.connect(bus);
+      toneSynth = new FluteSynth(ctx, mel);
+    }
     const countEvs: Ev[] = withCount
       ? tl.countIn.map((g, k) => ({ kind: "click", g, accent: k % perBar(tl) === 0, metro: false }) as Ev)
       : [];
@@ -281,8 +319,10 @@ export class SongPlayer {
       a4: opts.a4 ?? 440,
       bus,
       synth: new FluteSynth(ctx, bus),
+      toneSynth,
       L,
       C: withCount ? tl.countInDur : 0,
+      startT: ctx.currentTime + START_DELAY + (withCount ? tl.countInDur : 0) * this.spq,
       countEvs,
       passOnce: passEvents(tl, false),
       passWrap: passEvents(tl, true),
@@ -329,20 +369,25 @@ export class SongPlayer {
     this.ensureTick();
   }
 
-  /** Tempo ändern, auch während des Spielens (ohne Sprung). */
-  setTempo(secPerQuarter: number): void {
-    if (!(secPerQuarter > 0)) return;
+  /**
+   * Tempo ändern, auch während des Spielens (ohne Sprung). Gibt die Audiozeit zurück, ab der das neue
+   * Tempo gilt (Eingeplantes bleibt im alten Tempo), oder null, wenn nichts spielt.
+   */
+  setTempo(secPerQuarter: number): number | null {
+    if (!(secPerQuarter > 0)) return null;
     this.spq = secPerQuarter;
     const run = this.run;
-    if (!run || !this.ctx) return;
+    if (!run || !this.ctx) return null;
     const now = this.ctx.currentTime;
     const gA = Math.max(run.scheduledG, this.gAt(run, now));
     const last = run.anchors[run.anchors.length - 1];
     if (Math.abs(gA - last.g) < EPS) {
       last.spq = secPerQuarter;
-      return;
+      return last.t;
     }
-    run.anchors.push({ t: this.timeOf(run, gA), g: gA, spq: secPerQuarter });
+    const t = this.timeOf(run, gA);
+    run.anchors.push({ t, g: gA, spq: secPerQuarter });
+    return t;
   }
 
   /** Metronom-Klicks während des Lieds an/aus, auch während des Spielens. */
@@ -464,6 +509,7 @@ export class SongPlayer {
     const t = Math.max(this.timeOf(run, g), now);
     const key = `${run.seg}:${"id" in ev ? ev.id : ""}`;
     if (ev.kind === "on") {
+      if (!run.toneSynth) return; // ohne Melodie: nur Klicks
       const prevKey = `${run.seg}:${ev.id - 1}`;
       const bound = ev.legato ? run.voices.get(prevKey) : undefined;
       if (bound) {
@@ -472,7 +518,7 @@ export class SongPlayer {
         bound.voice.glide(ev.midi, t, run.a4);
         run.voices.set(key, { voice: bound.voice, at: t });
       } else {
-        run.voices.set(key, { voice: run.synth.tone(ev.midi, t, run.a4), at: t });
+        run.voices.set(key, { voice: run.toneSynth.tone(ev.midi, t, run.a4), at: t });
       }
     } else if (ev.kind === "off") {
       const entry = run.voices.get(key);

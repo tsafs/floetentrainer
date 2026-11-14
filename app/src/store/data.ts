@@ -1,5 +1,6 @@
 // Datenformat der App (Version 2), Standardwerte, Prüfung und Umwandlung älterer Versionen.
 
+import { isBetter, type FollowSummary } from "../audio/follow";
 import { levelOf, stagesOf, type Kind, type Track } from "../music/levels";
 import { NOTES } from "../music/notes";
 import { TEMPO_MAX, TEMPO_MIN } from "../songs/tempo";
@@ -19,10 +20,18 @@ export interface Settings {
   holdMs: number;
   tuningHz: number;
   theme: Theme;
+  /** Mitspielen: Sie trägt Kopfhörer – dann darf leise die Melodie mitklingen */
+  headphones: boolean;
+  /** Mitspielen: zuletzt gewählte Art */
+  followMode: FollowMode;
 }
 
+/** Art des Mitspielens: Warte-Modus oder Takt-Modus */
+export type FollowMode = "wait" | "beat";
+export const FOLLOW_MODES: FollowMode[] = ["wait", "beat"];
+
 /** Einstellungen mit Zahlenwert */
-export type NumSetting = Exclude<keyof Settings, "theme">;
+export type NumSetting = Exclude<keyof Settings, "theme" | "headphones" | "followMode">;
 
 export interface CardState {
   /** Fach 1–6 */
@@ -36,11 +45,26 @@ export interface CardState {
 /**
  * Was je Lied gemerkt wird (Schlüssel ist die Liedkennung, z. B. "jingle-bells").
  * Optionales Feld ohne Versionssprung: fehlt es (ältere Daten), gilt {}. Eine ältere App, die es nicht
- * kennt, lässt es beim Einlesen einfach weg. Später kommen hier z. B. Bestwerte vom Mitspielen hinzu.
+ * kennt, lässt es beim Einlesen einfach weg.
+ *
+ * Die Bestwerte vom Mitspielen (best) kamen ebenso ohne Versionssprung dazu: Sie sind eine Bequemlichkeit
+ * wie das Tempo, kein Inhalt, den sie eingegeben hat, und lassen sich jederzeit neu erspielen. Ein
+ * Versionssprung würde eine ältere App (z. B. ein noch nicht aktualisierter zweiter Browser oder eine
+ * ältere Sicherung-Prüfung) die ganzen Daten ablehnen lassen – für einen verlorenen Bestwert wäre das der
+ * größere Schaden. Eine ältere App lässt das Feld beim Einlesen weg und merkt sich dann nur das Tempo.
  */
 export interface SongPrefs {
   /** Tempo in Prozent des Grundtempos (50–120) */
   tempo?: number;
+  /** Bestes Ergebnis je Art des Mitspielens (nur vollständige Durchgänge des ganzen Lieds) */
+  best?: Partial<Record<FollowMode, BestScore>>;
+}
+
+/** Bestes Ergebnis: getroffene Noten von allen Noten des Lieds, Zeitpunkt (ms) */
+export interface BestScore {
+  hits: number;
+  total: number;
+  at: number;
 }
 
 /**
@@ -87,7 +111,7 @@ export interface AppData {
   days: string[];
   /** Zahl der begonnenen Sitzungen */
   sessions: number;
-  /** Einstellungen je Lied (Tempo) */
+  /** Einstellungen je Lied (Tempo, Bestwerte vom Mitspielen) */
   songs: Record<string, SongPrefs>;
   /** eingelesene eigene Lieder (ab Version 2), in der Reihenfolge des Einlesens */
   ownSongs: OwnSong[];
@@ -100,6 +124,8 @@ export const DEFAULT_SETTINGS: Settings = {
   holdMs: 300,
   tuningHz: 440,
   theme: "auto",
+  headphones: false,
+  followMode: "wait",
 };
 
 export const SETTING_LIMITS: Record<NumSetting, [number, number]> = {
@@ -180,6 +206,44 @@ export function uniqueId(id: string, taken: Set<string>): string {
   }
 }
 
+/**
+ * Ergebnis eines Durchgangs als Bestwert merken, wenn es einer ist. Zählt nur, wenn der Durchgang das
+ * ganze Lied vollständig umfasst (songTones = Zahl der Töne im Zeitplan des ganzen Lieds; ein Abschnitt
+ * oder ein abgebrochener Durchgang ist nicht vergleichbar). Ein Bestwert mit anderer Notenzahl (das Lied
+ * wurde inzwischen geändert) gilt als überholt. Gibt den bisherigen Bestwert zurück und ob das neue
+ * Ergebnis ihn ersetzt hat; speichern muss der Aufrufer.
+ */
+export function recordBest(
+  data: AppData,
+  songId: string,
+  mode: FollowMode,
+  s: FollowSummary,
+  songTones: number,
+  now: number,
+): { saved: boolean; prev: BestScore | null } {
+  const prefs = (data.songs[songId] ??= {});
+  const old = prefs.best?.[mode];
+  const prev = old && old.total === songTones ? old : null;
+  if (!s.complete || s.total !== songTones || !isBetter(s, prev)) return { saved: false, prev };
+  prefs.best = { ...prefs.best, [mode]: { hits: s.hits, total: s.total, at: now } };
+  return { saved: true, prev };
+}
+
+/** Bestwerte je Art prüfen; Ungültiges wird still übergangen (null, wenn nichts übrig bleibt). */
+function normalizeBest(raw: unknown): SongPrefs["best"] | null {
+  if (!isObj(raw)) return null;
+  const out: NonNullable<SongPrefs["best"]> = {};
+  for (const m of FOLLOW_MODES) {
+    const b = raw[m];
+    if (!isObj(b) || !isNum(b.hits) || !isNum(b.total)) continue;
+    const hits = Math.round(b.hits);
+    const total = Math.round(b.total);
+    if (total < 1 || hits < 0 || hits > total) continue;
+    out[m] = { hits, total, at: isNum(b.at) ? b.at : 0 };
+  }
+  return Object.keys(out).length ? out : null;
+}
+
 /** Prüft und vervollständigt Daten (aus dem Speicher oder einer Sicherung). Wirft DataError. */
 export function normalizeData(raw: unknown): AppData {
   if (!isObj(raw)) throw new DataError("Die Daten sind kein gültiges Objekt.");
@@ -210,6 +274,10 @@ export function normalizeData(raw: unknown): AppData {
     // unbekannte Werte fallen still auf „wie das Handy“ zurück
     const th = d.settings.theme;
     if (typeof th === "string" && (THEMES as string[]).includes(th)) out.settings.theme = th as Theme;
+    // Mitspielen (ohne Versionssprung dazugekommen): Fehlerhaftes fällt still auf den Standard zurück
+    if (typeof d.settings.headphones === "boolean") out.settings.headphones = d.settings.headphones;
+    const fm = d.settings.followMode;
+    if (typeof fm === "string" && (FOLLOW_MODES as string[]).includes(fm)) out.settings.followMode = fm as FollowMode;
   }
   // Stufen
   if (d.stages !== undefined) {
@@ -279,6 +347,8 @@ export function normalizeData(raw: unknown): AppData {
       if (!isObj(p) || !/^[a-z0-9-]{1,80}$/.test(id)) continue;
       const prefs: SongPrefs = {};
       if (isNum(p.tempo)) prefs.tempo = Math.max(TEMPO_MIN, Math.min(TEMPO_MAX, Math.round(p.tempo)));
+      const best = normalizeBest(p.best);
+      if (best) prefs.best = best;
       if (Object.keys(prefs).length) out.songs[id] = prefs;
     }
   }
