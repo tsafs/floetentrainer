@@ -23,7 +23,7 @@ test.describe("Startseite", () => {
     await expect(page.getByTestId("streak")).toHaveText("4");
   });
 
-  test("nichts fällig und nichts neu: „Trotzdem üben“", async ({ page }) => {
+  test("nichts fällig und nichts neu: „Weiter üben“", async ({ page }) => {
     const d = sampleData({ lesen: "erste-toene", spielen: "erste-toene" });
     const today = new Date();
     const key = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
@@ -33,9 +33,9 @@ test.describe("Startseite", () => {
     }
     await seed(page, d);
     await page.goto("./");
-    await expect(page.getByRole("button", { name: /Trotzdem üben/ })).toContainText("Für heute alles erledigt");
-    await expect(page.getByRole("button", { name: /Trotzdem spielen/ })).toBeVisible();
-    await page.getByRole("button", { name: /Trotzdem üben/ }).click();
+    await expect(page.getByRole("button", { name: /Weiter üben/ })).toContainText("Fälliges erledigt · zählt für Stufe 2");
+    await expect(page.getByRole("button", { name: /Weiter spielen/ })).toBeVisible();
+    await page.getByRole("button", { name: /Weiter üben/ }).click();
     expect((await info(page)).step).toBe("card");
   });
 });

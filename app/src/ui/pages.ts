@@ -63,7 +63,7 @@ export const progressView: View = (root, ctx) => {
       <div class="rows">${rows}</div>
       <p class="help">${
         next
-          ? `Als Nächstes: ${joinNames(next.notes)}. Dafür braucht jeder Ton mindestens 10 Antworten, davon 90 % richtig, an mindestens zwei Tagen.`
+          ? `Als Nächstes: ${joinNames(next.notes)}. Dafür braucht jeder Ton mindestens 10 Antworten, davon 90 % richtig.`
           : "Alle Stufen sind freigeschaltet."
       }${track === "spielen" && next ? " Spielen kann Lesen nicht überholen." : ""}</p>
     </section>`;

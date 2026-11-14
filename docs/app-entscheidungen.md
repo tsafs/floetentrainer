@@ -30,8 +30,12 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
     nicht.
   - Steht beim Sitzungsende noch eine Wiederholung aus, entfällt sie.
 - **Abbrechen mit ×:** Bereits beantwortete Karten bleiben gewertet, alles andere bleibt unverändert.
-- **Nichts fällig, nichts neu:** Die Startseite meldet „Für heute alles erledigt“, und der Knopf
-  heißt dann „Trotzdem üben“. Die Sitzung besteht dann nur aus Zusatzkarten.
+- **Nichts fällig, nichts neu:** Der Knopf heißt dann „Weiter üben“ bzw. „Weiter spielen“, darunter
+  „Fälliges erledigt · zählt für Stufe n“, auch wenn Spielen gerade an der Lesen-Stufe ansteht (die
+  Antworten zählen trotzdem, und Spielen schaltet frei, sobald Lesen steigt). Auf der letzten Stufe:
+  „Fälliges erledigt · alle Stufen erreicht“. Die Sitzung besteht dann nur aus Zusatzkarten. Bis 14.11.2026 hieß er „Trotzdem üben“ mit
+  „Für heute alles erledigt“; das klang, als brächte Weiterüben nichts, obwohl Zusatzkarten für die
+  Trefferquote und damit fürs Freischalten zählen.
 
 ## 2. Karten und Wiederholung (Leitner)
 
@@ -64,8 +68,14 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
 - **Freischalten:** Die nächste Stufe einer Spur kommt automatisch, sobald *jeder* freigeschaltete Ton
   dieser Spur
   - mindestens 10 gewertete Antworten hat,
-  - mindestens **90 %** richtig hat (z. B. 18 von 20 oder 9 von 10) und
-  - Antworten an **mindestens 2 verschiedenen Kalendertagen** unter diesen letzten 20 hat.
+  - mindestens **90 %** richtig hat (z. B. 18 von 20 oder 9 von 10).
+
+  Bis 14.11.2026 galt zusätzlich: Antworten an mindestens 2 verschiedenen Kalendertagen unter diesen
+  letzten 20. Gestrichen auf Rückmeldung: „Ich würde gerne weiter üben, doch für heute kann ich nichts
+  mehr erreichen. Fleißige Lerner werden ausgebremst. Wiederholt werden kann ja am nächsten Tag
+  trotzdem.“ Wer an einem Tag viel übte, verdrängte außerdem die Antworten vom Vortag aus den letzten
+  20 und blockierte sich so selbst. Ob die Töne auch am nächsten Tag sitzen, prüfen die fälligen Karten
+  (Abschnitt 2): Jede richtig beantwortete Karte kommt nach 1, 3, 7 … Tagen wieder.
 
   Die Prüfung läuft nach jeder Antwort. Die Meldung („Neu: c² und d²“) erscheint am Sitzungsende,
   und die neuen Töne kommen ab der nächsten Sitzung.
@@ -444,7 +454,7 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
     Source „GitHub Actions“.
 - **Tests:**
   - Vitest: alle 25 Griffe aus `app-prompt.md`, Namen, andere Schreibweisen, Frequenzen,
-    Leitner-Logik samt Randfällen, Freischalt-Regel (auch die 2-Tage-Bedingung), Zusammensetzung der
+    Leitner-Logik samt Randfällen, Freischalt-Regel (auch: alles an einem Tag reicht), Zusammensetzung der
     Sitzung, falsche Antworten (nie gleicher Griff, nie zwei Schreibweisen).
   - Playwright: die Übungsabläufe. Für Spielen wird `getUserMedia` per Init-Skript durch einen
     Oszillator ersetzt. Getestet werden richtig, falsch, dann richtig, Nachklang und Tonwechsel.

@@ -1,5 +1,4 @@
 import type { Answer, AppData } from "../../src/store/data";
-import { addDays } from "../../src/store/dates";
 
 /** Wiederholbarer Zufall */
 export function seeded(seed = 1): () => number {
@@ -22,6 +21,6 @@ export function answers(n: number, wrong: number, days: string[], t0 = 1000): An
 
 export const TODAY = "2026-11-13"; // ein Freitag
 
-export function master(data: AppData, track: "lesen" | "spielen", notes: string[], days = [addDays(TODAY, -1), TODAY]) {
+export function master(data: AppData, track: "lesen" | "spielen", notes: string[], days = [TODAY]) {
   for (const n of notes) data.history[track][n] = answers(10, 0, days);
 }
