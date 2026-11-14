@@ -14,6 +14,12 @@
 // Stabilitätsprüfung im Glätter; die Namensregel (drei Frames) fängt den Rest. Solange ein klarer
 // Wechsel abgewartet wird (NameHold.pending), bleiben Zeiger und Cent stehen, statt kurz an den Rand
 // („+100 Cent“) gezogen zu werden.
+//
+// Flötenprofil: Das Stimmgerät misst gegen den Stimmton der aktiven Flöte (seit 14.11.2026: der Stimmton
+// gehört zur Flöte, ../music/tuning.ts) – Name und Cent sind die echte Abweichung von dem, was dieser
+// Stimmton erwarten lässt. Ist für den gehörten Ton auf der aktiven Flöte ein Wert gespeichert, steht klein
+// darunter, wie dieser Ton innerhalb der Flöte liegt („Deine Flöte bei e¹: −15“). Oben dezent die Flöte
+// und ihr Stimmton („Flöte: Kinderflöte · etwa 432,5 Hz“).
 
 import { keepAwake, mic } from "../audio/mic";
 import { NameHold, pitched, Smoother, TUNER_SMOOTH } from "../audio/smooth";
@@ -21,25 +27,31 @@ import { fluteSvg } from "../music/flute";
 import { midiNameHtml } from "../music/names";
 import { CHART, chartNoteByMidi, freqToWrittenMidi } from "../music/notes";
 import { staffRange, staffSvg } from "../music/staff";
-import { topbar, type View } from "./common";
+import { hzText, tuningShort } from "../music/tuning";
+import { activeFlute } from "../store/data";
+import { esc, topbar, type View } from "./common";
+import { centsText } from "./flute";
 
 export const tunerView: View = (root, ctx) => {
   const range = staffRange(CHART.map((n) => n.id));
-  const tuning = ctx.data.settings.tuningHz;
+  const flute = activeFlute(ctx.data);
+  const tuning = flute.tuning.hz;
+  const tuningLine = tuningShort(flute) ?? `Stimmton unbekannt, ${hzText(flute.tuning)} angenommen`;
   const smoother = new Smoother(TUNER_SMOOTH);
   const names = new NameHold();
   const tol = ctx.data.settings.toleranceCents;
   root.innerHTML = `
 <main class="screen fit tuner">
   ${topbar("Stimmgerät")}
+  <p class="tunerfl soft" data-testid="tuner-tuning">Flöte: ${esc(flute.name)} · ${tuningLine}</p>
   <div class="stage" data-testid="tuner-staff">${staffSvg(null, { range, label: "Notenzeile" })}<p class="q soft" data-testid="tuner-hint">Spiel einen Ton</p></div>
   <div class="side">
     <div class="tunerrow">
       <div class="fl">${fluteSvg("oooooooo", "Griffbild")}</div>
-      <div><div class="nmbig" data-testid="tuner-name">–</div><div class="ct" data-testid="tuner-cents"></div></div>
+      <div><div class="nmbig" data-testid="tuner-name">–</div><div class="ct" data-testid="tuner-cents"></div><div class="flnote" data-testid="tuner-flute"></div></div>
     </div>
     <div class="meter off" aria-hidden="true"><i></i></div>
-    <p class="help soft">Stimmton a = ${ctx.data.settings.tuningHz} Hz. Grün heißt: höchstens ${tol} Cent daneben.</p>
+    <p class="help soft">Cent im Verhältnis zum Stimmton deiner Flöte. Grün heißt: höchstens ${tol} Cent daneben.</p>
     <button class="big" data-act="start" hidden>Mikrofon einschalten</button>
   </div>
 </main>`;
@@ -47,6 +59,8 @@ export const tunerView: View = (root, ctx) => {
   const stage = main.querySelector(".stage")!;
   const nm = main.querySelector('[data-testid="tuner-name"]')!;
   const ct = main.querySelector('[data-testid="tuner-cents"]')!;
+  const flnote = main.querySelector('[data-testid="tuner-flute"]') as HTMLElement;
+  const fluteMulti = ctx.data.flutes.length > 1;
   const meter = main.querySelector(".meter") as HTMLElement;
   const fl = main.querySelector(".fl")!;
   const hint = main.querySelector('[data-testid="tuner-hint"]')!;
@@ -66,6 +80,7 @@ export const tunerView: View = (root, ctx) => {
         nm.innerHTML = "–";
         ct.textContent = "";
         meter.className = "meter off";
+        flnote.textContent = "";
         hint.textContent = "Spiel einen Ton";
       }
       return;
@@ -82,6 +97,11 @@ export const tunerView: View = (root, ctx) => {
       fl.innerHTML = n ? fluteSvg(n.fingering, "Griffbild") : fluteSvg("oooooooo", "Griffbild");
       fl.classList.toggle("none", !n);
       hint.textContent = n ? "" : "außerhalb von c¹–c³";
+      const v = n ? flute.offsets[n.id] : undefined;
+      flnote.innerHTML =
+        v === undefined
+          ? ""
+          : `${fluteMulti ? esc(flute.name) : "Deine Flöte"} bei ${midiNameHtml(h.midi)}: ${centsText(v)}`;
     }
     ct.textContent = `${h.cents > 0 ? "+" : h.cents < 0 ? "−" : "±"}${Math.abs(h.cents)} Cent`;
     meter.className = Math.abs(h.cents) <= tol ? "meter in" : "meter";

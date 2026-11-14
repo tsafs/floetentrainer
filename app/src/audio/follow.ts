@@ -3,11 +3,29 @@
 //
 // Zwei Arten:
 // - Warte-Modus (WaitFollower): Die aktuelle Note bleibt stehen, bis ihr Ton kurz stabil erklingt.
-//   Wer vorher einen anderen Ton stabil spielt, bekommt die Note rot, kommt aber trotzdem weiter.
-// - Takt-Modus (BeatFollower): Die Zeit läuft im Tempo; eine Note ist getroffen, wenn ihr Ton etwa
-//   die Hälfte ihrer Dauer (mindestens 80 ms) erkannt wird.
+//   Wer vorher deutlich länger einen anderen Ton spielt, bekommt die Note rot, kommt aber trotzdem weiter.
+// - Takt-Modus (BeatFollower): Die Zeit läuft im Tempo; jede Note wird nach ihrem Ende gewertet
+//   (mittlerer Teil der Note bzw. Einsatz um den Notenbeginn, siehe unten).
 // Pausen sind im Zeitplan keine Töne und fallen damit von selbst heraus; Haltebögen sind dort schon
 // ein Ton.
+//
+// Robustere Regeln (Befund am echten Gerät vom 14.11.2026: Android-Handy, günstige Sopranflöte etwa
+// 30 Cent zu tief, erwachsene Anfängerin; „Im Takt“ fast alles rot, „Wartet auf mich“ oft rot).
+// Vorbild sind Gesangsspiele (Quelltext von UltraStar Deluxe und Performous): Sie werten nach dem
+// nächsten Halbton, falten Oktaven, werten nach Anteil der Dauer und gleichen eine einstellbare
+// Eingangs-Verzögerung aus (UltraStar Standard 140 ms, Performous 90 ms).
+// - Toleranz = nächster Halbton: Ein Ton zählt als Zielton, wenn er näher am Zielton liegt als an
+//   jedem Nachbarton (|Abweichung| < 50 Cent) – relativ zur Lage dieses Tons auf *ihrer* Flöte
+//   (Flötenprofil, ./flute-profile.ts: Stimmton der Flöte + Wert des Tons, ungemessene Töne 0). Das
+//   Profil wird während des Durchgangs je Ton langsam nachgeführt (LiveTuning). Die Toleranz aus den
+//   Einstellungen gilt nur noch für die Übung und das Stimmgerät.
+// - Klarheit ab 0,85 statt 0,9 (nur Mitspielen): Eine günstige Flöte klingt hauchig. Synthetisch
+//   gemessen (Flötenklang mit Obertönen, weißes Rauschen und tiefes Atemgeräusch, 1024 Samples): Bei
+//   sehr starkem Rauschen fällt die Klarheit eines Flötentons auf etwa 0,86 – mit 0,9 käme dann kein
+//   einziger Frame durch, mit 0,85 neun von zehn; die wenigen falschen Werte darunter sind
+//   Oktavfehler (zählen nicht) und Einzelwerte (Median und Nachbarprüfung entfernen sie). Reines
+//   Rauschen oder Atem ohne Ton erreicht im Bereich 480–2300 Hz nie 0,85 (je 400 Versuche).
+//   Einschwing-Frames („Chiff“) liegen bei beiden Schwellen darunter; sie zählen nicht gegen die Note.
 //
 // Neuer Einsatz (nur Warte-Modus, für Tonwiederholungen): Ein Ton gilt als neu angestoßen nach
 // - einer Unterbrechung von mindestens reattackGapMs (40 ms) ohne gültigen Ton (Stille, zu leise,
@@ -24,34 +42,42 @@
 // nur ein Median über 3 Frames (≈ 75 ms, Ausgabe 25 ms später), keine Zeitkonstante. Das entfernt
 // einzelne Ausreißer (Oktavsprung, Nachbarton), lässt aber auch Sechzehntel durch. Vor dem Median
 // prüft der Glätter, ob ein Frame zu einem Nachbarn passt: Übergangswerte beim schnellen Tonwechsel
-// (gis¹ zwischen g¹ und a¹) kommen als „kein Ton“ an, sind also weder falscher Ton noch neuer Einsatz
-// (eine Lücke von 25 ms liegt unter reattackGapMs). Ein einzelner
-// Frame ohne gültigen Ton zwischen zwei gleichen Tönen wird überbrückt (zählt als dieser Ton, seine
-// Lautstärke aber nicht für den Einbruch-Weg); ab 50 ms ohne Ton bleibt es Stille. Lautstärke und
-// Stille gehen sonst unverändert durch – der neue Einsatz (oben) wird also genauso erkannt wie roh. Die geglätteten Frames behalten ihren Zeitpunkt; der Median
+// (gis¹ zwischen g¹ und a¹) kommen als „kein Ton“ an. Ein einzelner Frame ohne gültigen Ton zwischen
+// zwei gleichen Tönen wird überbrückt. Die geglätteten Frames behalten ihren Zeitpunkt; der Median
 // verschiebt keinen Tonwechsel, deshalb braucht der Takt-Modus keinen zusätzlichen Ausgleich.
 //
+// Metronom-Klicks (Takt-Modus ohne Kopfhörer kommen sie aus dem Lautsprecher, gleich neben dem
+// Mikrofon): Sie sind keine Rauschimpulse, sondern kurze Sinus-Töne (1250 bzw. 1900 Hz, ≈ 40 ms
+// abklingend, ./flute-synth.ts). pitchy erkennt sie mit voller Klarheit, 1250 Hz liegt sogar fast genau
+// auf es² der Flöte. Deshalb fängt ClickFilter höchstens zwei Frames lange „Töne“ auf der Höhe eines
+// Klicks ab (sie gelten als unklar); ein echter Ton auf dieser Höhe klingt länger und geht durch.
+//
 // Schleife: Beide Arten werten je Durchgang getrennt (Ergebnis je Durchgang). Die Liedseite nutzt die
-// Schleife seit der Nachsteuerung vom 14.11.2026 nicht mehr (ein Durchgang, danach bleiben die Farben
-// stehen); die Wertung kann es weiterhin. Gezeigt werden nur noch die Farben je Note – die Zusammenfassung
-// (FollowSummary) dient den Abläufen (Durchgang fertig? vollständig?), nicht der Anzeige.
+// Schleife seit der Nachsteuerung vom 14.11.2026 nicht mehr; die Wertung kann es weiterhin.
 
 import { freqToWrittenMidi } from "../music/notes";
 import type { Settings } from "../store/data";
 import type { Timeline } from "../songs/timeline";
+import { CLICK_ACCENT_FREQ, CLICK_FREQ } from "./flute-synth";
+import { correctPitch, LiveTuning } from "./flute-profile";
 import { DEFAULT_JUDGE, type Frame, type Heard } from "./judge";
-import { Smoother } from "./smooth";
+import { Smoother, type SmoothedFrame } from "./smooth";
 
 export interface FollowConfig {
   tuning: number;
+  /** Zielton: näher als so viele Cent (an der eigenen Lage des Tons auf dieser Flöte); 50 = nächster Halbton */
   toleranceCents: number;
   minClarity: number;
-  /** Ein Oktavfehler zählt im Warte-Modus nur bei so hoher Klarheit als falsch. */
+  /** Ein Oktavfehler nach unten zählt im Warte-Modus nur bei so hoher Klarheit als falsch. */
   octaveClarity: number;
   minFreq: number;
   maxFreq: number;
-  /** Warte-Modus: so lange muss der Ton stabil sein (richtig wie falsch) */
+  /** Warte-Modus: so lange muss der Zielton stabil sein */
   holdMs: number;
+  /** Warte-Modus: so lange muss ein falscher Ton stabil sein (deutlich länger als ein Fingerwechsel) */
+  wrongHoldMs: number;
+  /** Warte-Modus: ein falscher Ton muss so viele Cent über der Halbton-Grenze liegen (keine scharfe Kante) */
+  wrongMarginCents: number;
   /** Warte-Modus: Unterbrechung, ab der ein neuer Einsatz erkannt wird */
   reattackGapMs: number;
   /** Warte-Modus: Lautstärke-Einbruch unter diesen Anteil des Höchstwerts … */
@@ -60,18 +86,26 @@ export interface FollowConfig {
   reattackRise: number;
   /** Takt-Modus: Verzögerung von Mikrofon und Erkennung in ms (Frames werden so viel früher einsortiert) */
   latencyMs: number;
-  /** Takt-Modus: nötiger Anteil der klingbaren Notendauer (Dauer minus articulationMs) mit erkanntem Ton */
-  minCoverage: number;
-  /** Takt-Modus: mindestens so viele ms erkannt (bei sehr kurzen Noten höchstens 80 % der Dauer) */
+  /** Takt-Modus: so viel vom Notenbeginn wird nicht gewertet (Einsatz, höchstens 30 % der Note) … */
+  headMs: number;
+  /** … und dieser Anteil am Ende (Zungen-Lücke vor dem nächsten Ton) */
+  tailShare: number;
+  /** Takt-Modus: Anteil des Zieltons an der gewerteten Zeit (Zielton + anderer Ton + Stille) */
+  minShare: number;
+  /** Takt-Modus: mindestens so viele ms Zielton (bei sehr kurzem gewertetem Teil höchstens 80 % davon) */
   minHitMs: number;
-  /**
-   * Takt-Modus: so viel jeder Note ist beim abgesetzten Spielen gar nicht als Ton messbar
-   * (Zungen-Lücke vor dem nächsten Ton und unklarer Einsatz). Wird vor dem Anteil abgezogen,
-   * sonst wären schnelle Sechzehntel kaum zu treffen.
-   */
-  articulationMs: number;
+  /** Takt-Modus: ein Einsatz des Zieltons so nah am Notenbeginn (±; zu früh höchstens eine halbe, zu spät eine ganze Note) … */
+  onsetWindowMs: number;
+  /** … der so lange hält, macht die Note ebenfalls grün */
+  onsetHoldMs: number;
   /** Takt-Modus: übliches Frame-Intervall in ms (Mikrofon: 25); größere Lücken zählen nur bis 2×. */
   frameMs: number;
+  /** Takt-Modus: Frequenzen der Metronom-Klicks (Hz) – so kurze Töne dort sind Klicks, kein Spiel */
+  clickFreqs: number[];
+  /** … „auf der Höhe eines Klicks“ heißt: höchstens so viele Cent daneben … */
+  clickCents: number;
+  /** … und höchstens so viele Frames lang */
+  clickFrames: number;
   /** Glättung (./smooth.ts): Median über so viele Frames (ungerade, 1 = keiner) … */
   medianFrames: number;
   /** … und Zeitkonstante in ms (0 = keine) */
@@ -80,50 +114,85 @@ export interface FollowConfig {
   stableCents: number;
 }
 
+/** Eingangs-Verzögerung (Mikrofon und Erkennung) ohne Abgleich am Gerät */
+export const DEFAULT_INPUT_LATENCY = 120;
 /**
- * Standardwerte. Toleranz, Klarheit, Oktavregel und Frequenzbereich wie beim Üben (DEFAULT_JUDGE).
- * Haltedauer 120 ms statt 300 ms: Achtel bei 100 Schlägen dauern 300 ms, die Note muss deutlich
- * vorher grün werden.
- * Verzögerung 50 ms (Mikrofon und Erkennung): Messfenster von pitchy + Mikrofon-Eingang auf Android
- * typisch 20–40 ms. Der Messwert gehört im Mittel zur Fenstermitte: bei 2048 Samples (bis 14.11.2026)
- * ≈ 20 ms zurück, bei jetzt 1024 Samples (./mic.ts) ≈ 10 ms. Zusammen also 30–50 ms statt 40–60 ms;
- * die 50 ms bleiben (oberer Rand, ohne Messung am Gerät nicht verschoben – die Wertung verträgt ±30 ms
- * Versatz, siehe Test „angestoßene Sechzehntel“). Die Ausgabe der Klicks, nach denen sie spielt,
- * kommt nicht hierher: Die Oberfläche legt startMs auf den Zeitpunkt, zu dem sie den Zeitplan-Beginn
- * *hört* (mit der vom Browser gemeldeten Ausgabe-Verzögerung, wie die Markierung des Abspielers; ohne Meldung üblich
- * 30 ms, zusammen also wie bisher 80 ms). Bluetooth-Kopfhörer, die der Browser zu knapp meldet,
- * brauchen mehr – dafür später ein Abgleich-Knopf (latencyMs ist einstellbar). Der Median der
- * Glättung kommt nicht hinzu: Die geglätteten Frames behalten ihren Zeitpunkt (siehe Kopfkommentar).
- * Median über 3 Frames statt 5 wie beim Üben: Schnelle Noten (Sechzehntel ≈ 150 ms) sollen erkannt
- * werden, und ein Ausreißer kostet hier höchstens die kurze Haltedauer bzw. 25 ms erkannte Zeit.
+ * … mit Kopfhörern (noch nicht abgeglichen): 200 ms. Bluetooth-Kopfhörer mit eigenem Mikrofon (Headset)
+ * verzögern den Eingang zusätzlich um typisch 100–200 ms, und manche Browser melden ihre
+ * Ausgabe-Verzögerung zu knapp. Mit Kabel-Kopfhörern (Mikrofon des Handys) sind 200 ms um etwa 80 ms zu
+ * viel – sie erscheint dann etwas zu früh, was Einsatz-Fenster (±120 ms) und Anteilsregel gut vertragen.
+ */
+export const DEFAULT_HEADPHONE_LATENCY = 200;
+
+/**
+ * Standardwerte.
+ * - Toleranz 50 Cent = nächster Halbton (siehe Kopfkommentar), Klarheit 0,85, Frequenzbereich und
+ *   Oktavregel wie beim Üben.
+ * - Warte-Modus: Zielton 120 ms stabil (Achtel bei 100 Schlägen dauern 300 ms, die Note muss deutlich
+ *   vorher grün werden); ein falscher Ton erst nach 250 ms und 10 Cent jenseits der Halbton-Grenze –
+ *   ein Fingerwechsel (Übergangsklang) dauert auf der Blockflöte typisch 20–80 ms.
+ * - Takt-Modus, Verzögerung 120 ms statt bisher 50: Gemessen wurde die Mikrofon-Eingangs-Verzögerung
+ *   bisher nirgends (AnalyserNode im 25-ms-Takt, Zeitstempel performance.now); auf Android liegt sie
+ *   samt Puffern typisch bei 80–200 ms, Gesangsspiele nehmen 90–140 ms. Ein Abgleich am Gerät
+ *   (Verzögerung abgleichen, ./latency.ts) speichert den echten Wert (settings.inputLatencyMs). Die
+ *   Ausgabe der Klicks kommt nicht hierher: Die Oberfläche legt startMs auf den Zeitpunkt, zu dem sie den
+ *   Zeitplan-Beginn *hört* (outputClock, ./song-player.ts).
+ * - Gewertet wird je Note nur der mittlere Teil: die ersten 60 ms (Einsatz, „Chiff“; höchstens 30 % der
+ *   Note) und die letzten 20 % (Zungen-Lücke) nicht. Unklare und fehlende Frames zählen dort weder für
+ *   noch gegen die Note, Stille und andere Töne schon. Getroffen, wenn der Zielton mindestens 38 % davon
+ *   ausmacht und mindestens 40 ms erkannt wurde – oder wenn der Zielton höchstens 120 ms vor oder nach dem
+ *   Notenbeginn einsetzt (bei kurzen Noten zu früh höchstens eine halbe, zu spät eine ganze Note) und mindestens 40 ms hält (so gehen auch Sechzehntel bis ♩ = 120, die etwas zu
+ *   früh oder spät kommen). Rot also nur, wenn überwiegend ein anderer Ton oder gar nichts kam.
+ * - Median über 3 Frames statt 5 wie beim Üben: Schnelle Noten (Sechzehntel ≈ 125 ms) sollen erkannt
+ *   werden, und ein Ausreißer kostet hier höchstens die kurze Haltedauer bzw. 25 ms erkannte Zeit.
  */
 export const DEFAULT_FOLLOW: FollowConfig = {
   tuning: DEFAULT_JUDGE.tuning,
-  toleranceCents: DEFAULT_JUDGE.toleranceCents,
-  minClarity: DEFAULT_JUDGE.minClarity,
+  toleranceCents: 50,
+  minClarity: 0.85,
   octaveClarity: DEFAULT_JUDGE.octaveClarity,
   minFreq: DEFAULT_JUDGE.minFreq,
   maxFreq: DEFAULT_JUDGE.maxFreq,
   holdMs: 120,
+  wrongHoldMs: 250,
+  wrongMarginCents: 10,
   reattackGapMs: 40,
   reattackDip: 0.5,
   reattackRise: 1.5,
-  latencyMs: 50,
-  minCoverage: 0.5,
-  minHitMs: 50,
-  articulationMs: 50,
+  latencyMs: DEFAULT_INPUT_LATENCY,
+  headMs: 60,
+  tailShare: 0.2,
+  minShare: 0.38,
+  minHitMs: 40,
+  onsetWindowMs: 120,
+  onsetHoldMs: 40,
   frameMs: 25,
+  clickFreqs: [CLICK_FREQ, CLICK_ACCENT_FREQ],
+  clickCents: 40,
+  clickFrames: 2,
   medianFrames: 3,
   tauMs: 0,
   stableCents: DEFAULT_JUDGE.stableCents,
 };
 
+/** Grenzen der Eingangs-Verzögerung (Abgleich und Schieber) */
+export const LATENCY_MIN = 0;
+export const LATENCY_MAX = 400;
+
+/** Verzögerung für den jetzigen Kopfhörer-Schalter: abgeglichen oder Standard */
+export function inputLatency(s: Pick<Settings, "inputLatencyMs" | "headphones">): { ms: number; calibrated: boolean } {
+  const v = s.headphones ? s.inputLatencyMs.headphones : s.inputLatencyMs.speaker;
+  if (v !== null) return { ms: v, calibrated: true };
+  return { ms: s.headphones ? DEFAULT_HEADPHONE_LATENCY : DEFAULT_INPUT_LATENCY, calibrated: false };
+}
+
 /**
- * Was aus den App-Einstellungen übernommen wird: Stimmton und Toleranz. Die Haltedauer der
- * Einstellungen gilt fürs Üben und ist fürs Mitspielen zu lang, sie bleibt bei DEFAULT_FOLLOW.
+ * Was aus den App-Daten übernommen wird: der Stimmton der aktiven Flöte (tuningHz, ../store/data.ts) und
+ * die Eingangs-Verzögerung (passend zum Kopfhörer-Schalter, abgeglichen oder Standard). Toleranz und
+ * Haltedauer der Einstellungen gelten fürs Üben, nicht hier.
  */
-export function followConfig(s: Pick<Settings, "tuningHz" | "toleranceCents">): Partial<FollowConfig> {
-  return { tuning: s.tuningHz, toleranceCents: s.toleranceCents };
+export function followConfig(s: Pick<Settings, "inputLatencyMs" | "headphones">, tuningHz: number): Partial<FollowConfig> {
+  return { tuning: tuningHz, latencyMs: inputLatency(s).ms };
 }
 
 /** Wertung einer Note im Warte-Modus */
@@ -132,13 +201,30 @@ export interface WaitNoteResult {
   ok: boolean;
   /** bei ok = false: der zuerst gespielte falsche Ton (notierte MIDI-Nummer) */
   wrongMidi?: number;
+  /** mittlere Abweichung des Zieltons vom Stimmton (Cent), für die Diagnose */
+  cents?: number;
 }
+
+/** Warum eine Note im Takt-Modus grün bzw. rot wurde */
+export type BeatReason = "anteil" | "einsatz" | "anderer-ton" | "nichts" | "zu-kurz";
 
 /** Wertung einer Note im Takt-Modus */
 export interface BeatNoteResult {
   ok: boolean;
-  /** Anteil der Notendauer, in dem ihr Ton erkannt wurde (0–1) */
+  /** Anteil der ganzen Notendauer, in dem ihr Ton erkannt wurde (0–1) */
   coverage: number;
+  reason: BeatReason;
+  /** gewerteter (mittlerer) Teil der Note in ms und darin: Zielton, anderer Ton, Stille */
+  partMs: number;
+  targetMs: number;
+  otherMs: number;
+  silentMs: number;
+  /** Einsatz des Zieltons relativ zum Notenbeginn (ms, nach Verzögerungsausgleich); null ohne */
+  onsetMs: number | null;
+  /** mittlere Abweichung des Zieltons vom Stimmton (Cent); null ohne Zielton */
+  cents: number | null;
+  /** am häufigsten erkannter anderer Ton (notierte MIDI-Nummer) */
+  otherMidi: number | null;
 }
 
 /** Zusammenfassung eines Durchgangs */
@@ -148,6 +234,23 @@ export interface FollowSummary {
   total: number;
   /** alle Noten des Zeitplans gewertet (nicht vorzeitig beendet) */
   complete: boolean;
+}
+
+/** Was ein Follower je geglättetem Frame gesehen hat (für die Diagnose-Aufnahme) */
+export interface JudgedFrame {
+  t: number;
+  /** geglättete Frequenz (null: kein gültiger Ton) */
+  freq: number | null;
+  filled?: boolean;
+  unstable?: boolean;
+  click?: boolean;
+  /** gehörter Ton dieser Flöte und Abstand dazu (Cent) */
+  midi?: number;
+  cents?: number;
+  /** Note, auf die sich die Wertung bezieht (Index im Zeitplan) */
+  note?: number;
+  /** Einordnung: Zielton, anderer Ton, Oktave, alter (gehaltener) Ton, unklar, Stille */
+  cls?: "ziel" | "anders" | "oktave" | "alt" | "unklar" | "still";
 }
 
 /** Treffer und Gesamtzahl. results[i] gehört zu tl.tones[i]; fehlende Einträge (nicht gewertet) zählen nicht. */
@@ -168,11 +271,56 @@ function isValid(cfg: FollowConfig, f: Frame): f is Frame & { freq: number } {
   return f.freq !== null && f.clarity >= cfg.minClarity && f.freq >= cfg.minFreq && f.freq <= cfg.maxFreq;
 }
 
-/** Gehörter Ton und gebrochene MIDI-Nummer eines gültigen Frames */
-function hear(cfg: FollowConfig, freq: number): { heard: Heard; m: number } {
-  const m = freqToWrittenMidi(freq, cfg.tuning);
-  const midi = Math.round(m);
-  return { heard: { midi, cents: Math.round((m - midi) * 100), freq }, m };
+/** Unter dieser Lautstärke gilt ein Frame als Stille (wie die Schwelle des Mikrofons, ./mic.ts) */
+const SILENT_RMS = 0.006;
+
+/** Klingt in einem Frame ohne gültigen Ton trotzdem etwas (unklar statt still)? */
+function sounding(f: SmoothedFrame & { click?: boolean }): boolean {
+  return f.freq !== null || !!f.unstable || !!f.click || (f.rms ?? 0) >= SILENT_RMS;
+}
+
+/**
+ * Fängt Metronom-Klicks ab (siehe Kopfkommentar): Frames auf der Höhe eines Klicks werden zurückgehalten;
+ * bleibt es bei höchstens clickFrames, kommen sie als unklar heraus (click), sonst unverändert.
+ */
+export class ClickFilter {
+  private held: SmoothedFrame[] = [];
+  private pass = false;
+
+  constructor(private cfg: Pick<FollowConfig, "clickFreqs" | "clickCents" | "clickFrames">) {}
+
+  private clicky(f: Frame): boolean {
+    const freq = f.freq;
+    return freq !== null && this.cfg.clickFreqs.some((c) => Math.abs(1200 * Math.log2(freq / c)) <= this.cfg.clickCents);
+  }
+
+  push(f: SmoothedFrame): (SmoothedFrame & { click?: boolean })[] {
+    if (!this.cfg.clickFreqs.length) return [f];
+    if (this.clicky(f)) {
+      if (this.pass) return [f];
+      this.held.push(f);
+      if (this.held.length <= this.cfg.clickFrames) return [];
+      this.pass = true;
+      const out = this.held;
+      this.held = [];
+      return out;
+    }
+    this.pass = false;
+    const out = this.release();
+    out.push(f);
+    return out;
+  }
+
+  /** Zurückgehaltenes ausgeben (am Ende) */
+  flush(): (SmoothedFrame & { click?: boolean })[] {
+    return this.release();
+  }
+
+  private release(): (SmoothedFrame & { click?: boolean })[] {
+    const out = this.held.map((h) => ({ ...h, freq: null, click: true }));
+    this.held = [];
+    return out;
+  }
 }
 
 interface Segment {
@@ -194,7 +342,7 @@ class Onsets {
 
   constructor(private cfg: FollowConfig) {}
 
-  /** Gültiger Frame: aktualisiert den Einsatz und gibt ihn zurück; sonst null. */
+  /** Gültiger Frame: aktualisiert den Einsatz und gibt ihn zurück. */
   push(f: Frame, midi: number): Segment {
     const cfg = this.cfg;
     const interrupted = this.gapStart !== null && f.t - this.gapStart >= cfg.reattackGapMs;
@@ -245,28 +393,40 @@ class Onsets {
 
 export interface WaitOptions {
   cfg?: Partial<FollowConfig>;
+  /** Abweichungen der Flöte (wird nachgeführt); Standard: leeres Profil, das sich selbst angleicht */
+  tuning?: LiveTuning;
   /** nach der letzten Note wieder von vorn (neuer Durchgang) */
   loop?: boolean;
   /** Note getroffen (Index in tl.tones), danach steht index auf der nächsten */
   onNote?: (index: number, result: WaitNoteResult, pass: number) => void;
   /** erster falscher Ton für die aktuelle Note (die Note wird rot, wartet aber weiter) */
   onWrong?: (index: number, midi: number, pass: number) => void;
+  /** Zielton eine Oktave zu hoch (überblasen): Hinweis, kein Fehler und kein Treffer */
+  onOctave?: (index: number, pass: number) => void;
   /** Durchgang fertig (alle Noten getroffen) */
   onPass?: (summary: FollowSummary, pass: number) => void;
+  /** jeder geglättete Frame mit seiner Einordnung (Diagnose) */
+  onFrame?: (j: JudgedFrame) => void;
 }
 
 /**
  * Warte-Modus. Die Oberfläche schickt jeden Frame mit push(); index ist die Note, auf die gewartet
  * wird (Index in tl.tones; = tl.tones.length, wenn fertig).
- * Eine Note ist getroffen, wenn ihr Ton holdMs lang ununterbrochen in der Toleranz liegt und sein
- * Einsatz nach dem Treffer der vorigen Note begann – bei einer Tonwiederholung braucht es also
- * einen neuen Einsatz, ein einfach weitergehaltener Ton zählt nicht. Ein anderer Ton holdMs lang
- * stabil (neuer Einsatz nach dem vorigen Treffer, kein Nachklang) macht die Note rot; ein Oktavfehler
- * nur bei hoher Klarheit (wie beim Üben). Ein Ton knapp außerhalb der Toleranz ist weder richtig
- * noch falsch.
+ * - Getroffen: Der Zielton (nächster Halbton, relativ zu ihrer Flöte) liegt holdMs (120 ms) lang
+ *   ununterbrochen an, und sein Einsatz begann nach dem Treffer der vorigen Note – bei einer
+ *   Tonwiederholung braucht es also einen neuen Einsatz.
+ * - Rot wird die Note nur, wenn ein anderer Ton (a) mindestens einen Halbton daneben liegt (nach der
+ *   Regel des nächsten Halbtons, mit 10 Cent Abstand zur Grenze), (b) nach dem Weiterspringen neu
+ *   eingesetzt hat – der gehaltene alte Ton zählt nie – und (c) wrongHoldMs (250 ms) lang stabil
+ *   bleibt. Übergangsklänge beim Fingerwechsel (wenige Frames) und kurze Fehlgriffe bleiben so ohne
+ *   Folgen. Ein Oktavfehler nach unten zählt nur bei hoher Klarheit (wie beim Üben).
+ * - Eine Oktave zu hoch (Überblasen beim Zielton) ist kein Fehler: Es ist der richtige Griff mit zu
+ *   viel Luft, und gerade Anfängerinnen passiert es oft. Er zählt aber auch nicht als Treffer – die
+ *   Markierung wartet, und onOctave gibt den Hinweis „eine Oktave zu hoch – sanfter blasen“.
  */
 export class WaitFollower {
   readonly cfg: FollowConfig;
+  readonly tuning: LiveTuning;
   index = 0;
   pass = 0;
   /** Wertungen des laufenden Durchgangs, results[i] zu tl.tones[i] */
@@ -275,18 +435,24 @@ export class WaitFollower {
   passes: FollowSummary[] = [];
   /** Wurde für die aktuelle Note schon ein falscher Ton gewertet? */
   wrongMidi: number | null = null;
+  /** Wurde für die aktuelle Note schon der Oktav-Hinweis gegeben? */
+  octaveHinted = false;
   done = false;
   private onsets: Onsets;
   private smoother: Smoother;
   private inTolStart: number | null = null;
   /** Zeitpunkt des letzten Treffers: nur spätere Einsätze zählen */
   private armedAt = -Infinity;
+  private cents: number[] = [];
+  /** zuletzt getroffener Zielton (für das Nachführen, solange sie ihn weiterhält) */
+  private lastTarget: number | null = null;
 
   constructor(
     readonly tl: Timeline,
     private opts: WaitOptions = {},
   ) {
     this.cfg = { ...DEFAULT_FOLLOW, ...opts.cfg };
+    this.tuning = opts.tuning ?? new LiveTuning();
     this.onsets = new Onsets(this.cfg);
     this.smoother = new Smoother(this.cfg);
     this.done = tl.tones.length === 0;
@@ -303,27 +469,56 @@ export class WaitFollower {
     const cfg = this.cfg;
     const f = this.smoother.push(raw);
     if (!f) return null;
+    const note = this.done ? undefined : this.index;
     if (!isValid(cfg, f)) {
       this.onsets.gap(f.t);
       this.inTolStart = null;
+      this.opts.onFrame?.({ t: f.t, freq: null, unstable: f.unstable, note, cls: sounding(f) ? "unklar" : "still" });
       return null;
     }
-    const { heard, m } = hear(cfg, f.freq);
+    const m = freqToWrittenMidi(f.freq, cfg.tuning);
+    const hp = correctPitch(m, this.tuning.offsetOf);
+    const heard: Heard = { midi: hp.midi, cents: Math.round(hp.cents), freq: f.freq };
     const seg = this.onsets.push(f, heard.midi);
+    const info: JudgedFrame = { t: f.t, freq: f.freq, filled: f.filled, midi: hp.midi, cents: Math.round(hp.cents), note };
+    const report = (cls: JudgedFrame["cls"]) => this.opts.onFrame?.({ ...info, cls });
     if (this.done || seg.start <= this.armedAt) {
-      // Nachklang der vorigen Note bzw. Ton ohne neuen Einsatz
+      // Nachklang der vorigen Note bzw. Ton ohne neuen Einsatz. Hält sie die eben getroffene Note weiter,
+      // sind das gute Messungen dieses Tons fürs Nachführen.
       this.inTolStart = null;
+      report("alt");
+      const lt = this.lastTarget;
+      if (lt !== null && !f.filled && Math.abs((m - lt) * 100 - this.tuning.offsetOf(lt)) < cfg.toleranceCents) {
+        this.tuning.observe(lt, (m - lt) * 100);
+      }
       return heard;
     }
     const target = this.tl.tones[this.index].midi;
-    if (Math.abs((m - target) * 100) <= cfg.toleranceCents) {
+    const dev = (m - target) * 100 - this.tuning.offsetOf(target);
+    if (Math.abs(dev) < cfg.toleranceCents) {
+      report("ziel");
+      if (!f.filled) {
+        this.tuning.observe(target, (m - target) * 100);
+        this.cents.push((m - target) * 100);
+      }
       this.inTolStart ??= f.t;
       if (f.t - this.inTolStart >= cfg.holdMs) this.hit(f.t);
       return heard;
     }
     this.inTolStart = null;
-    if (heard.midi === target || this.wrongMidi !== null || f.t - seg.start < cfg.holdMs) return heard;
-    if (Math.abs(heard.midi - target) === 12 && seg.minClarity < cfg.octaveClarity) return heard;
+    if (heard.midi === target + 12) {
+      report("oktave");
+      if (!this.octaveHinted && f.t - seg.start >= cfg.holdMs) {
+        this.octaveHinted = true;
+        this.opts.onOctave?.(this.index, this.pass);
+      }
+      return heard;
+    }
+    report(heard.midi - target === -12 ? "oktave" : "anders");
+    if (this.wrongMidi !== null || heard.midi === target) return heard;
+    if (Math.abs(dev) < cfg.toleranceCents + cfg.wrongMarginCents) return heard;
+    if (f.t - seg.start < cfg.wrongHoldMs) return heard;
+    if (heard.midi - target === -12 && seg.minClarity < cfg.octaveClarity) return heard;
     this.wrongMidi = heard.midi;
     this.opts.onWrong?.(this.index, heard.midi, this.pass);
     return heard;
@@ -336,11 +531,15 @@ export class WaitFollower {
 
   private hit(t: number): void {
     const result: WaitNoteResult = this.wrongMidi === null ? { ok: true } : { ok: false, wrongMidi: this.wrongMidi };
+    if (this.cents.length) result.cents = Math.round(this.cents.reduce((a, b) => a + b, 0) / this.cents.length);
     const i = this.index;
     this.results[i] = result;
+    this.lastTarget = this.tl.tones[i].midi;
     this.armedAt = t;
     this.inTolStart = null;
     this.wrongMidi = null;
+    this.octaveHinted = false;
+    this.cents = [];
     this.index++;
     this.opts.onNote?.(i, result, this.pass);
     if (this.index < this.tl.tones.length) return;
@@ -365,6 +564,8 @@ export interface BeatOptions {
   /** Zeitpunkt (ms, Uhr der Frames) des Zeitplan-Beginns, also nach dem Einzählen */
   startMs: number;
   cfg?: Partial<FollowConfig>;
+  /** Abweichungen der Flöte (wird nachgeführt); Standard: leeres Profil, das sich selbst angleicht */
+  tuning?: LiveTuning;
   /** Abschnitt/Lied endlos wiederholen; Durchgänge folgen lückenlos (wie im Abspieler) */
   loop?: boolean;
   /** Note hat genug erkannte Zeit (live, noch vor ihrem Ende) */
@@ -373,6 +574,8 @@ export interface BeatOptions {
   onNote?: (index: number, result: BeatNoteResult, pass: number) => void;
   /** Durchgang fertig */
   onPass?: (summary: FollowSummary, pass: number) => void;
+  /** jeder geglättete Frame mit seiner Einordnung (Diagnose) */
+  onFrame?: (j: JudgedFrame) => void;
 }
 
 interface Anchor {
@@ -381,11 +584,22 @@ interface Anchor {
   spq: number;
 }
 
+interface NoteAcc {
+  /** Viertel mit Zielton (ganze Note, für coverage) */
+  q: number;
+  targetMs: number;
+  otherMs: number;
+  silentMs: number;
+  centsSum: number;
+  centsMs: number;
+  other: Map<number, number>;
+  /** Einsatz des Zieltons relativ zum Notenbeginn (ms) */
+  onset: number | null;
+  hit: boolean;
+}
+
 interface PassState {
-  /** erkannte Zeit je Note in ms bzw. in Vierteln */
-  ms: number[];
-  q: number[];
-  hit: boolean[];
+  acc: NoteAcc[];
   results: (BeatNoteResult | undefined)[];
   /** nächste noch nicht abschließend gewertete Note */
   next: number;
@@ -393,18 +607,18 @@ interface PassState {
 
 /**
  * Takt-Modus. Zeitachse: Viertel g = (t − startMs) / (secPerQuarter · 1000), Frames werden um
- * latencyMs früher einsortiert. Jeder gültige Frame steht für ein Frame-Intervall um seinen
- * (korrigierten) Zeitpunkt; liegt der Ton in der Toleranz der Note, deren Fenster dieses Intervall
- * überlappt, zählt die Überlappung als erkannte Zeit. Getroffen: erkannte Zeit ≥ minCoverage der
- * klingbaren Dauer (Dauer minus articulationMs für Zungen-Lücke und Einsatz) und ≥ minHitMs
- * (bei Noten unter 100 ms höchstens 80 % der Dauer). So bleiben angestoßene Sechzehntel bis
- * etwa ♩ = 120 messbar.
- * Tonwiederholungen brauchen hier keinen neuen Einsatz: Es zählt nur die erkannte Zeit im Fenster
- * der jeweiligen Note; wer eine Wiederholung durchhält, hat beide getroffen (das Tempo gibt die
- * Notengrenzen vor). Oktavfehler und Töne knapp außerhalb der Toleranz zählen einfach nicht.
+ * latencyMs früher einsortiert. Jeder Frame steht für ein Frame-Intervall um seinen (korrigierten)
+ * Zeitpunkt. Je Note wird gezählt, wie viel davon im gewerteten (mittleren) Teil Zielton, anderer Ton
+ * oder Stille war (unklare und fehlende Frames sowie die Oktave zählen nicht), dazu der erste stabile
+ * Einsatz des Zieltons nahe am Notenbeginn. Regeln und Werte siehe DEFAULT_FOLLOW.
+ * Gewertet wird eine Note, sobald ihr Fenster vorbei ist und ein später Einsatz nicht mehr kommen kann
+ * (Notenbeginn + onsetWindowMs + onsetHoldMs + ein Frame).
+ * Tonwiederholungen brauchen hier keinen neuen Einsatz: Wer eine Wiederholung durchhält, hat beide
+ * getroffen (der Anteil im mittleren Teil reicht; das Tempo gibt die Notengrenzen vor).
  */
 export class BeatFollower {
   readonly cfg: FollowConfig;
+  readonly tuning: LiveTuning;
   pass = 0;
   /** Auswertungen der abgeschlossenen Durchgänge */
   passes: FollowSummary[] = [];
@@ -416,15 +630,20 @@ export class BeatFollower {
   private lastTc: number | null = null;
   private readonly L: number;
   private smoother: Smoother;
+  private clicks: ClickFilter;
+  /** laufender Einsatz (gehörter Ton, Beginn und letzter Frame in korrigierter Zeit) */
+  private run: { midi: number; start: number; last: number; used: boolean } | null = null;
 
   constructor(
     readonly tl: Timeline,
     private opts: BeatOptions,
   ) {
     this.cfg = { ...DEFAULT_FOLLOW, ...opts.cfg };
+    this.tuning = opts.tuning ?? new LiveTuning();
     this.anchor = { t: opts.startMs, g: 0, spq: opts.secPerQuarter };
     this.L = tl.total;
     this.smoother = new Smoother(this.cfg);
+    this.clicks = new ClickFilter(this.cfg);
     this.cur = this.newPass();
     this.done = tl.tones.length === 0 || this.L <= 0;
   }
@@ -461,21 +680,31 @@ export class BeatFollower {
   /** Roher Frame vom Mikrofon; gibt den gehörten (geglätteten) Ton zurück. */
   push(raw: Frame): Heard | null {
     const f = this.smoother.push(raw);
-    return f ? this.take(f) : null;
+    if (!f) return null;
+    let heard: Heard | null = null;
+    for (const g of this.clicks.push(f)) heard = this.take(g) ?? heard;
+    return heard;
   }
 
-  private take(f: Frame): Heard | null {
+  private take(f: SmoothedFrame & { click?: boolean }): Heard | null {
     const cfg = this.cfg;
     const tc = f.t - cfg.latencyMs;
     const dt = this.lastTc === null ? cfg.frameMs : Math.min(Math.max(tc - this.lastTc, 0), 2 * cfg.frameMs);
     this.lastTc = tc;
-    if (this.done) return isValid(cfg, f) ? hear(cfg, f.freq).heard : null;
-    let heard: Heard | null = null;
-    if (isValid(cfg, f)) {
-      const h = hear(cfg, f.freq);
-      heard = h.heard;
-      if (dt > 0) this.credit(tc - dt / 2, tc + dt / 2, h.m);
+    const valid = isValid(cfg, f);
+    const m = valid ? freqToWrittenMidi(f.freq!, cfg.tuning) : 0;
+    const hp = valid ? correctPitch(m, this.tuning.offsetOf) : null;
+    const heard: Heard | null = hp ? { midi: hp.midi, cents: Math.round(hp.cents), freq: f.freq! } : null;
+    if (this.done) return heard;
+    const info: JudgedFrame = { t: f.t, freq: valid ? f.freq : null, filled: f.filled, unstable: f.unstable, click: f.click };
+    if (hp) {
+      info.midi = hp.midi;
+      info.cents = Math.round(hp.cents);
     }
+    if (dt > 0) this.credit(tc - dt / 2, tc + dt / 2, valid ? m : null, sounding(f), !!f.filled, info);
+    this.opts.onFrame?.(info);
+    if (hp) this.onsetFrame(hp.midi, tc);
+    else this.run = null;
     this.settle(this.quarterAt(tc));
     return heard;
   }
@@ -488,11 +717,12 @@ export class BeatFollower {
    */
   finish(t: number): FollowSummary | null {
     if (this.done) return this.passes[this.passes.length - 1] ?? null;
-    // was der Glätter noch zurückhält, zählt mit
-    for (const f of this.smoother.flush()) this.take(f);
+    // was Glätter und Klick-Filter noch zurückhalten, zählt mit
+    for (const f of this.smoother.flush()) for (const g of this.clicks.push(f)) this.take(g);
+    for (const g of this.clicks.flush()) this.take(g);
     if (this.done) return this.passes[this.passes.length - 1] ?? null;
     const g = this.quarterAt(t - this.cfg.latencyMs);
-    this.settle(g);
+    this.settle(g, true);
     if (this.done) return this.passes[this.passes.length - 1] ?? null;
     const local = g - this.pass * this.L;
     const tones = this.tl.tones;
@@ -507,15 +737,35 @@ export class BeatFollower {
   }
 
   private newPass(): PassState {
-    const n = this.tl.tones.length;
-    return { ms: Array(n).fill(0), q: Array(n).fill(0), hit: Array(n).fill(false), results: [], next: 0 };
+    const acc = this.tl.tones.map(
+      (): NoteAcc => ({ q: 0, targetMs: 0, otherMs: 0, silentMs: 0, centsSum: 0, centsMs: 0, other: new Map(), onset: null, hit: false }),
+    );
+    return { acc, results: [], next: 0 };
   }
 
-  /** Erkannte Zeit [ta, tb] (ms, korrigiert) mit gebrochener MIDI-Nummer m gutschreiben */
-  private credit(ta: number, tb: number, m: number): void {
+  private get msPerQ(): number {
+    return this.anchor.spq * 1000;
+  }
+
+  /** Gewerteter Teil der Note i in Vierteln (relativ zum Durchgang) */
+  private part(i: number): [number, number] {
+    const n = this.tl.tones[i];
+    const durMs = n.dur * this.msPerQ;
+    const head = Math.min(this.cfg.headMs, 0.3 * durMs) / this.msPerQ;
+    return [n.start + head, n.start + n.dur * (1 - this.cfg.tailShare)];
+  }
+
+  /**
+   * Frame-Intervall [ta, tb] (ms, korrigiert) gutschreiben: m gebrochene MIDI-Nummer (null ohne gültigen
+   * Ton), snd: klingt trotzdem etwas (unklar statt Stille).
+   */
+  private credit(ta: number, tb: number, m: number | null, snd: boolean, filled: boolean, info: JudgedFrame): void {
     const ga = this.quarterAt(ta);
     const gb = this.quarterAt(tb);
-    if (gb <= 0) return;
+    if (gb <= 0) {
+      info.cls = m === null ? (snd ? "unklar" : "still") : undefined;
+      return;
+    }
     const msPerQ = (tb - ta) / (gb - ga);
     const local0 = ga - this.pass * this.L;
     const local1 = gb - this.pass * this.L;
@@ -523,13 +773,40 @@ export class BeatFollower {
     for (let i = this.cur.next; i < tones.length; i++) {
       const n = tones[i];
       if (n.start >= local1) break;
-      const ov = Math.min(local1, n.start + n.dur) - Math.max(local0, n.start);
-      if (ov <= 0) continue;
-      if (Math.abs((m - n.midi) * 100) > this.cfg.toleranceCents) continue;
-      this.cur.q[i] += ov;
-      this.cur.ms[i] += ov * msPerQ;
-      if (!this.cur.hit[i] && this.enough(i)) {
-        this.cur.hit[i] = true;
+      if (Math.min(local1, n.start + n.dur) - Math.max(local0, n.start) <= 0) continue;
+      const a = this.cur.acc[i];
+      const [p0, p1] = this.part(i);
+      const ovFull = Math.min(local1, n.start + n.dur) - Math.max(local0, n.start);
+      const ovPart = Math.max(0, Math.min(local1, p1) - Math.max(local0, p0)) * msPerQ;
+      let cls: JudgedFrame["cls"];
+      if (m === null) {
+        cls = snd ? "unklar" : "still";
+        if (!snd) a.silentMs += ovPart;
+      } else {
+        const nominal = (m - n.midi) * 100;
+        const dev = nominal - this.tuning.offsetOf(n.midi);
+        if (Math.abs(dev) < this.cfg.toleranceCents) {
+          cls = "ziel";
+          a.q += ovFull;
+          a.targetMs += ovPart;
+          a.centsSum += nominal * ovFull;
+          a.centsMs += ovFull;
+          if (!filled) this.tuning.observe(n.midi, nominal);
+        } else if (Math.abs(Math.round(nominal / 100)) === 12) {
+          cls = "oktave";
+        } else {
+          cls = "anders";
+          a.otherMs += ovPart;
+          const r = Math.round(m);
+          a.other.set(r, (a.other.get(r) ?? 0) + ovPart);
+        }
+      }
+      if (info.note === undefined) {
+        info.note = i;
+        info.cls = cls;
+      }
+      if (!a.hit && this.enough(i)) {
+        a.hit = true;
         this.opts.onHit?.(i, this.pass);
       }
     }
@@ -538,8 +815,44 @@ export class BeatFollower {
     // ruckelnder Hauptthread), beginnt es nicht an der Grenze, sonst würde Ungehörtes gutgeschrieben.
     if (this.opts.loop && local1 > this.L) {
       const pass = this.pass;
-      this.settle((pass + 1) * this.L);
-      if (this.pass > pass) this.credit(Math.max(ta, this.anchorTimeOf(this.pass * this.L)), tb, m);
+      this.settle((pass + 1) * this.L, true);
+      if (this.pass > pass) this.credit(Math.max(ta, this.anchorTimeOf(this.pass * this.L)), tb, m, snd, filled, info);
+    }
+  }
+
+  /** Gültiger Frame mit gehörtem Ton midi zur korrigierten Zeit tc: Einsätze verfolgen */
+  private onsetFrame(midi: number, tc: number): void {
+    const cfg = this.cfg;
+    let r = this.run;
+    if (!r || r.midi !== midi || tc - r.last > 2 * cfg.frameMs + 1) r = this.run = { midi, start: tc, last: tc, used: false };
+    r.last = tc;
+    if (r.used || r.last - r.start + cfg.frameMs < cfg.onsetHoldMs) return;
+    // dem nächstgelegenen passenden Notenbeginn zuordnen (höchstens einer je Einsatz)
+    const tones = this.tl.tones;
+    let best = -1;
+    let bestD = Infinity;
+    for (let i = this.cur.next; i < tones.length; i++) {
+      const n = tones[i];
+      const d = r.start - this.anchorTimeOf(this.pass * this.L + n.start);
+      if (d < -cfg.onsetWindowMs) break;
+      // zu früh bei kurzen Noten höchstens eine halbe Note (sonst gälte ein eine Sechzehntel zu früh
+      // gespielter Ton für die nächste Note); zu spät bis onsetWindowMs, höchstens eine ganze Note – der
+      // erste klare Frame kommt wegen des unklaren Einsatzes („Chiff“) ohnehin etwas später
+      const durMs = n.dur * this.msPerQ;
+      const win = d < 0 ? Math.min(cfg.onsetWindowMs, 0.5 * durMs) : Math.min(cfg.onsetWindowMs, durMs);
+      if (n.midi !== midi || this.cur.acc[i].onset !== null || Math.abs(d) > win) continue;
+      if (Math.abs(d) < Math.abs(bestD)) {
+        best = i;
+        bestD = d;
+      }
+    }
+    r.used = true;
+    if (best < 0) return;
+    const a = this.cur.acc[best];
+    a.onset = bestD;
+    if (!a.hit && this.enough(best)) {
+      a.hit = true;
+      this.opts.onHit?.(best, this.pass);
     }
   }
 
@@ -549,29 +862,64 @@ export class BeatFollower {
     return a.t + (g - a.g) * a.spq * 1000;
   }
 
+  private shareOk(i: number): boolean {
+    const a = this.cur.acc[i];
+    const [p0, p1] = this.part(i);
+    const partMs = (p1 - p0) * this.msPerQ;
+    const need = Math.min(this.cfg.minHitMs, 0.8 * partMs);
+    const base = a.targetMs + a.otherMs + a.silentMs;
+    return a.targetMs >= need - 1e-6 && a.targetMs >= this.cfg.minShare * base - 1e-6;
+  }
+
   private enough(i: number): boolean {
-    const n = this.tl.tones[i];
-    const durMs = n.dur * this.anchor.spq * 1000;
-    const playable = Math.max(durMs - this.cfg.articulationMs, 0);
-    const need = Math.min(Math.max(this.cfg.minCoverage * playable, this.cfg.minHitMs), 0.8 * durMs);
-    return this.cur.ms[i] >= need - 1e-6;
+    return this.shareOk(i) || this.cur.acc[i].onset !== null;
   }
 
   private decide(i: number): void {
     const n = this.tl.tones[i];
-    const result: BeatNoteResult = { ok: this.enough(i), coverage: Math.min(1, this.cur.q[i] / n.dur) };
+    const a = this.cur.acc[i];
+    const [p0, p1] = this.part(i);
+    const share = this.shareOk(i);
+    const ok = share || a.onset !== null;
+    let reason: BeatReason;
+    if (share) reason = "anteil";
+    else if (ok) reason = "einsatz";
+    else if (a.otherMs > a.targetMs && a.otherMs >= a.silentMs) reason = "anderer-ton";
+    else if (a.targetMs === 0 && a.otherMs === 0) reason = "nichts";
+    else reason = "zu-kurz";
+    let otherMidi: number | null = null;
+    let most = 0;
+    for (const [k, v] of a.other) if (v > most) [otherMidi, most] = [k, v];
+    const result: BeatNoteResult = {
+      ok,
+      coverage: Math.min(1, a.q / n.dur),
+      reason,
+      partMs: Math.round((p1 - p0) * this.msPerQ),
+      targetMs: Math.round(a.targetMs),
+      otherMs: Math.round(a.otherMs),
+      silentMs: Math.round(a.silentMs),
+      onsetMs: a.onset === null ? null : Math.round(a.onset),
+      cents: a.centsMs > 0 ? Math.round(a.centsSum / a.centsMs) : null,
+      otherMidi,
+    };
     this.cur.results[i] = result;
     this.opts.onNote?.(i, result, this.pass);
   }
 
-  /** Alle Noten abschließend werten, deren Fenster vor der Stelle g (Viertel) zu Ende ist. */
-  private settle(g: number): void {
+  /**
+   * Alle Noten abschließend werten, deren Fenster vor der Stelle g (Viertel) zu Ende ist und deren
+   * Einsatz-Fenster vorbei ist (now: ohne auf späte Einsätze zu warten, z. B. beim Stopp).
+   */
+  private settle(g: number, now = false): void {
     const tones = this.tl.tones;
+    const cfg = this.cfg;
+    const waitQ = (cfg.onsetWindowMs + cfg.onsetHoldMs + cfg.frameMs) / this.msPerQ;
     while (!this.done) {
       const local = g - this.pass * this.L;
       while (this.cur.next < tones.length) {
         const n = tones[this.cur.next];
         if (n.start + n.dur > local + 1e-9) break;
+        if (!now && n.start + waitQ > local + 1e-9) break;
         this.decide(this.cur.next++);
       }
       if (this.cur.next < tones.length || local < this.L - 1e-9) return;
@@ -585,6 +933,7 @@ export class BeatFollower {
       }
       this.pass++;
       this.cur = this.newPass();
+      this.run = null;
     }
   }
 }

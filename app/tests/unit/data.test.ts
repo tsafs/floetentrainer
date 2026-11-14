@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DATA_VERSION, defaultData, normalizeData } from "../../src/store/data";
-import { backupJson, loadData, parseBackup, saveData, STORAGE_KEY } from "../../src/store/storage";
+import { activeFlute, DATA_VERSION, defaultData, newFluteId, normalizeData } from "../../src/store/data";
+import { backupJson, keepDeviceSettings, loadData, parseBackup, saveData, STORAGE_KEY } from "../../src/store/storage";
 import { TODAY } from "./helpers";
 
 class MemStorage {
@@ -72,7 +72,9 @@ describe("Umwandlung und Prüfung", () => {
   it("Einstellungen werden auf sinnvolle Grenzen gebracht", () => {
     const d = normalizeData({ version: 1, settings: { toleranceCents: 500, tuningHz: 442 } });
     expect(d.settings.toleranceCents).toBe(50);
-    expect(d.settings.tuningHz).toBe(442);
+    // der alte Stimmton für alle wird zum (unbekannten) Stimmton der Flöte
+    expect(activeFlute(d).tuning).toEqual({ hz: 442, known: false });
+    expect("tuningHz" in d.settings).toBe(false);
     expect(d.settings.sessionCards).toBe(20);
   });
   it("Darstellung: auto, hell oder dunkel; Unbekanntes fällt auf auto zurück", () => {
@@ -125,7 +127,8 @@ describe("Mitspielen: Einstellungen; alte Bestwerte werden still verworfen", () 
     const d = normalizeData({ version: 2, app: "floetentrainer", settings: { tuningHz: 442 } });
     expect(d.version).toBe(DATA_VERSION);
     expect(DATA_VERSION).toBe(2);
-    expect(d.settings).toMatchObject({ tuningHz: 442, headphones: false, followMode: "wait" });
+    expect(d.settings).toMatchObject({ headphones: false, followMode: "wait" });
+    expect(activeFlute(d).tuning.hz).toBe(442);
   });
 
   it("Kopfhörer und Art werden übernommen, Fehlerhaftes fällt still auf den Standard zurück", () => {
@@ -157,5 +160,62 @@ describe("Mitspielen: Einstellungen; alte Bestwerte werden still verworfen", () 
     expect(back.settings).toMatchObject({ headphones: true, followMode: "beat" });
     expect(back.songs["jingle-bells"]).toEqual({ tempo: 80 });
     expect(JSON.parse(backupJson(back)).songs["jingle-bells"].best).toBeUndefined();
+  });
+});
+
+describe("Flöten und Verzögerung (ohne Versionssprung)", () => {
+  it("Standard: eine Flöte „Meine Flöte“ ohne Werte; ältere Daten ohne Feld bekommen sie", () => {
+    const d = defaultData();
+    expect(d.flutes).toEqual([{ id: "floete-1", name: "Meine Flöte", tuning: { hz: 440, known: false }, offsets: {}, updated: 0 }]);
+    expect(d.activeFlute).toBe("floete-1");
+    expect(d.settings.inputLatencyMs).toEqual({ speaker: null, headphones: null });
+    const old = normalizeData({ version: 2, settings: { tuningHz: 442 } });
+    expect(old.flutes.length).toBe(1);
+    expect(activeFlute(old).name).toBe("Meine Flöte");
+    expect(old.settings.inputLatencyMs).toEqual({ speaker: null, headphones: null });
+    expect(DATA_VERSION).toBe(2);
+  });
+
+  it("Flöten hin und zurück über die Sicherung; Fehlerhaftes fällt still weg, Werte begrenzt", () => {
+    const d = defaultData();
+    d.flutes = [
+      { id: "floete-1", name: "Meine Flöte", tuning: { hz: 432.4, known: false }, offsets: { a1: -2.5, e1: 12 }, updated: 5 },
+      { id: "floete-2", name: "Holzflöte", tuning: { hz: 442, known: true }, offsets: {}, updated: 0 },
+    ];
+    d.activeFlute = "floete-2";
+    const back = parseBackup(backupJson(d));
+    expect(back.flutes).toEqual(d.flutes);
+    expect(back.activeFlute).toBe("floete-2");
+    const messy = normalizeData({
+      version: 2,
+      flutes: [
+        { id: "floete-1", name: "  ", tuning: { hz: 500, known: "ja" }, offsets: { a1: -300, xx: 3, dis1: 4, h1: "a" } },
+        { id: "floete-1", name: "doppelt" },
+        { id: "boese id", name: "x" },
+        "kaputt",
+      ],
+      activeFlute: "floete-9",
+    });
+    expect(messy.flutes).toEqual([{ id: "floete-1", name: "Meine Flöte", tuning: { hz: 466, known: false }, offsets: { a1: -120 }, updated: 0 }]);
+    expect(messy.activeFlute).toBe("floete-1");
+    expect(newFluteId(back.flutes)).toBe("floete-3");
+  });
+
+  it("Verzögerung je Kopfhörer-Zustand gehört zum Gerät: nicht in der Sicherung, beim Einlesen bleibt der Wert des Geräts", () => {
+    const d = defaultData();
+    d.settings.inputLatencyMs = { speaker: 140, headphones: 260 };
+    const json = backupJson(d);
+    expect(JSON.parse(json).settings.inputLatencyMs).toBeUndefined();
+    const other = defaultData();
+    other.settings.inputLatencyMs = { speaker: 90, headphones: null };
+    const incoming = parseBackup(json);
+    expect(incoming.settings.inputLatencyMs).toEqual({ speaker: null, headphones: null });
+    expect(keepDeviceSettings(incoming, other).settings.inputLatencyMs).toEqual({ speaker: 90, headphones: null });
+    // im Speicher des Geräts bleibt sie erhalten (begrenzt auf 0–400 ms)
+    const s = mem();
+    saveData(d, s);
+    const r = loadData(s);
+    expect(r.ok && r.data.settings.inputLatencyMs).toEqual({ speaker: 140, headphones: 260 });
+    expect(normalizeData({ version: 2, settings: { inputLatencyMs: { speaker: 900, headphones: "x" } } }).settings.inputLatencyMs).toEqual({ speaker: 400, headphones: null });
   });
 });

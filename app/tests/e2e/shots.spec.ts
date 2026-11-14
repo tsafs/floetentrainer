@@ -280,3 +280,159 @@ for (const s of SIZES) {
     });
   });
 }
+
+// Mitspielen robuster: Verzögerung abgleichen, Flöte (Hinweis, Einstellungen, Einstellen), Diagnose.
+// Nur 360×740 und quer 740×360 (SCHEME=dark für dunkel).
+for (const s of SIZES.filter((x) => x.name === "360x740" || x.name === "740x360")) {
+  test.describe(`robust ${s.name}`, () => {
+    test.use({ viewport: { width: s.width, height: s.height }, deviceScaleFactor: 2, colorScheme: scheme });
+    test("Flöte und Verzögerung", async ({ page }) => {
+      test.setTimeout(120_000);
+      await page.addInitScript(FAKE_AUDIO);
+      await page.addInitScript(FAKE_MIC);
+      await seed(page, { ...sampleData(), version: 2 });
+      const p = (x: string) => `${OUT}/${scheme}-${s.name}-${x}.png`;
+      type Dbg = { started: boolean; running: boolean; cal: { clicks: number[] | null; state: string } | null; timeline: { tones: { midi: number }[] } | null };
+      const dbg = () => page.evaluate(() => (window as unknown as { __lied: { follow(): Dbg } }).__lied.follow());
+      const schedule = (list: [number, number | null][]) =>
+        page.evaluate((l) => (window as unknown as { __osc: { schedule(l: [number, number | null][]): void } }).__osc.schedule(l), list);
+      const now = () => page.evaluate(() => performance.now());
+      const hz = (m: number, c = 0) => soundingFreq(m) * Math.pow(2, c / 1200);
+      // Mitspiel-Bereich im Takt: Flöte noch nicht eingestellt, Verzögerung Standard
+      await page.goto("./#/lied/jingle-bells");
+      await page.evaluate(() => document.fonts.ready);
+      await page.getByRole("tab", { name: "Mitspielen" }).click();
+      await page.getByRole("button", { name: "Im Takt" }).click();
+      await page.waitForTimeout(200);
+      await page.screenshot({ path: p("r1-mitspielen-floete-tipp") });
+      // Abgleich: Start, Messung, Ergebnis
+      await page.getByRole("button", { name: "abgleichen" }).click();
+      await page.waitForTimeout(150);
+      await page.screenshot({ path: p("r2-abgleich-start") });
+      await page.getByRole("button", { name: "Abgleich starten" }).click();
+      await page.waitForFunction(() => !!(window as unknown as { __lied: { follow(): Dbg } }).__lied.follow().cal?.clicks);
+      const clicks = (await dbg()).cal!.clicks!;
+      await schedule(clicks.flatMap((c): [number, number | null][] => [[c + 140, hz(69)], [c + 340, null]]));
+      await page.waitForFunction((t) => performance.now() > t, clicks[4] + 300);
+      await page.screenshot({ path: p("r3-abgleich-laeuft") });
+      await expect(page.getByTestId("fcal-text")).toContainText("Dein Handy hört", { timeout: 15000 });
+      await page.screenshot({ path: p("r4-abgleich-ergebnis") });
+      await page.getByRole("button", { name: "Fertig" }).click();
+      // Flöte mit Werten (etwa 30 Cent tief), Takt 1 im Warte-Modus, danach Diagnose-Link
+      await page.evaluate(() => {
+        const ft = (window as unknown as { __ft: { data: { flutes: { offsets: Record<string, number> }[] }; save(): void } }).__ft;
+        ft.data.flutes[0].offsets = { d1: -28, e1: -35, g1: -30, a1: -32, h1: -26, c2: -30, d2: -29 };
+        ft.save();
+      });
+      await page.getByRole("button", { name: "Wartet auf mich" }).click();
+      await page.locator('rect.takt[data-bar="0"]').click();
+      await page.getByRole("button", { name: "Takt 1 mitspielen" }).click();
+      await page.waitForFunction(() => (window as unknown as { __lied: { follow(): Dbg } }).__lied.follow().started);
+      await page.waitForFunction(() => (window as unknown as { __osc: unknown }).__osc !== null);
+      const tones = (await dbg()).timeline!.tones;
+      let t = (await now()) + 150;
+      const list: [number, number | null][] = [];
+      for (const n of tones) {
+        list.push([t, hz(n.midi, -30)], [t + 300, null]);
+        t += 450;
+      }
+      await schedule(list);
+      await page.waitForFunction(() => !(window as unknown as { __lied: { follow(): Dbg } }).__lied.follow().running, null, { timeout: 10000 });
+      await page.waitForTimeout(200);
+      await page.screenshot({ path: p("r5-mitspielen-floete-diagnose") });
+      // Stimmgerät mit Wert der Flöte
+      await page.goto("./#/");
+      await page.getByRole("link", { name: "Stimmgerät" }).click();
+      await page.waitForFunction(() => (window as unknown as { __osc: unknown }).__osc !== null);
+      await page.evaluate((f) => (window as unknown as { __osc: { play(f: number): void } }).__osc.play(f), hz(69, -32));
+      await expect(page.getByTestId("tuner-flute")).not.toHaveText("");
+      await page.waitForTimeout(300);
+      await page.screenshot({ path: p("r6-stimmgeraet-floete") });
+      await page.evaluate(() => (window as unknown as { __osc: { silence(): void } }).__osc.silence());
+      // Einstellungen: Abschnitt Flöte, zweite Flöte, Umbenennen, Löschen
+      await page.goto("./#/einstellungen");
+      await page.getByRole("button", { name: "Flöte hinzufügen" }).click();
+      await page.getByTestId("flute-new-name").fill("Holzflöte");
+      await page.getByRole("heading", { name: "Flöte", exact: true }).scrollIntoViewIfNeeded();
+      await page.evaluate(() => window.scrollBy(0, -12));
+      await page.screenshot({ path: p("r7-einstellungen-floete-neu") });
+      await page.getByRole("button", { name: "Flöte anlegen" }).click();
+      await page.getByRole("heading", { name: "Flöte", exact: true }).scrollIntoViewIfNeeded();
+      await page.evaluate(() => window.scrollBy(0, -12));
+      await page.screenshot({ path: p("r8-einstellungen-floete") });
+      await page.getByRole("button", { name: "Löschen" }).click();
+      await page.screenshot({ path: p("r9-einstellungen-floete-loeschen") });
+      await page.getByRole("button", { name: "Abbrechen" }).first().click();
+      await page.getByRole("radio", { name: /Meine Flöte/ }).click();
+      // Flöte einstellen: messen, Ergebnis, fertig
+      await page.getByRole("button", { name: "„Meine Flöte“ einstellen" }).click();
+      await page.waitForFunction(() => !!(window as unknown as { __floete?: unknown }).__floete);
+      await page.waitForFunction(() => (window as unknown as { __osc: unknown }).__osc !== null);
+      await page.evaluate(() => document.fonts.ready);
+      const ids = await page.evaluate(() => (window as unknown as { __floete: { ids: string[] } }).__floete.ids);
+      const midiOf: Record<string, number> = { d1: 62, e1: 64, fis1: 66, g1: 67, a1: 69, h1: 71, c2: 72, d2: 74 };
+      const t0 = (await now()) + 200;
+      await schedule(ids.flatMap((id, k): [number, number | null][] => [[t0 + k * 3800, hz(midiOf[id], -24 - (k % 3) * 4)], [t0 + 2200 + k * 3800, null]]));
+      await page.waitForFunction((x) => performance.now() > x, t0 + 900);
+      await page.screenshot({ path: p("r10-floete-einstellen-messen") });
+      await expect(page.locator("main[data-phase='done']")).toBeVisible({ timeout: 5000 });
+      await page.screenshot({ path: p("r11-floete-einstellen-ergebnis") });
+      await expect(page.locator("main[data-phase='fertig']")).toBeVisible({ timeout: 40000 });
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.screenshot({ path: p("r12-floete-einstellen-fertig") });
+      await page.screenshot({ path: p("r12-floete-einstellen-fertig-ganz"), fullPage: true });
+    });
+  });
+}
+
+// Stimmton je Flöte: Einstellungen (bekannt/unbekannt), Neuanlegen-Frage, Flöte einstellen, Stimmgerät.
+// Nur 360×740 und quer 740×360 (SCHEME=dark für dunkel).
+for (const s of SIZES.filter((x) => x.name === "360x740" || x.name === "740x360")) {
+  test.describe(`stimmton ${s.name}`, () => {
+    test.use({ viewport: { width: s.width, height: s.height }, deviceScaleFactor: 2, colorScheme: scheme });
+    test("Stimmton der Flöte", async ({ page }) => {
+      test.setTimeout(90_000);
+      await page.addInitScript(FAKE_MIC);
+      const kid = 440 * 2 ** (-30 / 1200);
+      await seed(page, {
+        ...sampleData(),
+        version: 2,
+        flutes: [
+          { id: "floete-1", name: "Kinderflöte", tuning: { hz: kid, known: false }, offsets: { d1: 2, e1: -15, fis1: 8, g1: 0, a1: 3, h1: -4, c2: 6, d2: -2 }, updated: 1 },
+          { id: "floete-2", name: "Neue Flöte", tuning: { hz: 442, known: true }, offsets: { g1: -18, a1: -12, h1: -20, c2: -9 }, updated: 1 },
+        ],
+        activeFlute: "floete-1",
+      });
+      const p = (x: string) => `${OUT}/${scheme}-${s.name}-${x}.png`;
+      const toFlute = async () => {
+        await page.evaluate(() => window.scrollBy(0, (document.querySelector(".settings h2 + .flutes")!.previousElementSibling as HTMLElement).getBoundingClientRect().top - 12));
+      };
+      await page.goto("./#/einstellungen");
+      await page.evaluate(() => document.fonts.ready);
+      await toFlute();
+      await page.screenshot({ path: p("s1-einstellungen-stimmton-unbekannt") });
+      await page.getByRole("radio", { name: /Neue Flöte/ }).click();
+      await toFlute();
+      await page.screenshot({ path: p("s2-einstellungen-stimmton-bekannt") });
+      await page.getByRole("button", { name: "Flöte hinzufügen" }).click();
+      await page.getByTestId("flute-new-name").fill("Altflöte");
+      await toFlute();
+      await page.screenshot({ path: p("s3-neue-floete-frage") });
+      await page.getByTestId("flute-add").getByRole("button", { name: "442 Hz" }).click();
+      await toFlute();
+      await page.screenshot({ path: p("s4-neue-floete-442") });
+      await page.getByRole("button", { name: "Abbrechen" }).click();
+      // Flöte einstellen (bekannt, mit Angebot) und Stimmgerät
+      await page.goto("./#/floete");
+      await page.evaluate(() => document.fonts.ready);
+      await page.screenshot({ path: p("s5-floete-einstellen-bekannt"), fullPage: true });
+      await page.goto("./#/stimmgeraet");
+      await page.getByRole("button", { name: "Mikrofon einschalten" }).click();
+      await page.waitForFunction(() => (window as unknown as { __osc: unknown }).__osc !== null);
+      await page.evaluate((f) => (window as unknown as { __osc: { play(f: number): void } }).__osc.play(f), soundingFreq(69, 442) * 2 ** (-12 / 1200));
+      await expect(page.getByTestId("tuner-flute")).not.toHaveText("");
+      await page.waitForTimeout(300);
+      await page.screenshot({ path: p("s6-stimmgeraet-floete") });
+    });
+  });
+}

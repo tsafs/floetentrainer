@@ -18,19 +18,29 @@
 // - Takt-Modus: Der Abspieler zählt ein und klickt leise im Tempo, ohne Melodie (mit Kopfhörern leise
 //   mit Melodie); Markierung und Balken laufen mit, jede Note wird nach ihrem Ende grün oder rot.
 //   Im Warte-Modus steht der Balken an der Note, auf die gewartet wird.
+// Unter dem großen Knopf klein: die aktive Flöte (Link zu den Einstellungen) mit ihrem Stimmton (z. B.
+// „442 Hz“ bzw. ermittelt „etwa 432,5 Hz, wird ausgeglichen“; Tipp „Flöte einstellen“, solange sie keine
+// Werte hat). Alles – Wertung, Klicks, mitklingende Melodie – gilt im Stimmton der aktiven Flöte. Im
+// Takt-Modus die Verzögerung
+// mit „abgleichen“ (Abgleich-Feld .fcal, ../audio/latency.ts; je Kopfhörer-Zustand ein Wert) und nach
+// einem Durchgang „Diagnose speichern“ (../audio/diagnose.ts: nur Messwerte, kein Ton).
 // Mikrofon und AudioContext starten erst beim Tippen auf „Mitspielen“; nach dem Durchgang, beim Stopp,
 // beim Wechsel in den Hintergrund und beim Verlassen der Seite gehen Mikrofon und Klicks wieder aus.
 // Die Lernspuren bleiben unberührt; gespeichert werden nur Art, Kopfhörer und Tempo.
 
-import { BeatFollower, followConfig, WaitFollower } from "../audio/follow";
+import { diag, offerDiag } from "../audio/diagnose";
+import { LiveTuning } from "../audio/flute-profile";
+import { BeatFollower, DEFAULT_FOLLOW, followConfig, inputLatency, LATENCY_MAX, LATENCY_MIN, WaitFollower } from "../audio/follow";
+import { CAL_CLICKS, CAL_COUNT_IN, CAL_SPQ, DEFAULT_LATENCY, latencyFromOnsets, OnsetDetector } from "../audio/latency";
 import { keepAwake, mic } from "../audio/mic";
-import { heardAtPerf, songPlayer } from "../audio/song-player";
+import { heardAtPerf, outputClock, songPlayer } from "../audio/song-player";
 import { midiNameHtml, nameHtml } from "../music/names";
 import type { NoteEvent, Song } from "../songs/model";
 import { clampPercent, secPerQuarter, TEMPO_MAX, TEMPO_MIN } from "../songs/tempo";
 import { sectionTimeline, type Timeline } from "../songs/timeline";
-import type { FollowMode } from "../store/data";
-import type { Ctx } from "./common";
+import { A4, centsBetween, recenter, tuningShort } from "../music/tuning";
+import { activeFlute, tuningHz, type FollowMode } from "../store/data";
+import { esc, type Ctx } from "./common";
 
 /** Lautstärke der mitlaufenden Melodie (Takt-Modus mit Kopfhörern) relativ zum Vorspielen */
 export const MELODY_VOL = 0.35;
@@ -44,6 +54,10 @@ export const PREVIEW_VOL = 0.4;
 const PREVIEW_SEC = 0.7;
 /** Schritt der Tempo-Knöpfe (Prozent) */
 const TEMPO_STEP = 5;
+/** Schritt des feinen Schiebers der Verzögerung (ms) */
+const LATENCY_STEP = 10;
+/** Abstand eines ermittelten Stimmtons von 440 Hz (Cent), ab dem „wird ausgeglichen“ dabeisteht */
+const FLUTE_NOTE_CENTS = 8;
 
 const ICON_PLAY_SM = `<svg width="18" height="18" viewBox="0 0 26 26" aria-hidden="true"><path d="M8.5 5.2v15.6L21 13z"/></svg>`;
 const ICON_STOP = `<svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><rect x="7" y="7" width="12" height="12" rx="1.6"/></svg>`;
@@ -113,6 +127,26 @@ export function followBarHtml(): string {
           ${tempoStepHtml("fset-tempo")}
           <button class="big fgo" data-act="fstart">${ICON_PLAY_SM}<span data-testid="follow-go">Mitspielen</span></button>
         </div>
+        <div class="fmeta">
+          <p class="fline" data-testid="flute-line"></p>
+          <div class="fline2">
+            <p class="fline" data-testid="latency-line"></p>
+            <button class="clear fdiag" data-act="diag" data-testid="diag" hidden>Diagnose speichern</button>
+          </div>
+        </div>
+      </div>
+      <div class="fcal" data-testid="fcal" hidden>
+        <div class="fcalhead"><h3>Verzögerung abgleichen</h3><span class="fcalfor" data-testid="fcal-for"></span></div>
+        <p class="fcaltext" data-testid="fcal-text" aria-live="polite"></p>
+        <div class="fdots" data-testid="fcal-dots" aria-hidden="true"></div>
+        <div class="fcalval">
+          <div class="stepper" role="group" aria-label="Verzögerung"><button data-lat="-1" aria-label="weniger">−</button><output data-testid="fcal-val"></output><button data-lat="1" aria-label="mehr">+</button></div>
+          <button class="clear" data-act="lat-default">Standard</button>
+        </div>
+        <div class="fcalbtns">
+          <button class="big alt" data-act="lat-close">Fertig</button>
+          <button class="big" data-act="lat-start">Abgleich starten</button>
+        </div>
       </div>
       <div class="frun" hidden>
         <button class="playbtn on" data-act="fstop" aria-label="Stopp">${ICON_STOP}</button>
@@ -181,6 +215,17 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
   const goBtn = q<HTMLButtonElement>('[data-act="fstart"]');
   const goText = q<HTMLElement>('[data-testid="follow-go"]');
   const tempoBoxes = [...el.querySelectorAll<HTMLElement>(".tstep")];
+  const fluteLine = q<HTMLElement>('[data-testid="flute-line"]');
+  const latLine = q<HTMLElement>('[data-testid="latency-line"]');
+  const diagBtn = q<HTMLButtonElement>('[data-act="diag"]');
+  const fcal = q<HTMLElement>(".fcal");
+  const fcalFor = q<HTMLElement>('[data-testid="fcal-for"]');
+  const fcalText = q<HTMLElement>('[data-testid="fcal-text"]');
+  const fcalDots = q<HTMLElement>('[data-testid="fcal-dots"]');
+  const fcalVal = q<HTMLElement>('[data-testid="fcal-val"]');
+  const fcalVals = q<HTMLElement>(".fcalval");
+  const latClose = q<HTMLButtonElement>('[data-act="lat-close"]');
+  const latStart = q<HTMLButtonElement>('[data-act="lat-start"]');
 
   let active = false;
   let mode: FollowMode = settings.followMode;
@@ -190,12 +235,30 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
     tl: Timeline;
     wait?: WaitFollower;
     beat?: BeatFollower;
+    /** Abweichungen der Flöte, im Durchgang nachgeführt */
+    tuning?: LiveTuning;
     unlisten?: () => void;
     started: boolean;
     /** Takt-Modus: Beginn des Zeitplans (ms, Uhr der Frames) */
     startMs: number | null;
   } | null = null;
   let shownMidi: number | null | undefined;
+  /**
+   * Abgleich der Verzögerung: null = zu; intro (Erklärung, Wert, Start), running (Klicks laufen),
+   * result (Ergebnis oder Fehlschlag). Gemessen wird für den Kopfhörer-Zustand beim Start (which).
+   */
+  let cal: {
+    state: "intro" | "running" | "result";
+    which: "speaker" | "headphones";
+    ok?: boolean;
+    clicks?: number[];
+    det?: OnsetDetector;
+    hits?: boolean[];
+    passed?: number;
+    unlisten?: () => void;
+    timer?: number;
+  } | null = null;
+  let diagMsg = "";
 
   // ------------------------------------------------------------ Anzeige
   const showNote = (midi: number | null, id?: string) => {
@@ -257,8 +320,72 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
       selBox.hidden = !sec;
       selText.innerHTML = sec ? `${barRangeText(sec)}<span class="gw"> gewählt</span>` : "";
       goText.textContent = sec ? `${barRangeText(sec)} mitspielen` : "Mitspielen";
+      renderMeta();
+      renderCal();
     }
     host.changed();
+  };
+
+  /** Zeilen unter dem großen Knopf: Flöte, Verzögerung (Takt-Modus), Diagnose */
+  const renderMeta = () => {
+    const fl = activeFlute(ctx.data);
+    const name = `<a href="#/einstellungen" data-testid="flute-name">${esc(fl.name)}</a>`;
+    const hz = tuningShort(fl);
+    const tip = `Tipp: <a href="#/floete">Flöte einstellen</a>, dann wird genauer gewertet.`;
+    if (!Object.keys(fl.offsets).length) {
+      fluteLine.innerHTML = `Flöte: ${name}${hz ? ` · ${hz}` : ""} · ${tip}`;
+    } else if (!fl.tuning.known && Math.abs(centsBetween(fl.tuning.hz, A4)) >= FLUTE_NOTE_CENTS) {
+      fluteLine.innerHTML = `Flöte: ${name} · ${hz}, wird ausgeglichen`;
+    } else {
+      fluteLine.innerHTML = `Flöte: ${name} · ${hz}, eingestellt`;
+    }
+    const lat = inputLatency(settings);
+    latLine.hidden = mode !== "beat";
+    latLine.innerHTML =
+      `Verzögerung ${lat.ms} ms ` +
+      (lat.calibrated ? "" : settings.headphones ? "<span class=\"warn\">· mit Kopfhörern noch nicht abgeglichen</span> " : "(Standard) ") +
+      `· <button class="clear" data-act="lat-open">${lat.calibrated ? "ändern" : "abgleichen"}</button>`;
+    diagBtn.hidden = !diag.available;
+    diagBtn.textContent = diagMsg || "Diagnose speichern";
+    (latLine.parentElement as HTMLElement).hidden = latLine.hidden && diagBtn.hidden;
+  };
+
+  /** Abgleich-Feld zeichnen */
+  const renderCal = () => {
+    const open = active && !!cal;
+    fcal.hidden = !open;
+    if (!cal) return;
+    fset.hidden = true;
+    frun.hidden = true;
+    const which = cal.which;
+    fcalFor.textContent = which === "headphones" ? "mit Kopfhörern" : "ohne Kopfhörer";
+    const lat = inputLatency({ ...settings, headphones: which === "headphones" });
+    fcalVal.textContent = `${lat.ms} ms`;
+    for (const b of fcalVals.querySelectorAll<HTMLButtonElement>("[data-lat]")) {
+      const d = Number(b.dataset.lat);
+      b.disabled = d < 0 ? lat.ms <= LATENCY_MIN : lat.ms >= LATENCY_MAX;
+    }
+    (fcalVals.querySelector('[data-act="lat-default"]') as HTMLElement).hidden = !lat.calibrated;
+    fcalVals.hidden = cal.state === "running";
+    fcalDots.hidden = cal.state !== "running";
+    latStart.hidden = cal.state === "running";
+    latClose.textContent = cal.state === "running" ? "Abbrechen" : "Fertig";
+    latStart.textContent = cal.state === "intro" ? "Abgleich starten" : "Nochmal";
+    if (cal.state === "running") {
+      fcalDots.innerHTML = Array.from(
+        { length: CAL_CLICKS },
+        (_, k) => `<i class="${cal!.hits?.[k] ? "hit" : k < (cal!.passed ?? 0) ? "on" : ""}"></i>`,
+      ).join("");
+    }
+    if (cal.state === "intro") {
+      fcalText.textContent =
+        "Nach vier Klicks zum Einzählen klickt es acht Mal. Spiel zu jedem Klick einen kurzen Ton – egal welchen." +
+        (lat.calibrated ? "" : " Bis dahin gilt ein Standardwert.");
+    } else if (cal.state === "result") {
+      fcalText.textContent = cal.ok
+        ? `${which === "headphones" ? "Mit Kopfhörern hört" : "Dein Handy hört"} etwa ${lat.ms} ms verzögert. Mit + und − kannst du den Wert fein einstellen.`
+        : "Das hat nicht geklappt – es kamen zu wenige Töne passend zu den Klicks. Spiel zu jedem Klick einen kurzen, deutlichen Ton.";
+    }
   };
 
   const setStatus = (text: string) => {
@@ -273,6 +400,10 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
     token++;
     run = null;
     r.unlisten?.();
+    if (diag.recording) {
+      diag.end({ t: diag.rel(performance.now()), mic: mic.info(), tuning: r.tuning ? { ...r.tuning.values } : null });
+    }
+    diagMsg = "";
     if (songPlayer.playing) songPlayer.stop();
     else songPlayer.idle();
     mic.stop();
@@ -286,6 +417,7 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
 
   /** Stopp/Hintergrund: Gespieltes bleibt gefärbt, die offene Note wird nicht gewertet */
   const stopRun = () => {
+    if (cal?.state === "running") stopCal(false);
     const r = run;
     if (!r) return;
     if (r.beat) {
@@ -299,6 +431,82 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
     finishRun();
   };
 
+  /** Abweichungen der aktiven Flöte für einen Durchgang (werden darin nachgeführt) */
+  const startTuning = (r: NonNullable<typeof run>) => {
+    const fl = activeFlute(ctx.data);
+    const t = new LiveTuning(fl.offsets, {}, fl.tuning.known);
+    r.tuning = t;
+    return t;
+  };
+
+  /**
+   * Nach einem *vollständigen* Durchgang die nachgeführten Werte (Töne mit mindestens 10 Messungen) in die
+   * aktive Flöte übernehmen. Nur dann: Ein abgebrochener Versuch (oft gerade, weil es nicht klappte) soll
+   * das Profil nicht verschieben. Die Schritte sind klein und je Durchgang begrenzt (LiveTuning). Ein
+   * unbekannter Stimmton wird dabei neu ermittelt (Median der absoluten Lagen, recenter).
+   */
+  const saveTuning = (t: LiveTuning) => {
+    const ch = t.changes();
+    if (!Object.keys(ch).length) return;
+    const fl = activeFlute(ctx.data);
+    Object.assign(fl.offsets, ch);
+    recenter(fl);
+    fl.updated = Date.now();
+    ctx.save();
+  };
+
+  /** Ausgabe-Uhr des Abspielers (für die Diagnose) */
+  const outputInfo = () => {
+    const ac = songPlayer.context;
+    if (!ac) return null;
+    const ts = typeof ac.getOutputTimestamp === "function" ? ac.getOutputTimestamp() : null;
+    const now = performance.now();
+    return {
+      sampleRate: ac.sampleRate,
+      baseLatency: ac.baseLatency,
+      outputLatency: ac.outputLatency,
+      currentTime: ac.currentTime,
+      outputTimestamp: ts ? { contextTime: ts.contextTime, performanceTime: ts.performanceTime } : null,
+      perfNow: now,
+      outputClock: outputClock(ac, now),
+    };
+  };
+
+  /** Diagnose-Aufnahme für einen Durchgang beginnen (nur Messwerte) */
+  const beginDiag = (kind: "warten" | "takt" | "abgleich", t0: number, tl: Timeline | null, beat: { startMs: number; spq: number } | null) => {
+    const fl = activeFlute(ctx.data);
+    const lat = inputLatency(settings);
+    const sec = host.section();
+    diag.begin(kind, t0, {
+      song: song.title,
+      songId: song.id,
+      section: sec ? barRangeText(sec) : null,
+      percent: host.percent(),
+      tuningHz: fl.tuning.hz,
+      tuningKnown: fl.tuning.known,
+      headphones: settings.headphones,
+      latencyMs: lat.ms,
+      latencyCalibrated: lat.calibrated,
+      flute: { name: fl.name, tuning: { ...fl.tuning }, offsets: { ...fl.offsets } },
+      minClarity: DEFAULT_FOLLOW.minClarity,
+      startMs: beat ? diag.rel(beat.startMs) : null,
+      spq: beat?.spq ?? null,
+      tones: tl
+        ? tl.tones.map((n) => ({
+            midi: n.midi,
+            start: n.start,
+            dur: n.dur,
+            ...(beat ? { fromMs: Math.round(beat.startMs - t0 + n.start * beat.spq * 1000), toMs: Math.round(beat.startMs - t0 + (n.start + n.dur) * beat.spq * 1000) } : {}),
+          }))
+        : [],
+      mic: mic.info(),
+      output: outputInfo(),
+      userAgent: navigator.userAgent,
+      screen: { w: screen.width, h: screen.height, dpr: devicePixelRatio },
+    });
+    diag.setMeta({ t0perf: t0 });
+  };
+
   const beginWait = (tl: Timeline, my: number) => {
     const r = run!;
     const ok = () => my === token && run === r;
@@ -307,12 +515,17 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
       host.setCur(tl.tones[i].ids);
       host.playhead(tl, tl.tones[i].start);
     };
+    const tuning = startTuning(r);
     const w = new WaitFollower(tl, {
-      cfg: followConfig(settings),
+      cfg: followConfig(settings, tuningHz(ctx.data)),
+      tuning,
+      onFrame: (j) => diag.judged(j),
       onNote: (i, nr) => {
         if (!ok()) return;
+        diag.event(performance.now(), "note", { i, midi: tl.tones[i].midi, ...nr });
         host.paint(tl.tones[i].ids, nr.ok ? "hit" : "miss");
         fwrong.textContent = "";
+        fwrong.classList.remove("hint");
         if (w.index < tl.tones.length) {
           markAt(w.index);
           showTone(w.index);
@@ -321,25 +534,40 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
       },
       onWrong: (i, midi) => {
         if (!ok()) return;
+        diag.event(performance.now(), "falsch", { i, midi: tl.tones[i].midi, wrongMidi: midi });
         host.paint(tl.tones[i].ids, "miss");
+        fwrong.classList.remove("hint");
         fwrong.innerHTML = `Du spielst ${midiNameHtml(midi)}`;
         if (settings.headphones) {
           songPlayer.play(singleTone(tl.tones[i].midi), {
             secPerQuarter: PREVIEW_SEC,
-            a4: settings.tuningHz,
+            a4: tuningHz(ctx.data),
             countIn: false,
             melody: PREVIEW_VOL,
           });
         }
       },
+      onOctave: (i) => {
+        if (!ok()) return;
+        diag.event(performance.now(), "oktave", { i, midi: tl.tones[i].midi });
+        if (w.wrongMidi !== null) return;
+        fwrong.classList.add("hint");
+        fwrong.textContent = "eine Oktave zu hoch – sanfter blasen";
+      },
       onPass: () => {
-        if (ok()) finishRun();
+        if (!ok()) return;
+        saveTuning(tuning);
+        finishRun();
       },
     });
     r.wait = w;
-    w.arm(performance.now());
+    const t0 = performance.now();
+    w.arm(t0);
+    beginDiag("warten", t0, tl, null);
     r.unlisten = mic.listen((f) => {
-      if (ok()) w.push(f);
+      if (!ok()) return;
+      diag.frame(f);
+      w.push(f);
     });
     markAt(0);
     showTone(0);
@@ -353,7 +581,7 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
     const spq = secPerQuarter(song, host.percent());
     songPlayer.play(tl, {
       secPerQuarter: spq,
-      a4: settings.tuningHz,
+      a4: tuningHz(ctx.data),
       countIn: true,
       metronome: true,
       melody: settings.headphones ? MELODY_VOL : false,
@@ -373,30 +601,40 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
       },
       onEnd: () => {
         if (!ok()) return;
-        b.finish(performance.now());
+        const s = b.finish(performance.now());
+        if (s?.complete) saveTuning(tuning);
         finishRun();
       },
     });
     const startMs = heardAt(songPlayer.context!, songPlayer.timelineStart!);
+    const tuning = startTuning(r);
     const b = new BeatFollower(tl, {
       secPerQuarter: spq,
       startMs,
-      cfg: followConfig(settings),
+      cfg: followConfig(settings, tuningHz(ctx.data)),
+      tuning,
+      onFrame: (j) => diag.judged(j),
       onNote: (i, nr) => {
-        if (ok()) host.paint(tl.tones[i].ids, nr.ok ? "hit" : "miss");
+        if (!ok()) return;
+        diag.event(performance.now(), "note", { i, midi: tl.tones[i].midi, ...nr });
+        host.paint(tl.tones[i].ids, nr.ok ? "hit" : "miss");
       },
     });
     r.beat = b;
     r.startMs = startMs;
+    beginDiag("takt", performance.now(), tl, { startMs, spq });
     r.unlisten = mic.listen((f) => {
-      if (ok()) b.push(f);
+      if (!ok()) return;
+      diag.frame(f);
+      b.push(f);
     });
     showTone(0);
     setStatus("");
   };
 
   const startRun = () => {
-    if (run) return;
+    if (run || cal?.state === "running") return;
+    cal = null;
     const sec = host.section();
     const tl = sec ? sectionTimeline(song, sec.from, sec.to) : host.full;
     if (!tl.tones.length) {
@@ -437,7 +675,157 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
       });
   };
 
+  // ------------------------------------------------------------ Verzögerung abgleichen
+  /** Zeitplan des Abgleichs: vier Klicks Einzählen, dann zwei Takte zu vier Klicks, keine Töne */
+  const calTimeline = (): Timeline => ({
+    tones: [],
+    bars: [0, 1].map((k) => ({ index: k, start: 4 * k, dur: 4, beats: [0, 1, 2, 3] })),
+    total: 2 * CAL_COUNT_IN,
+    countIn: [0, 1, 2, 3],
+    countInDur: CAL_COUNT_IN,
+    countInBeats: CAL_COUNT_IN,
+  });
+
+  const openCal = () => {
+    if (run) return;
+    cal = { state: "intro", which: settings.headphones ? "headphones" : "speaker" };
+    render();
+  };
+
+  const closeCal = () => {
+    if (cal?.state === "running") stopCal(false);
+    cal = null;
+    render();
+  };
+
+  const setLatency = (which: "speaker" | "headphones", v: number | null) => {
+    settings.inputLatencyMs[which] = v;
+    ctx.save();
+  };
+
+  const startCal = () => {
+    if (!cal || run || cal.state === "running") return;
+    const which = settings.headphones ? "headphones" : "speaker";
+    const my = ++token;
+    const c: NonNullable<typeof cal> = { state: "running", which, hits: [], passed: 0 };
+    cal = c;
+    // AudioContext direkt aus dem Tippen heraus
+    songPlayer.prepare();
+    keepAwake(true);
+    render();
+    fcalText.textContent = "Mikrofon wird eingeschaltet …";
+    mic
+      .start()
+      .then(() => {
+        if (my !== token || cal !== c) return;
+        songPlayer.play(calTimeline(), {
+          secPerQuarter: CAL_SPQ,
+          a4: tuningHz(ctx.data),
+          countIn: true,
+          metronome: true,
+          melody: false,
+          onPosition: (p) => {
+            if (my !== token || cal !== c) return;
+            fcalText.textContent = p.countIn != null ? `Einzählen … ${p.countIn}` : "Spiel zu jedem Klick einen kurzen Ton.";
+          },
+          onFrame: (p) => {
+            if (my !== token || cal !== c) return;
+            const passed = p.quarter < 0 ? 0 : Math.min(CAL_CLICKS, Math.floor(p.quarter) + 1);
+            if (passed !== c.passed) {
+              c.passed = passed;
+              renderCal();
+            }
+          },
+          onEnd: () => {
+            // die Antwort auf den letzten Klick (bis 450 ms danach) noch abwarten
+            if (my === token && cal === c) c.timer = window.setTimeout(() => stopCal(true), 500);
+          },
+        });
+        const ac = songPlayer.context!;
+        const t0 = songPlayer.timelineStart!;
+        c.clicks = Array.from({ length: CAL_CLICKS }, (_, k) => heardAt(ac, t0 + k * CAL_SPQ));
+        const det = new OnsetDetector(DEFAULT_LATENCY, { tuning: tuningHz(ctx.data) });
+        c.det = det;
+        beginDiag("abgleich", performance.now(), null, null);
+        diag.setMeta({ clicks: c.clicks.map((x) => diag.rel(x)), which, spq: CAL_SPQ });
+        c.unlisten = mic.listen((f) => {
+          if (my !== token || cal !== c) return;
+          diag.frame(f);
+          const n = det.onsets.length;
+          det.push(f);
+          for (const o of det.onsets.slice(n)) {
+            diag.event(o, "einsatz");
+            const k = c.clicks!.findIndex((t, i) => !c.hits![i] && o >= t - DEFAULT_LATENCY.before && o <= t + DEFAULT_LATENCY.after);
+            if (k >= 0) {
+              c.hits![k] = true;
+              renderCal();
+            }
+          }
+        });
+      })
+      .catch((e) => {
+        if (my !== token) return;
+        cal = null;
+        render();
+        ctx.micError = String(e);
+        ctx.micRetry = () => mic.start().then(() => ctx.go(`#/lied/${encodeURIComponent(song.id)}`));
+        ctx.go("#/mikrofon");
+      });
+  };
+
+  /** Abgleich beenden: done = Klicks vorbei, auswerten; sonst abgebrochen */
+  const stopCal = (done: boolean) => {
+    const c = cal;
+    if (!c || c.state !== "running") return;
+    token++;
+    if (c.timer) window.clearTimeout(c.timer);
+    c.unlisten?.();
+    if (songPlayer.playing) songPlayer.stop();
+    else songPlayer.idle();
+    const micInfo = mic.info();
+    mic.stop();
+    if (done && c.det && c.clicks) {
+      c.det.flush();
+      const res = latencyFromOnsets(c.clicks, c.det.onsets);
+      diag.event(performance.now(), "ergebnis", { ...res, which: c.which });
+      if (res.ok) setLatency(c.which, res.ms);
+      cal = { state: "result", which: c.which, ok: res.ok };
+    } else {
+      cal = { state: "intro", which: c.which };
+    }
+    diag.end({ t: diag.rel(performance.now()), mic: micInfo, done });
+    render();
+  };
+
   // ------------------------------------------------------------ Bedienung
+  el.addEventListener("click", (e) => {
+    if ((e.target as Element).closest?.('[data-act="lat-open"]')) openCal();
+  });
+  latStart.addEventListener("click", () => startCal());
+  latClose.addEventListener("click", () => closeCal());
+  for (const b of fcalVals.querySelectorAll<HTMLButtonElement>("[data-lat]")) {
+    b.addEventListener("click", () => {
+      if (!cal) return;
+      const which = cal.which;
+      const cur = inputLatency({ ...settings, headphones: which === "headphones" }).ms;
+      setLatency(which, Math.max(LATENCY_MIN, Math.min(LATENCY_MAX, cur + Number(b.dataset.lat) * LATENCY_STEP)));
+      render();
+    });
+  }
+  q<HTMLButtonElement>('[data-act="lat-default"]').addEventListener("click", () => {
+    if (!cal) return;
+    setLatency(cal.which, null);
+    render();
+  });
+  diagBtn.addEventListener("click", () => {
+    if (!diag.available) return;
+    offerDiag(diag.json())
+      .then((r) => {
+        diagMsg = r === "geteilt" ? "Diagnose geteilt" : r === "heruntergeladen" ? "Diagnose gespeichert" : "";
+        if (active) renderMeta();
+      })
+      .catch(() => {});
+  });
   for (const b of modeBtns) {
     b.addEventListener("click", () => {
       if (run) return;
@@ -448,6 +836,7 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
     });
   }
   phonesBtn.addEventListener("click", () => {
+    if (run || cal?.state === "running") return;
     settings.headphones = !settings.headphones;
     ctx.save();
     render();
@@ -478,7 +867,7 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
       return active;
     },
     get running() {
-      return !!run;
+      return !!run || cal?.state === "running";
     },
     enter() {
       if (active) return;
@@ -488,6 +877,8 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
     },
     exit() {
       if (!active) return;
+      if (cal?.state === "running") stopCal(false);
+      cal = null;
       if (run) finishRun();
       mic.stop();
       active = false;
@@ -502,6 +893,8 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
       if (active) render();
     },
     destroy() {
+      if (cal?.state === "running") stopCal(false);
+      cal = null;
       if (run) finishRun();
       mic.stop();
       if (active) keepAwake(false);
@@ -515,6 +908,10 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
       timeline: run?.tl ?? null,
       index: run?.wait?.index ?? null,
       startMs: run?.startMs ?? null,
+      latency: inputLatency(settings),
+      cal: cal ? { state: cal.state, which: cal.which, ok: cal.ok ?? null, clicks: cal.clicks ?? null, onsets: cal.det?.onsets ?? null } : null,
+      diag: diag.available,
+      tuning: run?.tuning ? { ...run.tuning.values } : null,
     }),
   };
 

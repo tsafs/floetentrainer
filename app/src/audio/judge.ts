@@ -2,6 +2,7 @@
 // Rein rechnerisch, ohne Mikrofon – dadurch automatisch testbar.
 
 import { freqToWrittenMidi } from "../music/notes";
+import { correctPitch, NO_OFFSET, type OffsetOf } from "./flute-profile";
 import { DEFAULT_SMOOTH, Smoother } from "./smooth";
 
 export interface Frame {
@@ -63,7 +64,7 @@ export const DEFAULT_JUDGE: JudgeConfig = {
 export interface Heard {
   /** nächstliegende notierte MIDI-Nummer */
   midi: number;
-  /** Abweichung von diesem Ton in Cent */
+  /** Abweichung von diesem Ton in Cent (mit Flötenprofil: von seiner Lage auf dieser Flöte) */
   cents: number;
   freq: number;
 }
@@ -100,10 +101,16 @@ export class PlayJudge {
   wrongCounted = false;
   /** Fehler nicht werten (z. B. bei der Vorstellung) */
   private judgeWrong = true;
+  /**
+   * Abweichungen der Flöte je Ton (Flötenprofil, ./flute-profile.ts): Toleranz und angezeigte Cent
+   * gelten relativ zur Lage des Tons auf ihrer Flöte. Standard: keine.
+   */
+  private offsetOf: OffsetOf;
 
-  constructor(cfg: Partial<JudgeConfig> = {}) {
+  constructor(cfg: Partial<JudgeConfig> = {}, offsetOf: OffsetOf = NO_OFFSET) {
     this.cfg = { ...DEFAULT_JUDGE, ...cfg };
     this.smoother = new Smoother(this.cfg);
+    this.offsetOf = offsetOf;
   }
 
   /** Neue Karte: gesuchter Ton als notierte MIDI-Nummer. */
@@ -142,8 +149,10 @@ export class PlayJudge {
     }
     this.gapStart = null;
     const m = freqToWrittenMidi(f.freq, this.cfg.tuning);
-    const midi = Math.round(m);
-    const heard: Heard = { midi, cents: Math.round((m - midi) * 100), freq: f.freq };
+    // nächster Ton *ihrer* Flöte (ohne Profil: nächster Halbton)
+    const hp = correctPitch(m, this.offsetOf);
+    const midi = hp.midi;
+    const heard: Heard = { midi, cents: Math.round(hp.cents), freq: f.freq };
     if (!this.seg || this.seg.midi !== midi) {
       this.seg = { midi, start: f.t, minClarity: f.clarity };
       this.inTolStart = null;
@@ -158,7 +167,7 @@ export class PlayJudge {
     const armedAt = this.shownAt + this.cfg.armDelayMs;
     if (f.t < armedAt) return { heard, event: null };
 
-    const centsToTarget = (m - this.target) * 100;
+    const centsToTarget = (m - this.target) * 100 - this.offsetOf(this.target);
     if (Math.abs(centsToTarget) <= this.cfg.toleranceCents) {
       this.inTolStart ??= Math.max(f.t, seg.start, armedAt);
       if (f.t - this.inTolStart >= this.cfg.holdMs) {

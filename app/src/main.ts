@@ -7,6 +7,7 @@ import { topbar } from "./ui/common";
 import { homeView } from "./ui/home";
 import { chartView, micHelpView, progressView, summaryView } from "./ui/pages";
 import { practiceView } from "./ui/practice";
+import { fluteView } from "./ui/flute";
 import { settingsView } from "./ui/settings";
 import { songAddView } from "./ui/own-songs";
 import { songListView, songView } from "./ui/songs";
@@ -26,6 +27,7 @@ const ROUTES: Record<string, View> = {
   griffe: chartView,
   stimmgeraet: tunerView,
   einstellungen: settingsView,
+  floete: fluteView, // #/floete bzw. #/floete/<Ton>: Flöte einstellen
   mikrofon: micHelpView,
   lieder: songListView,
   lied: songView, // #/lied/<Kennung>
