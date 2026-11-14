@@ -230,3 +230,50 @@ test.describe("Spielen", () => {
     expect(d.history.spielen.c2.at(-1)[0]).toBe(1);
   });
 });
+
+test.describe("Tippen am Kartenwechsel", () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 412, height: 839 } });
+
+  test("Lesen: Tipp, der auf der Karte davor beginnt, zählt nicht als erste Antwort der Folge", async ({ page }) => {
+    await page.clock.install();
+    await seed(page, extrasOnly());
+    await page.goto("./");
+    await page.getByRole("button", { name: /Weiter üben/ }).click();
+    /** Mitte eines Namenknopfs der Folge (aus einer früheren Folge derselben Sitzung, die Anordnung ist gleich) */
+    let pt: { x: number; y: number } | null = null;
+    for (let k = 0; k < 16; k++) {
+      const i = await info(page);
+      const m = page.locator(`main[data-seq="${i.seq}"]`);
+      if (i.step === "folge" || !pt) {
+        if (i.step === "folge") {
+          const box = (await m.locator(".btns button").first().boundingBox())!;
+          pt = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+        }
+        // ohne Zeiger auflösen (el.click zählt immer) und weiter
+        await m.locator('[data-act="idk"]').evaluate((b: HTMLElement) => b.click());
+        await m.locator('[data-act="next"]').evaluate((b: HTMLElement) => b.click());
+        await waitNext(page, i.seq);
+        continue;
+      }
+      if (i.step !== "card") throw new Error(`unerwartet: ${i.step}`);
+      await answer(page, true);
+      await expect(page.getByTestId("panel")).toContainText("Richtig");
+      // Finger aufsetzen, während „Richtig“ steht; abheben erst nach dem automatischen Wechsel
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [pt] });
+      await page.clock.runFor(1800);
+      await waitNext(page, i.seq);
+      const j = await info(page);
+      const hit = await page.evaluate(({ x, y }) => !!document.elementFromPoint(x, y)?.closest(".btns button"), pt);
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      await page.clock.runFor(300);
+      // nur aussagekräftig, wenn jetzt eine Folge kam und der Finger auf einem ihrer Namenknöpfe lag
+      if (j.step !== "folge" || !hit) continue;
+      await expect(folge(page).locator(".sn.hit, .sn.miss")).toHaveCount(0);
+      await expect(folge(page).locator(".sn.cur")).toHaveAttribute("data-i", "0");
+      await expect(folge(page)).toHaveClass(/\bask\b/);
+      return;
+    }
+    throw new Error("keine Folge nach einer Karte");
+  });
+});

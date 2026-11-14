@@ -763,6 +763,9 @@ svg.acc {
 }
 .btns button:disabled {
   cursor: default;
+  /* Nach „Richtig“: ein Tipp auf die (gesperrten) Antworten soll wie überall sonst weiterschalten.
+     Gesperrte Knöpfe schlucken den Klick sonst, man tippt nochmal – und trifft die nächste Karte. */
+  pointer-events: none;
 }
 .idkrow {
   display: flex;

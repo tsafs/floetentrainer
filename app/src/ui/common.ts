@@ -28,6 +28,20 @@ export const ICON_X = `<svg width="18" height="18" viewBox="0 0 18 18" aria-hidd
 export const ICON_BACK = `<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M12.5 3.5L6 10l6.5 6.5" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 export const ICON_CHECK = `<svg width="22" height="22" viewBox="0 0 34 34" aria-hidden="true"><circle cx="17" cy="17" r="15.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10.5 17.5l4.3 4.3 8.7-9.3" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
+/**
+ * Klicks auf einen Knopf nur zählen, wenn auch der Druck auf diesem Knopf begann. Sonst landet ein Tipp,
+ * der noch auf der vorigen Ansicht anfing (z. B. „Richtig“ wegtippen, während die Karte gerade von selbst
+ * weitergeht), als Klick auf dem Knopf, der in der neuen Ansicht an derselben Stelle liegt.
+ * Klicks ohne Zeiger (Tastatur, Screenreader, el.click(): detail = 0) zählen immer.
+ */
+export function pressGuard(root: HTMLElement): (e: Event, el: Element) => boolean {
+  let pressed: Element | null = null;
+  root.addEventListener("pointerdown", (e) => {
+    pressed = (e.target as Element).closest("button");
+  });
+  return (e, el) => (e as MouseEvent).detail === 0 || pressed === el;
+}
+
 export const ICON_MENU = `<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13" fill="none" stroke-width="1.6" stroke-linecap="round"/></svg>`;
 
 /**
