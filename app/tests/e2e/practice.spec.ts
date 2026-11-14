@@ -51,7 +51,7 @@ test.describe("Üben", () => {
     await expect(page.getByTestId("count")).toHaveText("Neuer Ton");
     await page.getByRole("button", { name: "Verstanden" }).click();
     await waitNext(page, i.seq);
-    // Erste Karte richtig: grünes Feld, geht nach etwa 1 s von selbst weiter
+    // Erste Karte richtig: grüne Bestätigung, geht nach knapp 2 s von selbst weiter
     i = await info(page);
     expect(i.step).toBe("card");
     await expect(page.getByTestId("count")).toHaveText("1 von 20");

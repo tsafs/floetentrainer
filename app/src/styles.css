@@ -572,10 +572,18 @@ svg.acc {
   text-align: center;
   line-height: 1.2;
 }
+/* Die Notenzeile hat eine feste Höhe (svh: ändert sich nicht, wenn die Adressleiste ein-/ausfährt) und
+   wird nur auf sehr kleinen Bildschirmen kleiner. Die Antworten sitzen unten. Was nach dem Antworten
+   erscheint, liegt über den Antworten (.slot) – so verschiebt und skaliert sich nichts. */
+.prac .stage {
+  flex: 0 1 clamp(190px, 34svh, 320px);
+}
 .answer {
   display: grid;
   gap: 12px;
   flex: 0 0 auto;
+  margin-top: auto;
+  position: relative;
 }
 .btns {
   display: grid;
@@ -583,13 +591,16 @@ svg.acc {
   gap: 10px;
 }
 .btns button {
+  position: relative;
   background: var(--btn);
   border: 1px solid var(--line);
   border-radius: 14px;
   height: 64px;
   font-size: 1.8rem;
   line-height: 1;
-  transition: opacity 0.2s;
+  transition:
+    opacity 0.2s,
+    background-color 0.2s;
   min-width: 0;
 }
 .btns.n8 button {
@@ -620,6 +631,21 @@ svg.acc {
   border-color: var(--ok);
   box-shadow: inset 0 0 0 1.5px var(--ok);
 }
+.prac.ok .btns .right {
+  background: var(--ok-tint);
+}
+.btns .okmark {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--ok);
+  color: var(--paper);
+}
 .btns .dim {
   opacity: 0.4;
 }
@@ -630,6 +656,56 @@ svg.acc {
   display: flex;
   justify-content: center;
   margin: -6px 0 -10px;
+  min-height: 48px;
+}
+/* „Richtig“ steht anstelle von „Weiß nicht“ */
+.okline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  color: var(--ok);
+  font-size: 1.25rem;
+  animation: fb-in 0.18s ease-out;
+}
+.okline .name {
+  color: var(--ink);
+  font-size: 1.6rem;
+  font-weight: 500;
+  line-height: 1;
+  margin-left: 4px;
+}
+/* „Falsch“ legt sich über die Antworten; ist es höher, wächst es nach oben in den freien Platz */
+.slot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  min-height: 100%;
+  z-index: 2;
+  display: grid;
+  align-content: end;
+  gap: 12px;
+  background: var(--paper);
+  animation: fb-in 0.18s ease-out;
+}
+.slot:empty {
+  display: none;
+}
+/* Beim Spielen bleibt „Ich höre“ sichtbar: das Feld steht darüber */
+.anchor {
+  position: relative;
+  height: 0;
+  margin-bottom: -12px;
+}
+.anchor .slot {
+  bottom: 12px;
+  min-height: 0;
+}
+@keyframes fb-in {
+  from {
+    opacity: 0;
+  }
 }
 .panel {
   border-radius: 16px;
@@ -702,9 +778,12 @@ svg.acc {
   width: 100%;
 }
 .prac.err .btns,
-.prac.err .idkrow,
-.prac.ok .idkrow {
-  display: none;
+.prac.err .idkrow {
+  visibility: hidden;
+}
+.prac.ok .listen {
+  border-color: var(--ok);
+  box-shadow: inset 0 0 0 1.5px var(--ok);
 }
 
 /* Hören */
@@ -773,19 +852,6 @@ svg.acc {
 }
 .meter.off i {
   display: none;
-}
-.prac.err .listen,
-.prac.ok .listen {
-  min-height: 0;
-  padding: 6px 14px;
-}
-.prac.err .listen .meter,
-.prac.ok .listen .meter {
-  display: none;
-}
-.prac.err .listen .heard,
-.prac.ok .listen .heard {
-  font-size: 1.35rem;
 }
 
 /* Vorstellung */
@@ -1138,6 +1204,18 @@ svg.acc {
   .answer {
     align-content: center;
     min-height: 0;
+    margin-top: 0;
+  }
+  .slot {
+    align-content: center;
+  }
+  /* Spielen: über „Ich höre“ ist hier zu wenig Platz – das Feld deckt die ganze Antwortspalte */
+  .anchor {
+    position: static;
+  }
+  .anchor .slot {
+    bottom: 0;
+    min-height: 100%;
   }
   .btns {
     grid-template-columns: 1fr 1fr;
@@ -1160,9 +1238,6 @@ svg.acc {
   }
   .btns.staffs button {
     height: min(96px, calc((100vh - 190px) / 2));
-  }
-  .prac.ok .btns {
-    display: none;
   }
   .panel {
     padding: 12px 16px;
@@ -1445,6 +1520,10 @@ svg.bm {
   background: var(--line);
 }
 @media (prefers-reduced-motion: reduce) {
+  .okline,
+  .slot {
+    animation: none;
+  }
   .cardbody,
   .cardhd,
   .cardhd .chev,

@@ -21,13 +21,17 @@ const QUESTION: Record<Kind, string> = {
   spiel: "Spiel diese Note",
 };
 
-const AUTO_NEXT_MS = 1000;
+/** Nach „Richtig“ so lange stehen lassen, dass man die Bestätigung in Ruhe sieht (Tippen geht schneller) */
+const AUTO_NEXT_MS = 1800;
 /** fortlaufende Nummer jeder angezeigten Karte (für automatische Tests) */
 let seq = 0;
 
 function flute(id: string): string {
   return fluteSvg(note(id).fingering, `Griffbild ${nameText(id)}`);
 }
+
+/** kleines Häkchen am richtigen Antwortknopf */
+const TICK = `<span class="okmark" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 7.4l2.6 2.6L11 4.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
 
 function listenBox(): string {
   return `<div class="listen" aria-live="off"><span class="hl">Ich höre</span><span class="heard">–</span><span class="cents"></span><div class="meter off"><i></i></div></div>`;
@@ -220,19 +224,23 @@ export const practiceView: View = (root, ctx) => {
           .join("")}</div>`;
       }
     }
+    // Rückmeldung ohne Verschieben: „Richtig“ ersetzt nur die Zeile „Weiß nicht“ (gleiche Höhe),
+    // „Falsch“ legt sich als .slot über die Antworten bzw. beim Spielen über den Platz darüber.
+    const idk = `<div class="idkrow" aria-live="polite"><button class="textbtn" data-act="idk">Weiß nicht</button></div>`;
+    const answer =
+      kind === "spiel"
+        ? `<div class="answer"><div class="anchor"><div class="slot" aria-live="polite"></div></div>${listenBox()}${idk}</div>`
+        : `<div class="answer">${btns}${idk}<div class="slot" aria-live="polite"></div></div>`;
     root.innerHTML = `
 <main class="screen fit prac ask kind-${kind}" data-step="card" data-kind="${kind}" data-note="${id}" data-retry="${retry}" data-seq="${++seq}">
   ${header(label)}
   <div class="stage">${stage}<p class="q">${QUESTION[kind]}</p></div>
-  <div class="answer">
-    ${kind === "spiel" ? listenBox() : btns}
-    <div class="slot"></div>
-    <div class="idkrow"><button class="textbtn" data-act="idk">Weiß nicht</button></div>
-  </div>
+  ${answer}
 </main>`;
     const main = root.querySelector("main")!;
     bindCommon(main);
     const slot = main.querySelector(".slot")!;
+    const idkRow = main.querySelector(".idkrow")!;
 
     const setPhase = (p: "ok" | "err") => {
       phase = p;
@@ -240,8 +248,10 @@ export const practiceView: View = (root, ctx) => {
       main.classList.add(p);
     };
 
-    const okPanel = (head = "Richtig") =>
-      `<div class="panel ok" data-testid="panel"><div class="fl">${flute(id)}</div><div class="txt"><span class="head">${ICON_CHECK}${head}</span><span class="name">${nameHtml(id)}</span></div></div>`;
+    const showOk = (head = "Richtig") => {
+      slot.innerHTML = "";
+      idkRow.innerHTML = `<span class="okline" data-testid="panel">${ICON_CHECK}<span>${head}</span><span class="name">${nameHtml(id)}</span></span>`;
+    };
 
     const errPanel = (head: string, hint: string) => {
       // Bei Griff→Note steht der Griff schon oben: im Feld die Note zeigen
@@ -253,17 +263,24 @@ export const practiceView: View = (root, ctx) => {
       );
     };
 
-    const bindNext = () =>
-      slot.querySelector('[data-act="next"]')?.addEventListener("click", (e) => {
+    const bindNext = () => {
+      const go = slot.querySelector<HTMLButtonElement>('[data-act="next"]');
+      go?.addEventListener("click", (e) => {
         e.stopPropagation();
         advance();
       });
+      // die Antwortknöpfe sind jetzt verdeckt: Fokus auf „Weiter“, damit er nicht verloren geht
+      go?.focus({ preventScroll: true });
+    };
 
     const markButtons = (chosen: string | null) => {
       main.querySelectorAll<HTMLButtonElement>(".btns button").forEach((b) => {
         b.disabled = true;
         const c = b.dataset.choice;
-        if (c === id) b.classList.add("right");
+        if (c === id) {
+          b.classList.add("right");
+          b.insertAdjacentHTML("beforeend", TICK);
+        }
         else b.classList.add("dim");
         if (c === chosen && c !== id) b.classList.add("chosen");
       });
@@ -280,7 +297,7 @@ export const practiceView: View = (root, ctx) => {
         markButtons(c);
         if (ok) {
           setPhase("ok");
-          slot.innerHTML = okPanel();
+          showOk();
           autoAdvance();
         } else {
           setPhase("err");
@@ -318,12 +335,12 @@ export const practiceView: View = (root, ctx) => {
           if (phase === "ask") {
             s.answer(true);
             setPhase("ok");
-            slot.innerHTML = okPanel();
+            showOk();
           } else {
             // nach einem Fehler: jetzt richtig, zählt aber als Fehler
             main.classList.remove("err");
             main.classList.add("ok");
-            slot.innerHTML = okPanel("Jetzt stimmt es");
+            showOk("Jetzt stimmt es");
           }
           autoAdvance();
         }
