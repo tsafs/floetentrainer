@@ -20,8 +20,10 @@
 // erkennbar, aber die Lautstärke sinkt deutlich; dafür ist der Einbruch-Weg da. Das Wiederansteigen
 // ist nötig, damit ein bloßes Leiserwerden (Ausklingen) keinen Einsatz vortäuscht.
 //
-// Schleife: Beide Arten werten je Durchgang getrennt (Ergebnis und Auswertung je Durchgang), damit
-// „42 von 48“ sich immer auf ein Durchspielen bezieht und mit dem Bestwert vergleichbar bleibt.
+// Schleife: Beide Arten werten je Durchgang getrennt (Ergebnis je Durchgang). Die Liedseite nutzt die
+// Schleife seit der Nachsteuerung vom 14.11.2026 nicht mehr (ein Durchgang, danach bleiben die Farben
+// stehen); die Wertung kann es weiterhin. Gezeigt werden nur noch die Farben je Note – die Zusammenfassung
+// (FollowSummary) dient den Abläufen (Durchgang fertig? vollständig?), nicht der Anzeige.
 
 import { freqToWrittenMidi } from "../music/notes";
 import type { Settings } from "../store/data";
@@ -106,68 +108,25 @@ export interface BeatNoteResult {
   coverage: number;
 }
 
-export interface HardBar {
-  /** Index des Takts im Notenbild */
-  bar: number;
-  misses: number;
-  total: number;
-}
-
-/** Auswertung eines Durchgangs */
+/** Zusammenfassung eines Durchgangs */
 export interface FollowSummary {
   hits: number;
   /** Zahl der gewerteten Noten */
   total: number;
   /** alle Noten des Zeitplans gewertet (nicht vorzeitig beendet) */
   complete: boolean;
-  /** höchstens 3 Takte mit den meisten Fehlern (leer, wenn es keine gab) */
-  hardestBars: HardBar[];
 }
 
-/**
- * Endauswertung: Treffer, Gesamtzahl und die schwierigsten Takte (meiste Fehler, bei Gleichstand
- * kleinste Trefferquote, dann frühester Takt). Takte, die durch Wiederholungen mehrfach gespielt
- * werden, zählen zusammen (Index im Notenbild). results[i] gehört zu tl.tones[i]; fehlende
- * Einträge (nicht gewertet) zählen nicht.
- */
-export function summarize(tl: Timeline, results: ({ ok: boolean } | undefined)[], maxBars = 3): FollowSummary {
+/** Treffer und Gesamtzahl. results[i] gehört zu tl.tones[i]; fehlende Einträge (nicht gewertet) zählen nicht. */
+export function summarize(tl: Timeline, results: ({ ok: boolean } | undefined)[]): FollowSummary {
   let hits = 0;
   let total = 0;
-  const bars = new Map<number, HardBar>();
   results.forEach((r, i) => {
     if (!r || !tl.tones[i]) return;
     total++;
     if (r.ok) hits++;
-    const idx = tl.tones[i].bar;
-    let b = bars.get(idx);
-    if (!b) bars.set(idx, (b = { bar: idx, misses: 0, total: 0 }));
-    b.total++;
-    if (!r.ok) b.misses++;
   });
-  const hardestBars = [...bars.values()]
-    .filter((b) => b.misses > 0)
-    .sort((a, b) => b.misses - a.misses || b.misses / b.total - a.misses / a.total || a.bar - b.bar)
-    .slice(0, maxBars);
-  return { hits, total, complete: total === tl.tones.length, hardestBars };
-}
-
-/** Kern eines Ergebnisses zum Vergleichen (z. B. der gespeicherte Bestwert) */
-export interface Score {
-  hits: number;
-  total: number;
-}
-
-/**
- * Ist a besser als der bisherige Bestwert b? Höhere Trefferquote gewinnt, bei gleicher Quote mehr
- * Noten. Ohne Bestwert ist jedes Ergebnis mit mindestens einer Note besser.
- * Hinweis für die Speicherung: nur vollständige Durchgänge des ganzen Lieds als Bestwert merken.
- */
-export function isBetter(a: Score, b?: Score | null): boolean {
-  if (a.total <= 0) return false;
-  if (!b || b.total <= 0) return true;
-  const cmp = a.hits * b.total - b.hits * a.total; // Quoten über Kreuz verglichen, ohne Rundung
-  if (cmp !== 0) return cmp > 0;
-  return a.total > b.total;
+  return { hits, total, complete: total === tl.tones.length };
 }
 
 // ---------------------------------------------------------------- gemeinsame Bausteine

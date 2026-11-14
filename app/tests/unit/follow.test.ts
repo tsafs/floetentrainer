@@ -4,7 +4,6 @@ import {
   BeatFollower,
   DEFAULT_FOLLOW,
   followConfig,
-  isBetter,
   summarize,
   WaitFollower,
   type BeatNoteResult,
@@ -68,7 +67,7 @@ describe("Mitspielen: Warte-Modus", () => {
     expect(w.results.map((r) => r?.ok)).toEqual([true, true, true, true, true]);
     expect(w.done).toBe(true);
     expect(w.index).toBe(5);
-    expect(summary).toMatchObject({ hits: 5, total: 5, complete: true, hardestBars: [] });
+    expect(summary).toMatchObject({ hits: 5, total: 5, complete: true, });
   });
 
   it("die Note bleibt stehen, bis sie getroffen ist; kurze Haltedauer (≈ 0,12 s)", () => {
@@ -303,7 +302,7 @@ describe("Mitspielen: Takt-Modus", () => {
     feed(b, beatFrames(tl));
     expect(notes.map(([i]) => i)).toEqual([0, 1, 2, 3, 4, 5]);
     expect(notes.every(([, r]) => r.ok && r.coverage > 0.85 && r.coverage <= 1)).toBe(true);
-    expect(summary).toMatchObject({ hits: 6, total: 6, complete: true, hardestBars: [] });
+    expect(summary).toMatchObject({ hits: 6, total: 6, complete: true, });
     expect(b.done).toBe(true);
   });
 
@@ -393,7 +392,7 @@ describe("Mitspielen: Takt-Modus", () => {
     expect(b.passResults[0].every((r) => r?.coverage === 0)).toBe(true);
   });
 
-  it("Heft-Lied „Alle meine Entchen“: Auswertung mit den schwierigsten Takten", () => {
+  it("Heft-Lied „Alle meine Entchen“: Treffer im ganzen Lied", () => {
     const tl = buildTimeline(songById("alle-meine-entchen")!);
     const spq = 60 / 88;
     const ix = (bar: number) => tl.tones.flatMap((n, i) => (n.bar === bar ? [i] : []));
@@ -407,12 +406,8 @@ describe("Mitspielen: Takt-Modus", () => {
     feed(b, beatFrames(tl, { spq, wrong }));
     const s = b.passes[0];
     expect(s).toMatchObject({ hits: 20, total: 27, complete: true });
-    // Takt 4 hat nur eine Note: gleich viele Fehler wie Takt 9, aber kleinere Trefferquote
-    expect(s.hardestBars).toEqual([
-      { bar: 6, misses: 3, total: 4 },
-      { bar: 2, misses: 2, total: 4 },
-      { bar: 3, misses: 1, total: 1 },
-    ]);
+    // falsch gespielte Noten sind genau die verfehlten
+    expect(Object.keys(wrong).every((i) => b.passResults[0][Number(i)]?.ok === false)).toBe(true);
   });
 
   it("Schleife über einen Abschnitt: Bewertung je Durchgang", () => {
@@ -472,27 +467,14 @@ describe("Mitspielen: Takt-Modus", () => {
   });
 });
 
-// ---------------------------------------------------------------- Auswertung, Bestwert
+// ---------------------------------------------------------------- Zusammenfassung
 
-describe("Mitspielen: Auswertung und Bestwert", () => {
-  it("schwierigste Takte: höchstens 3, nur bei Fehlern", () => {
+describe("Mitspielen: Zusammenfassung eines Durchgangs", () => {
+  it("zählt Treffer und gewertete Noten; vollständig nur, wenn alle Noten gewertet sind", () => {
     const tl = buildTimeline(song("g'4 g'4 g'4 g'4 | a'4 a'4 a'4 a'4 | h'1 | c''2 c''2 | d''1 ||"));
-    const ok = tl.tones.map(() => ({ ok: true }));
-    expect(summarize(tl, ok).hardestBars).toEqual([]);
+    expect(summarize(tl, tl.tones.map(() => ({ ok: true })))).toEqual({ hits: tl.tones.length, total: tl.tones.length, complete: true });
     const r = tl.tones.map((n) => ({ ok: n.midi === A }));
-    const s = summarize(tl, r);
-    expect(s.hits).toBe(4);
-    expect(s.hardestBars.map((b) => b.bar)).toEqual([0, 3, 2]);
-  });
-
-  it("ist besser als: Trefferquote, bei Gleichstand mehr Noten", () => {
-    expect(isBetter({ hits: 1, total: 2 })).toBe(true);
-    expect(isBetter({ hits: 0, total: 0 })).toBe(false);
-    expect(isBetter({ hits: 45, total: 48 }, { hits: 42, total: 48 })).toBe(true);
-    expect(isBetter({ hits: 42, total: 48 }, { hits: 45, total: 48 })).toBe(false);
-    expect(isBetter({ hits: 42, total: 48 }, { hits: 42, total: 48 })).toBe(false);
-    expect(isBetter({ hits: 8, total: 10 }, { hits: 4, total: 5 })).toBe(true);
-    expect(isBetter({ hits: 4, total: 5 }, { hits: 8, total: 10 })).toBe(false);
-    expect(isBetter({ hits: 10, total: 10 }, { hits: 47, total: 48 })).toBe(true);
+    expect(summarize(tl, r)).toEqual({ hits: 4, total: tl.tones.length, complete: true });
+    expect(summarize(tl, r.slice(0, 5))).toEqual({ hits: 1, total: 5, complete: false });
   });
 });

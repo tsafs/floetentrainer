@@ -224,3 +224,18 @@ export function sectionTimeline(song: Song, fromBar: number, toBar: number): Tim
   if (i1 < 0) i1 = order.length - 1;
   return timelineOfBars(song, order.slice(i0, i1 + 1));
 }
+
+/**
+ * Zeitplan ab einem Takt bis zum Liedende, Start bei 0 („ab hier“ beim Anhören). bar ist der Index im
+ * Notenbild; es gilt sein erstes Vorkommen in Spielreihenfolge (Wiederholungen danach werden wie sonst
+ * ausgeschrieben). Kommt der Takt in der Spielreihenfolge nicht vor, beginnt der Zeitplan beim nächsten
+ * Takt, der vorkommt. Eingezählt wird in der Taktart dieses Takts.
+ */
+export function fromBarTimeline(song: Song, bar: number): Timeline {
+  const n = song.bars.length;
+  const b = Math.max(0, Math.min(n - 1, Math.round(bar)));
+  const order = playOrder(song);
+  let i0 = order.indexOf(b);
+  if (i0 < 0) i0 = order.findIndex((i) => i >= b);
+  return timelineOfBars(song, i0 < 0 ? order : order.slice(i0));
+}
