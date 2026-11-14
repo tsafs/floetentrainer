@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DATA_VERSION, defaultData, normalizeData } from "../../src/store/data";
-import { loadData, parseBackup, saveData, STORAGE_KEY } from "../../src/store/storage";
+import { backupJson, loadData, parseBackup, saveData, STORAGE_KEY } from "../../src/store/storage";
 import { TODAY } from "./helpers";
 
 class MemStorage {
@@ -99,5 +99,63 @@ describe("Umwandlung und Prüfung", () => {
     const back = parseBackup(JSON.stringify({ ...d, savedAt: "x" }));
     expect(back.stages.lesen).toBe("c1");
     expect(back.days).toEqual([TODAY]);
+  });
+});
+
+describe("Einstellungen je Lied", () => {
+  it("ältere Daten ohne Feld: leer, ohne Versionssprung", () => {
+    const d = normalizeData({ version: 1, app: "floetentrainer" });
+    expect(d.version).toBe(DATA_VERSION);
+    expect(d.songs).toEqual({});
+  });
+  it("Tempo wird begrenzt, Fehlerhaftes still übergangen, kommt mit in die Sicherung", () => {
+    const d = normalizeData({
+      version: 1,
+      songs: { "jingle-bells": { tempo: 80 }, "stille-nacht": { tempo: 300 }, kaputt: 5, "Böse Kennung": { tempo: 90 }, x: { tempo: "schnell" } },
+    });
+    expect(d.songs).toEqual({ "jingle-bells": { tempo: 80 }, "stille-nacht": { tempo: 120 } });
+    const back = parseBackup(JSON.stringify({ ...d, savedAt: "x" }));
+    expect(back.songs["jingle-bells"].tempo).toBe(80);
+  });
+});
+
+describe("Mitspielen: Einstellungen; alte Bestwerte werden still verworfen", () => {
+  it("Standard: keine Kopfhörer, Warte-Modus; ältere Daten ohne die Felder bekommen den Standard (ohne Versionssprung)", () => {
+    expect(defaultData().settings).toMatchObject({ headphones: false, followMode: "wait" });
+    const d = normalizeData({ version: 2, app: "floetentrainer", settings: { tuningHz: 442 } });
+    expect(d.version).toBe(DATA_VERSION);
+    expect(DATA_VERSION).toBe(2);
+    expect(d.settings).toMatchObject({ tuningHz: 442, headphones: false, followMode: "wait" });
+  });
+
+  it("Kopfhörer und Art werden übernommen, Fehlerhaftes fällt still auf den Standard zurück", () => {
+    const ok = normalizeData({ ...defaultData(), settings: { ...defaultData().settings, headphones: true, followMode: "beat" } });
+    expect(ok.settings).toMatchObject({ headphones: true, followMode: "beat" });
+    const bad = normalizeData({ ...defaultData(), settings: { ...defaultData().settings, headphones: "ja", followMode: "schnell" } });
+    expect(bad.settings).toMatchObject({ headphones: false, followMode: "wait" });
+  });
+
+  it("Bestwerte aus älteren Daten sind kein Fehler, werden aber nicht übernommen; das Tempo bleibt", () => {
+    const d = normalizeData({
+      ...defaultData(),
+      songs: {
+        a: { tempo: 90, best: { wait: { hits: 45, total: 48, at: 5 }, beat: { hits: 50, total: 48 } } },
+        b: { best: { beat: { hits: 3.4, total: 7 }, wait: "gut" } },
+        e: { best: [1, 2] },
+      },
+    });
+    expect(d.version).toBe(DATA_VERSION);
+    expect(d.songs).toEqual({ a: { tempo: 90 } });
+  });
+
+  it("Sicherung mit alten Bestwerten lässt sich einlesen; Kopfhörer kommen mit, Bestwerte nicht", () => {
+    const d = defaultData();
+    d.settings.headphones = true;
+    d.settings.followMode = "beat";
+    const old = { ...JSON.parse(backupJson(d)), songs: { "jingle-bells": { tempo: 80, best: { beat: { hits: 40, total: 48, at: 123 } } } } };
+    const back = parseBackup(JSON.stringify(old));
+    expect(back.settings).toMatchObject({ headphones: true, followMode: "beat" });
+    expect(back.songs["jingle-bells"]).toEqual({ tempo: 80 });
+    expect(JSON.parse(backupJson(back)).songs["jingle-bells"].best).toBeUndefined();
   });
 });

@@ -45,6 +45,12 @@
   --hole-ring: #2b2724;
   --thumb-bg: none;
   --thumb-line: none;
+  /* Notensatz der Lieder: klingende Note (samt Hinterlegung und Balken), gewählter Abschnitt */
+  --mark: #1f6fba;
+  --mark-glow: rgba(31, 111, 186, 0.26);
+  --playhead: rgba(31, 111, 186, 0.5);
+  --mark-tint: #e2e5e0;
+  --mark-sel: #d0d9d8;
 }
 
 /* Dunkelmodus: folgt dem Handy, außer in den Einstellungen ist „Hell“ oder „Dunkel“ gewählt.
@@ -72,6 +78,11 @@
     --hole-ring: #e6dccb;
     --thumb-bg: var(--wood);
     --thumb-line: var(--wood-line);
+    --mark: #62aef0;
+    --mark-glow: rgba(98, 174, 240, 0.3);
+    --playhead: rgba(98, 174, 240, 0.62);
+    --mark-tint: #2f3234;
+    --mark-sel: #3b444a;
   }
 }
 :root[data-theme="dark"] {
@@ -96,6 +107,11 @@
   --hole-ring: #e6dccb;
   --thumb-bg: var(--wood);
   --thumb-line: var(--wood-line);
+  --mark: #62aef0;
+  --mark-glow: rgba(98, 174, 240, 0.3);
+  --playhead: rgba(98, 174, 240, 0.62);
+  --mark-tint: #2f3234;
+  --mark-sel: #3b444a;
 }
 
 * {
@@ -480,6 +496,17 @@ svg.acc {
   min-height: 48px;
   display: grid;
   align-items: center;
+  white-space: nowrap;
+}
+/* passt die Zeile nicht (home.ts misst), wird sie zweizeilig – bei gleicher Schrift */
+.links.two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  justify-items: center;
+  row-gap: 0;
+}
+.links.two a {
+  padding: 4px 6px;
 }
 .banner {
   border-radius: 12px;
@@ -1184,4 +1211,1095 @@ svg.acc {
 
 [hidden] {
   display: none !important;
+}
+
+/* Notensatz der Lieder (src/songs/engrave.ts): je Zeile ein SVG, Einheit 1 = ein Zwischenraum.
+   .n/.r = Note/Pause (data-id), .cur = gerade klingende Note, .takt = Tipp-Rechteck je Takt (data-bar),
+   .inloop = Takt im gewählten Abschnitt, .sel = gerade angetippter Takt. */
+.score {
+  display: block;
+}
+.score svg.sys {
+  display: block;
+  overflow: visible;
+  fill: var(--ink);
+  stroke: var(--ink);
+  -webkit-user-select: none;
+  user-select: none;
+}
+.score svg.sys * {
+  pointer-events: none;
+}
+.score path,
+.score rect,
+.score circle,
+.score text {
+  stroke: none;
+}
+.score .volta {
+  fill: none;
+  stroke: var(--ink);
+}
+.score text {
+  font-family: "EB Garamond", Georgia, serif;
+}
+.score .syl {
+  text-anchor: middle;
+}
+.score .bno {
+  font-style: italic;
+  fill: var(--soft);
+}
+.score svg.sys .takt {
+  fill: transparent;
+  shape-rendering: crispEdges;
+  pointer-events: all;
+  cursor: pointer;
+  transition: fill 0.15s;
+}
+/* Mitspielen: gewählte Takte; Anhören: Takt, ab dem gerade vorgespielt wird */
+.score svg.sys .takt.picked {
+  fill: var(--mark-tint);
+}
+.score svg.sys .takt.from {
+  fill: var(--neutral-tint);
+}
+/* klingende Note: kräftiger Farbton, der Kopf zart hinterlegt (breiter halbdurchsichtiger Rand
+   hinter der Füllung). Keine Übergänge: die Markierung soll genau mit dem Ton kommen. */
+.score .cur {
+  fill: var(--mark);
+  stroke: var(--mark);
+}
+.score .cur path.h {
+  stroke: var(--mark-glow);
+  stroke-width: 0.9;
+  stroke-linejoin: round;
+  paint-order: stroke;
+}
+/* Notensatz der Lieder, Zusatz für ABC-Lieder: Klammer einer Triole (.tup = Zahl samt Klammer) */
+.score .tup path.tupb {
+  fill: none;
+  stroke: var(--ink);
+}
+
+/* ---------------------------------------------------------------- Lieder */
+/* Taktart */
+.ts {
+  white-space: nowrap;
+}
+/* Notenzeichen der Tempoangabe */
+svg.bm {
+  height: 1.05em;
+  width: auto;
+  vertical-align: -0.2em;
+  fill: currentColor;
+  margin-right: 0.05em;
+}
+.eq {
+  white-space: pre;
+}
+.nb {
+  white-space: nowrap;
+}
+
+/* Liederliste: Abschnitte als Karten mit getönter Kopfzeile, über die Kopfzeile ein- und ausklappbar */
+.songlist {
+  gap: 0;
+}
+.songlist .topbar {
+  margin-bottom: 0;
+}
+.songlist .intro {
+  margin: 0 2px 16px;
+  font-size: 0.95rem;
+}
+.songlist .msg {
+  margin: -6px 2px 14px;
+}
+.songlist .card {
+  display: block;
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--btn);
+  overflow: hidden;
+}
+.cardh {
+  margin: 0;
+  font: inherit;
+}
+.cardhd {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: baseline;
+  column-gap: 10px;
+  width: 100%;
+  min-height: 60px;
+  padding: 11px 14px 10px 16px;
+  background: var(--neutral-tint);
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  color: var(--ink);
+  transition: border-color 0.24s;
+}
+.card.closed .cardhd {
+  border-bottom-color: transparent;
+}
+.cardhd:focus-visible {
+  outline: 2px solid var(--wood-line);
+  outline-offset: -3px;
+  border-radius: 15px;
+}
+.cardhd .ct {
+  font-weight: 500;
+  font-size: 1.15rem;
+  line-height: 1.2;
+}
+.cardhd .cn {
+  font-style: italic;
+  color: var(--soft);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+.cardhd .chev {
+  align-self: center;
+  stroke: var(--soft);
+  transition: transform 0.24s ease;
+}
+.card.closed .chev {
+  transform: rotate(-90deg);
+}
+.cardhd .cs {
+  grid-column: 1 / 3;
+  margin-top: 2px;
+  font-style: italic;
+  color: var(--soft);
+  font-size: 0.88rem;
+  line-height: 1.25;
+}
+/* Aufklappen: Höhe über grid-template-rows (0fr ↔ 1fr), zugeklappt unsichtbar und nicht erreichbar */
+.cardbody {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 0.24s ease, visibility 0.24s;
+}
+.card.closed .cardbody {
+  grid-template-rows: 0fr;
+  visibility: hidden;
+}
+.cardin {
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 16px;
+}
+.cardin > .help {
+  margin: 0;
+  padding: 12px 0;
+  font-size: 0.95rem;
+}
+.cardin > .help + .help,
+.cardin > ul + .help {
+  padding-top: 0;
+}
+.addrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 54px;
+  margin: 0 -16px;
+  border-top: 1px solid var(--track);
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 1.1rem;
+}
+.addrow svg {
+  stroke: currentColor;
+  flex: none;
+}
+.songlist .grp {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 4px 12px;
+  font-style: italic;
+  color: var(--soft);
+}
+.songlist .grp::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+@media (prefers-reduced-motion: reduce) {
+  .cardbody,
+  .cardhd,
+  .cardhd .chev {
+    transition: none;
+  }
+}
+ul.songs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+ul.songs li + li {
+  border-top: 1px solid var(--track);
+}
+.songrow {
+  display: grid;
+  gap: 1px;
+  min-height: 56px;
+  padding: 10px 0 11px;
+  align-content: center;
+  color: inherit;
+  text-decoration: none;
+}
+.songrow .st {
+  font-size: 1.15rem;
+  line-height: 1.2;
+}
+.songrow .sm {
+  font-size: 0.9rem;
+  color: var(--soft);
+}
+.songrow .sm .ts,
+.songhead .ts {
+  font-size: 1.12em;
+}
+.songrow .miss {
+  font-size: 0.9rem;
+  font-style: italic;
+  color: var(--soft);
+}
+
+/* Liedseite */
+.songpage {
+  max-width: 760px;
+  gap: 12px;
+  padding-bottom: calc(var(--ph, 140px) + 36px);
+}
+.songhead {
+  align-items: start;
+  margin-bottom: 0;
+}
+.songhead .ttl {
+  padding-top: 6px;
+  display: grid;
+  gap: 3px;
+}
+.songhead h1 {
+  font-size: 1.5rem;
+}
+.songhead .meta {
+  font-size: 0.95rem;
+  color: var(--soft);
+  font-style: italic;
+}
+/* Umschalter „Anhören | Mitspielen“ */
+.songpage .modes {
+  grid-template-columns: 1fr 1fr;
+  border-radius: 25px;
+}
+.modes button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  font-size: 1.08rem;
+}
+.modes button svg {
+  stroke: currentColor;
+  flex: none;
+}
+.modes button[aria-selected="true"] {
+  background: var(--ink);
+  color: var(--paper);
+}
+/* während des Mitspielens gesperrt: die gewählte Art bleibt kräftig, die andere tritt zurück */
+.modes button:disabled {
+  cursor: default;
+}
+.modes button:disabled:not([aria-selected="true"]) {
+  opacity: 0.4;
+}
+.songpage .hint {
+  margin-top: -4px;
+  font-size: 0.92rem;
+  font-style: italic;
+  color: var(--soft);
+  line-height: 1.3;
+  transition: opacity 0.2s;
+}
+.songpage .hint.gone {
+  display: none;
+}
+.scorebox {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+  min-height: 60px;
+}
+.scorebox .score svg.sys + svg.sys {
+  margin-top: 4px;
+}
+/* mitlaufender Balken (src/ui/playhead.ts): Lage nur über transform, ohne Übergänge */
+.scorebox {
+  position: relative;
+}
+.playhead {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 2.5px;
+  height: 40px;
+  border-radius: 1.25px;
+  background: var(--playhead);
+  opacity: 0;
+  pointer-events: none;
+  will-change: transform;
+}
+.playhead.on {
+  opacity: 1;
+}
+.stanzas {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(min(100%, max(var(--minw), calc((100% - (var(--cols) - 1) * 28px) / var(--cols)))), 1fr)
+  );
+  gap: 14px 28px;
+  margin-top: 14px;
+  padding-left: 1.5em;
+}
+.stz {
+  position: relative;
+  font-size: 1.02rem;
+  line-height: 1.35;
+}
+.stn {
+  position: absolute;
+  left: -1.5em;
+  color: var(--soft);
+  font-style: italic;
+}
+.songpage .credit {
+  font-style: italic;
+  color: var(--soft);
+  font-size: 0.92rem;
+  margin-top: 8px;
+}
+
+/* Bedienleiste: im Hochformat unten fest. Kein Griffbild (nur der kleine Name der Note): knapp,
+   damit viele Noten sichtbar bleiben. Anhören: links Abspielen, daneben Name/Takt über dem Tempo,
+   rechts das Metronom. */
+.player {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  background: var(--paper);
+  border-top: 1px solid var(--line);
+  padding: 8px max(20px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+}
+.pin {
+  max-width: 720px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "play info metro"
+    "play tempo metro";
+  column-gap: 14px;
+  row-gap: 0;
+  align-items: center;
+}
+.pinfo {
+  grid-area: info;
+  display: flex;
+  align-items: baseline;
+  gap: 2px 12px;
+  min-height: 26px;
+  min-width: 0;
+}
+.pname {
+  font-size: 1.3rem;
+  line-height: 1;
+  font-weight: 500;
+  min-width: 1.4em;
+  padding-top: 0.25em;
+}
+.pcount {
+  display: flex;
+  gap: 0.55em;
+  font-size: 1.15rem;
+  line-height: 1;
+  color: var(--line);
+  font-variant-numeric: tabular-nums;
+}
+.pcount i {
+  font-style: normal;
+}
+.pcount i.on {
+  color: var(--soft);
+}
+.pstat {
+  flex: 1;
+  min-width: 0;
+  font-style: italic;
+  color: var(--soft);
+  font-size: 0.92rem;
+  line-height: 1.2;
+}
+.clear {
+  min-height: 48px;
+  padding: 4px 2px 4px 8px;
+  font-style: italic;
+  color: var(--ink);
+  font-size: 0.95rem;
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 3px;
+  white-space: nowrap;
+}
+.playbtn {
+  grid-area: play;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--paper);
+  display: grid;
+  place-items: center;
+}
+.playbtn svg {
+  fill: currentColor;
+}
+.playbtn:not(.on) svg {
+  margin-left: 3px;
+}
+.tempo {
+  grid-area: tempo;
+  display: grid;
+  min-width: 0;
+}
+.tempo .tl {
+  font-size: 0.88rem;
+  font-style: italic;
+  color: var(--soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tempo output {
+  font-style: normal;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.tempo input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 32px;
+  margin: 0;
+  background: none;
+  touch-action: pan-y;
+}
+.tempo input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--track);
+}
+.tempo input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 24px;
+  height: 24px;
+  margin-top: -10px;
+  border-radius: 50%;
+  background: var(--btn);
+  border: 1.5px solid var(--ink);
+}
+.tempo input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--track);
+}
+.tempo input[type="range"]::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--btn);
+  border: 1.5px solid var(--ink);
+}
+.tempo input[type="range"]:focus-visible {
+  outline: 2px solid var(--wood-line);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.metro {
+  grid-area: metro;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 1.2px solid var(--line);
+  display: grid;
+  place-items: center;
+  color: var(--soft);
+}
+.metro svg {
+  stroke: currentColor;
+  fill: currentColor;
+}
+.metro[aria-pressed="true"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+/* Querformat (Handy): Noten links, rechts eine Spalte mit dem Umschalter oben und der Bedienleiste */
+@media (orientation: landscape) and (max-height: 520px) {
+  .songpage {
+    max-width: none;
+    margin: 0;
+    padding-right: calc(272px + max(24px, env(safe-area-inset-right)));
+    padding-bottom: 28px;
+  }
+  .songpage .modes {
+    position: fixed;
+    z-index: 6;
+    top: max(12px, env(safe-area-inset-top));
+    right: max(18px, env(safe-area-inset-right));
+    width: 236px;
+  }
+  .modes button {
+    font-size: 1rem;
+    gap: 6px;
+  }
+  .songpage .hint {
+    margin-top: 0;
+  }
+  .player {
+    left: auto;
+    top: 0;
+    width: 272px;
+    border-top: 0;
+    border-left: 1px solid var(--line);
+    padding: calc(max(12px, env(safe-area-inset-top)) + 62px) max(18px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) 18px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .pin {
+    width: 100%;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "info info info"
+      "tempo tempo tempo"
+      "play . metro";
+    row-gap: 10px;
+  }
+  .pinfo {
+    min-height: 40px;
+  }
+  .pname {
+    font-size: 1.8rem;
+  }
+}
+
+/* ---------------------------------------------------------------- Mitspielen (src/ui/song-follow.ts)
+   Im Zustand .following ersetzt .fpin die Leiste fürs Anhören. Einstellen (.fset): ggf. Auswahl mit
+   „Auswahl aufheben“, Wahl der Art, Kopfhörer, darunter Tempo (nur „Im Takt“) und der große Knopf.
+   Während des Spielens (.frun) eine Zeile: Stopp, Name der Note und Hinweise, ggf. Tempo.
+   Noten im Notensatz: .hit getroffen, .miss verfehlt/falsch (die aktuelle bleibt markiert). */
+.score .hit {
+  fill: var(--ok);
+  stroke: var(--ok);
+}
+.score .miss {
+  fill: var(--err);
+  stroke: var(--err);
+}
+.score .cur.hit,
+.score .cur.miss {
+  fill: var(--mark);
+  stroke: var(--mark);
+}
+.songpage.following .pin {
+  display: none;
+}
+.fpin {
+  max-width: 720px;
+  margin: 0 auto;
+}
+.fset {
+  display: grid;
+  gap: 6px;
+}
+.fsel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -4px 0 -6px;
+}
+.fsl {
+  font-size: 1.02rem;
+  white-space: nowrap;
+}
+.fmode {
+  grid-template-columns: repeat(2, 1fr);
+}
+.fmode button {
+  font-size: 1.02rem;
+}
+.fphones {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+}
+.fphones .switch {
+  margin-left: -4px;
+}
+.fphones .lab,
+.setting .lab {
+  display: grid;
+  line-height: 1.25;
+}
+.fphones .lab {
+  line-height: 1.15;
+}
+.fphones .lab small {
+  font-style: italic;
+  color: var(--soft);
+  font-size: 0.85rem;
+}
+.fgorow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.fgo.big {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 52px;
+  border-radius: 26px;
+  font-size: 1.12rem;
+  line-height: 1.1;
+  padding: 4px 16px;
+}
+.fgo svg {
+  fill: currentColor;
+  flex: none;
+}
+/* Tempo in Schritten: − Tempo 80 % + */
+.tstep {
+  display: flex;
+  align-items: center;
+  height: 52px;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 26px;
+  background: var(--btn);
+}
+.tstep button {
+  width: 44px;
+  height: 50px;
+  font-size: 1.45rem;
+  line-height: 1;
+  color: var(--ink);
+}
+.tstep button:disabled {
+  opacity: 0.3;
+}
+.tstep .tv {
+  display: grid;
+  min-width: 3.3em;
+  text-align: center;
+  line-height: 1;
+}
+.tstep small {
+  font-style: italic;
+  color: var(--soft);
+  font-size: 0.72rem;
+  margin-bottom: 3px;
+}
+.tstep output {
+  font-size: 1.02rem;
+  font-variant-numeric: tabular-nums;
+}
+/* schmale Handys: Tempo knapper, damit „Takt 5–7 mitspielen“ in eine Zeile passt */
+@media (max-width: 400px) {
+  .tstep button {
+    width: 38px;
+  }
+  .tstep .tv {
+    min-width: 2.7em;
+  }
+  .fpin.beat .fgo svg {
+    display: none;
+  }
+  .fgo.big {
+    padding: 4px 12px;
+    font-size: 1.08rem;
+  }
+}
+/* Schalter (Kopfhörer) */
+.switch {
+  position: relative;
+  width: 58px;
+  height: 48px;
+  flex: none;
+}
+.switch::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: 10px;
+  height: 28px;
+  border-radius: 14px;
+  background: var(--track);
+  border: 1px solid var(--line);
+  transition: background 0.15s, border-color 0.15s;
+}
+.switch i {
+  position: absolute;
+  top: 13px;
+  left: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--btn);
+  border: 1.2px solid var(--soft);
+  transition: transform 0.15s;
+}
+.switch[aria-checked="true"]::before {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+.switch[aria-checked="true"] i {
+  transform: translateX(24px);
+  border-color: var(--ink);
+}
+.switch:focus-visible {
+  outline: 2px solid var(--wood-line);
+  outline-offset: -2px;
+  border-radius: 16px;
+}
+.frun {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 56px;
+}
+.frun .playbtn {
+  flex: none;
+}
+.finfo {
+  flex: 1 1 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 12px;
+  min-width: 0;
+}
+.finfo .pstat {
+  flex: 1 1 auto;
+}
+.fwrong {
+  font-style: italic;
+  color: var(--err);
+  font-size: 0.95rem;
+  line-height: 1.2;
+}
+.fwrong:empty {
+  display: none;
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  /* Einstellen: was nicht passt, scrollt; der große Knopf bleibt unten sichtbar */
+  .songpage.following .player {
+    justify-content: flex-end;
+  }
+  .fpin {
+    width: 100%;
+    min-height: 0;
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  .fset {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .fgorow {
+    position: sticky;
+    bottom: 0;
+    background: var(--paper);
+    flex-wrap: wrap;
+  }
+  .fgorow .fgo.big,
+  .fgorow .tstep {
+    flex-basis: 100%;
+  }
+  .fgorow .tstep {
+    justify-content: space-between;
+  }
+  .fsl .gw {
+    display: none;
+  }
+  .fphones .lab small {
+    font-size: 0.8rem;
+  }
+  .frun {
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+  .frun .finfo {
+    order: -1;
+    flex-basis: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .frun .pname {
+    font-size: 1.8rem;
+  }
+}
+
+/* ---------------------------------------------------------------- Eigene Lieder (ABC)
+   Liederliste (Kapitel „Eigene Lieder“), Seite „Lied hinzufügen“ (src/ui/own-songs.ts), Kasten auf der
+   Liedseite. Nur dieser Abschnitt gehört zur Erweiterung „Eigene Lieder“. */
+.songrow.broken .miss {
+  color: var(--err);
+}
+
+.screen.songadd {
+  max-width: 600px;
+}
+.songadd .addsrc {
+  gap: 12px;
+}
+.songadd .or {
+  text-align: center;
+  font-style: italic;
+  color: var(--soft);
+  margin: 2px 0;
+}
+.songadd .paste {
+  display: grid;
+  gap: 6px;
+}
+.songadd textarea {
+  width: 100%;
+  min-height: 9.5em;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--btn);
+  color: var(--ink);
+  padding: 12px 14px;
+  font: 0.85rem/1.45 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+.songadd textarea::placeholder {
+  color: var(--soft);
+  opacity: 0.7;
+}
+.songadd textarea:focus-visible {
+  outline: 2px solid var(--wood-line);
+  outline-offset: 1px;
+}
+.big:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.songadd .addres {
+  gap: 14px;
+}
+.srcline,
+.selall {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  column-gap: 12px;
+}
+.srcline b {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.srcline .textbtn,
+.selall .textbtn {
+  margin-left: auto;
+  margin-right: -10px;
+}
+.selall > span {
+  font-style: italic;
+  color: var(--soft);
+}
+.songadd .note,
+.songbroken .note {
+  font-size: 0.92rem;
+  font-style: italic;
+  color: var(--soft);
+  line-height: 1.35;
+}
+ul.picks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--track);
+}
+.pick {
+  border-bottom: 1px solid var(--track);
+  padding: 4px 0 10px;
+  display: grid;
+  gap: 6px;
+}
+.pk,
+.tick {
+  position: relative;
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  align-items: center;
+  column-gap: 14px;
+  min-height: 56px;
+  cursor: pointer;
+}
+.pk.one {
+  grid-template-columns: 1fr;
+  cursor: default;
+}
+.tick {
+  min-height: 48px;
+}
+.pk input,
+.tick input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+}
+svg.ck {
+  width: 26px;
+  height: 26px;
+}
+svg.ck circle {
+  fill: none;
+  stroke: var(--soft);
+  stroke-width: 1.3;
+}
+svg.ck path {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+input:checked + svg.ck circle {
+  fill: var(--ink);
+  stroke: var(--ink);
+}
+input:checked + svg.ck path {
+  stroke: var(--paper);
+}
+input:focus-visible + svg.ck {
+  outline: 2px solid var(--wood-line);
+  outline-offset: 2px;
+  border-radius: 50%;
+}
+.pt {
+  display: grid;
+  gap: 1px;
+}
+.pt .st {
+  font-size: 1.15rem;
+  line-height: 1.2;
+}
+.pt .sm {
+  font-size: 0.9rem;
+  color: var(--soft);
+}
+.pt .sm .ts {
+  font-size: 1.12em;
+}
+.pd {
+  display: grid;
+  gap: 8px;
+}
+.pk:not(.one) + .pd {
+  padding-left: 40px;
+}
+.pd:empty {
+  display: none;
+}
+.shiftbox {
+  border-radius: 14px;
+  background: var(--neutral-tint);
+  padding: 10px 14px 4px;
+  display: grid;
+  gap: 2px;
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+.shiftbox .tick span {
+  font-size: 1.05rem;
+}
+.songadd .bad {
+  border-radius: 16px;
+  background: var(--err-tint);
+  padding: 14px 16px;
+  gap: 8px;
+}
+.songadd .bad h3 {
+  font-size: 1.05rem;
+  font-weight: 500;
+}
+.songadd .bad ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+.songadd .bad b {
+  font-weight: 500;
+}
+.songadd .bad .help {
+  font-size: 0.92rem;
+}
+
+/* Liedseite eines eigenen Lieds */
+.songpage .ownbox,
+.songbroken .ownbox {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--track);
+}
+.ownnotes {
+  display: grid;
+  gap: 4px;
+  font-size: 0.92rem;
+  font-style: italic;
+  color: var(--soft);
+  line-height: 1.35;
+}
+.ownbox > .big {
+  max-width: 340px;
+}
+.ownbox .confirm {
+  max-width: 540px;
 }

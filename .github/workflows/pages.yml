@@ -1,5 +1,7 @@
 # Baut die Übungs-App (app/) bei jedem Push auf main und veröffentlicht sie auf GitHub Pages:
 # https://tsafs.github.io/floetentrainer/
+# Die Lieder kommen beim Bauen aus heft/songs.py (app/scripts/heft-songs-plugin.ts, mit dem
+# vorinstallierten python3), deshalb gilt das auch für Änderungen am Heft: kein Pfadfilter.
 name: App veröffentlichen
 
 on:

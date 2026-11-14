@@ -7,6 +7,8 @@ import { homeView } from "./ui/home";
 import { chartView, micHelpView, progressView, summaryView } from "./ui/pages";
 import { practiceView } from "./ui/practice";
 import { settingsView } from "./ui/settings";
+import { songAddView } from "./ui/own-songs";
+import { songListView, songView } from "./ui/songs";
 import { applyTheme } from "./ui/theme";
 import { tunerView } from "./ui/tuner";
 import { defaultData } from "./store/data";
@@ -24,10 +26,13 @@ const ROUTES: Record<string, View> = {
   stimmgeraet: tunerView,
   einstellungen: settingsView,
   mikrofon: micHelpView,
+  lieder: songListView,
+  lied: songView, // #/lied/<Kennung>
+  "lied-hinzufuegen": songAddView,
 };
 
 function routeName(): string {
-  return location.hash.replace(/^#\/?/, "").split("?")[0];
+  return location.hash.replace(/^#\/?/, "").split("?")[0].split("/")[0];
 }
 
 let cleanup: (() => void) | void;

@@ -91,7 +91,7 @@ export const homeView: View = (root, ctx) => {
     <button class="main" data-act="ueben">${lese.label}<small>${lese.sub}</small></button>
     <button class="alt" data-act="spielen">${spiel.label}<small>${spiel.sub}</small></button>
   </section>
-  <nav class="links"><a href="#/stimmgeraet" data-act="tuner">Stimmgerät</a><a href="#/griffe">Grifftabelle</a><a href="#/einstellungen">Einstellungen</a></nav>
+  <nav class="links"><a href="#/lieder">Lieder</a><a href="#/stimmgeraet" data-act="tuner">Stimmgerät</a><a href="#/griffe">Grifftabelle</a><a href="#/einstellungen">Einstellungen</a></nav>
 </main>`;
   const main = root.querySelector("main")!;
   main.querySelector('[data-act="ueben"]')!.addEventListener("click", () => startSession(ctx, "lesen"));
@@ -102,8 +102,12 @@ export const homeView: View = (root, ctx) => {
   });
 
   // Passt alles ohne Scrollen? Sonst die Tonübersicht verdichten oder ausblenden.
+  // Die untere Zeile wird zweizeilig, wenn ihre vier Einträge nicht nebeneinander passen.
+  const links = main.querySelector(".links") as HTMLElement;
   const fit = () => {
     main.classList.remove("dense", "denser");
+    links.classList.remove("two");
+    if (links.scrollWidth > links.clientWidth + 1) links.classList.add("two");
     const over = () => main.scrollHeight > main.clientHeight + 1;
     if (over()) main.classList.add("dense");
     if (over()) main.classList.add("denser");

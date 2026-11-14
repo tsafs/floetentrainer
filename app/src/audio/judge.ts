@@ -10,6 +10,8 @@ export interface Frame {
   freq: number | null;
   /** Klarheit laut pitchy (0–1) */
   clarity: number;
+  /** Lautstärke (Effektivwert des Messfensters, 0–1); optional, das Mitspielen erkennt daran neue Einsätze */
+  rms?: number;
 }
 
 export interface JudgeConfig {
