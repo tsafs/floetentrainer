@@ -1,12 +1,19 @@
 // Stimmgerät: freies Spielen mit laufender Anzeige der gehörten Note.
 //
 // Ruhige Anzeige (Rückmeldung vom 14.11.2026, „der Ton wackelt zu viel hin und her“): Die Frames
-// laufen durch den Glätter (../audio/smooth.ts) mit kräftiger Einstellung – Median über 5 Frames
-// (≈ 125 ms) und Zeitkonstante 175 ms – für Zeiger und Cent-Anzeige. Ein klarer Tonwechsel (über
-// 70 Cent) und ein neuer Einsatz nach Stille gelten trotzdem sofort. Der Notenname hat eine Hysterese
-// (NameHold): Er wechselt erst, wenn der neue Ton 100 ms anliegt oder mehr als 60 Cent vom angezeigten
-// abweicht; die Cent-Anzeige bezieht sich immer auf den angezeigten Namen. Dazu gleitet der Zeiger per
-// CSS kurz (100 ms) nach, ohne die Anzeige zu verzögern.
+// laufen durch den Glätter (../audio/smooth.ts) mit kräftiger Einstellung – Stabilitätsprüfung,
+// Median über 5 Frames (≈ 125 ms) und Zeitkonstante 175 ms – für Zeiger und Cent-Anzeige. Ein klarer
+// Tonwechsel (über 70 Cent) und ein neuer Einsatz nach Stille gelten trotzdem sofort. Der Notenname hat
+// eine Hysterese (NameHold): Er wechselt erst, wenn der neue Ton ununterbrochen anliegt – bei einem
+// klaren Wechsel (über 60 Cent vom angezeigten) drei Frames (≈ 50 ms), knapp an der Mitte zwischen zwei
+// Tönen 100 ms. Die Cent-Anzeige bezieht sich immer auf den angezeigten Namen. Dazu gleitet der Zeiger
+// per CSS kurz (100 ms) nach, ohne die Anzeige zu verzögern.
+//
+// Tonwechsel (Rückmeldung vom 14.11.2026: „wenn ich schnell von G auf A oder von A auf H wechsle, sehe
+// ich kurz GIS bzw. den Zwischenton“): Übergangswerte, die beim Wechsel entstehen, filtert schon die
+// Stabilitätsprüfung im Glätter; die Namensregel (drei Frames) fängt den Rest. Solange ein klarer
+// Wechsel abgewartet wird (NameHold.pending), bleiben Zeiger und Cent stehen, statt kurz an den Rand
+// („+100 Cent“) gezogen zu werden.
 
 import { keepAwake, mic } from "../audio/mic";
 import { NameHold, pitched, Smoother, TUNER_SMOOTH } from "../audio/smooth";
@@ -64,6 +71,8 @@ export const tunerView: View = (root, ctx) => {
       return;
     }
     lastAt = f.t;
+    // neuer Ton wird noch abgewartet: Name, Zeiger und Cent bleiben wie sie sind
+    if (names.pending) return;
     if (h.midi !== shown) {
       shown = h.midi;
       nm.innerHTML = midiNameHtml(h.midi);

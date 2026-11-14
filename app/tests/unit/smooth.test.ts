@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_FOLLOW } from "../../src/audio/follow";
 import { DEFAULT_JUDGE, type Frame } from "../../src/audio/judge";
-import { DEFAULT_SMOOTH, NameHold, pitched, Smoother, TUNER_SMOOTH, type SmoothConfig } from "../../src/audio/smooth";
+import { DEFAULT_SMOOTH, NameHold, pitched, Smoother, TUNER_SMOOTH, type SmoothConfig, type SmoothedFrame } from "../../src/audio/smooth";
 import { freqToWrittenMidi, soundingFreq } from "../../src/music/notes";
 import { seeded } from "./helpers";
+import { A, fastChanges, G, H, UP_DOWN, type Played } from "./transition-helpers";
 
 const STEP = 25;
 /** klingende Frequenz zu einer notierten MIDI-Nummer, ggf. mit Cent-Abweichung */
@@ -199,17 +200,29 @@ describe("Notenname mit Hysterese", () => {
     expect(shown.size).toBe(1);
   });
 
-  it("wechselt nach 100 ms am neuen Ton oder sofort über 60 Cent", () => {
+  it("wechselt knapp an der Mitte nach 100 ms, bei einem klaren Wechsel (über 60 Cent) nach drei Frames", () => {
     const n = new NameHold();
     expect(n.push(FIS1 + 0.1, 0)).toBe(FIS1);
     // 55 Cent über fis¹ = g¹ −45 Cent: erst nach 100 ms
     let t = 25;
     for (; t < 125; t += STEP) expect(n.push(FIS1 + 0.55, t)).toBe(FIS1);
     expect(n.push(FIS1 + 0.55, t)).toBe(G1);
-    // zurück: 65 Cent unter g¹ ist mehr als 60 → sofort
-    expect(n.push(G1 - 0.65, t + 25)).toBe(FIS1);
-    // ein klarer Tonwechsel gilt sofort
+    // zurück: 65 Cent unter g¹ ist mehr als 60 → nach 50 ms (drei Frames), nicht mehr sofort
+    t += STEP;
+    expect(n.push(G1 - 0.65, t)).toBe(G1);
+    expect(n.pending).toBe(true);
+    expect(n.push(G1 - 0.65, t + 25)).toBe(G1);
+    expect(n.push(G1 - 0.65, t + 50)).toBe(FIS1);
+    expect(n.pending).toBe(false);
+    // ein klarer Tonwechsel ebenso: der erste und zweite Frame auf a¹ lassen fis¹ stehen, der dritte gilt
+    t += 75;
+    expect(n.push(A1, t)).toBe(FIS1);
+    expect(n.push(A1, t + 25)).toBe(FIS1);
     expect(n.push(A1, t + 50)).toBe(A1);
+    // ein einzelner Zwischenwert (auch zwei verschiedene in Folge) setzt sich nie durch
+    expect(n.push(A1 + 1.1, t + 75)).toBe(A1);
+    expect(n.push(A1 + 1.6, t + 100)).toBe(A1);
+    expect(n.push(A1, t + 125)).toBe(A1);
   });
 
   it("das Abwarten beginnt neu, wenn der Ton zwischendurch zurückkommt", () => {
@@ -271,5 +284,112 @@ describe("Notenname mit Hysterese", () => {
     // roh (ohne Glättung und Hysterese) sprang die Anzeige zwischen fis¹, g¹ und fis²
     const rawNames = new Set(fs.map((f) => Math.round(freqToWrittenMidi(f.freq!))));
     expect(rawNames.size).toBe(3);
+  });
+});
+
+describe("schneller Tonwechsel mit Übergangswerten (Rückmeldung: „GIS zwischen G und A“)", () => {
+  /** Wie das Stimmgerät (../../src/ui/tuner.ts): angezeigter Name und Cent je Frame (ohne die abgewarteten) */
+  function tuner(fs: Frame[], smooth: Partial<SmoothConfig> = TUNER_SMOOTH, hold = {}) {
+    const s = new Smoother(smooth);
+    const names = new NameHold(hold);
+    const shown: { t: number; midi: number; cents: number }[] = [];
+    const take = (f: Frame) => {
+      const m = pitched(s.cfg, f) ? freqToWrittenMidi(f.freq) : null;
+      const midi = names.push(m, f.t);
+      if (m === null || midi === null || names.pending) return;
+      shown.push({ t: f.t, midi, cents: (m - midi) * 100 });
+    };
+    fs.forEach((f) => {
+      const o = s.push(f);
+      if (o) take(o);
+    });
+    s.flush().forEach(take);
+    return shown;
+  }
+  /** Folge der angezeigten Namen (aufeinanderfolgende gleiche zusammengefasst) */
+  const sequence = (xs: { midi: number }[]) => xs.map((x) => x.midi).filter((m, i, a) => i === 0 || m !== a[i - 1]);
+  const played = (p: Played) => p.onsets.map((o) => o.midi);
+
+  it("Stimmgerät: g¹–a¹–h¹–a¹–g¹ bei 6–10 Tönen je Sekunde zeigt nur g¹, a¹, h¹ – in der gespielten Reihenfolge", () => {
+    for (const rate of [6, 7, 8, 9, 10]) {
+      for (const seed of [1, 2, 3]) {
+        const p = fastChanges(UP_DOWN, rate, { seed });
+        const shown = tuner(p.frames);
+        expect(new Set(shown.map((x) => x.midi)), `${rate} Töne/s`).toEqual(new Set([G, A, H]));
+        // jeder gespielte Ton erscheint, keiner dazwischen
+        expect(sequence(shown), `${rate} Töne/s`).toEqual(played(p));
+        // Zeiger und Cent werden nicht von Übergangswerten gezogen
+        expect(Math.max(...shown.map((x) => Math.abs(x.cents))), `${rate} Töne/s`).toBeLessThan(1);
+      }
+    }
+  });
+
+  it("Stimmgerät: auch abwärts (h¹–a¹–g¹) und mit Vibrato ±30 Cent keine Zwischennamen", () => {
+    const vib = (t: number) => 30 * Math.sin((2 * Math.PI * 5 * t) / 1000);
+    for (const rate of [6, 8, 10]) {
+      const down = fastChanges([H, A, G], rate);
+      expect(sequence(tuner(down.frames))).toEqual(played(down));
+      const p = fastChanges(UP_DOWN, rate, { cents: vib });
+      const shown = tuner(p.frames);
+      expect(sequence(shown), `${rate} Töne/s`).toEqual(played(p));
+      // Zeiger nur im Bereich des Vibratos (geglättet)
+      expect(Math.max(...shown.map((x) => Math.abs(x.cents)))).toBeLessThan(31);
+    }
+  });
+
+  it("früher (ohne Stabilitätsprüfung, Name sofort bei über 60 Cent) erschienen gis¹ und b¹", () => {
+    const p = fastChanges(UP_DOWN, 8);
+    const old = tuner(p.frames, { ...TUNER_SMOOTH, stableCents: 0 }, { switchMs: 0 });
+    const names = new Set(old.map((x) => x.midi));
+    expect(names.has(G + 1) || names.has(A + 1)).toBe(true);
+    // Die Namensregel allein reicht nicht: Die Zeitkonstante zieht den Wert vom Übergangswert nur
+    // langsam zum neuen Ton, so liegt er mehrere Frames auf gis¹. Die Stabilitätsprüfung allein schon.
+    expect(new Set(tuner(p.frames, { ...TUNER_SMOOTH, stableCents: 0 }).map((x) => x.midi)).has(G + 1)).toBe(true);
+    expect(new Set(tuner(p.frames, TUNER_SMOOTH, { switchMs: 0 }).map((x) => x.midi))).toEqual(new Set([G, A, H]));
+  });
+
+  it("Übergangswerte kommen aus dem Glätter als „kein Ton“; echte Töne behalten Zeitpunkt und Verzögerung", () => {
+    for (const cfg of [DEFAULT_FOLLOW, {}, TUNER_SMOOTH]) {
+      const p = fastChanges(UP_DOWN, 8);
+      const out = run(p.frames, cfg);
+      const at = new Map(out.map((o) => [o.f.t, o]));
+      for (const t of p.transitions) {
+        expect(at.get(t)!.f.freq).toBeNull();
+        expect((at.get(t)!.f as SmoothedFrame).unstable).toBe(true);
+      }
+      // jeder echte Ton ist ab seinem ersten Frame da, mit seinem eigenen Zeitpunkt; Ausgabe nur um den
+      // halben Median später (wie ohne Übergangswerte, kein zusätzlicher Frame)
+      const lag = new Smoother(cfg).lag;
+      for (const o of p.onsets) {
+        const x = at.get(o.t)!;
+        expect(Math.round(freqToWrittenMidi(x.f.freq!))).toBe(o.midi);
+        expect(p.frames[x.at].t - o.t).toBe(lag * STEP);
+      }
+      // alle übrigen Frames tragen genau ihren Ton
+      const tr = new Set(p.transitions);
+      expect(out.filter((o) => !tr.has(o.f.t)).every((o) => o.f.freq !== null && Math.abs(centsOf(o.f, Math.round(freqToWrittenMidi(o.f.freq)))!) < 1)).toBe(true);
+    }
+  });
+
+  it("Stimmgerät: ein echter Tonwechsel erscheint zwei Frames nach seinem ersten Frame", () => {
+    const p = fastChanges(UP_DOWN, 8);
+    const shown = tuner(p.frames);
+    for (const o of p.onsets.slice(1)) {
+      const first = shown.find((x) => x.t >= o.t && x.midi === o.midi)!;
+      expect(first.t - o.t).toBe(2 * STEP);
+    }
+  });
+
+  it("Vibrato ±30 Cent (5 Hz) besteht die Stabilitätsprüfung: kein Frame fällt heraus", () => {
+    const fs = held(A1, 0, 3000, (t) => 30 * Math.sin((2 * Math.PI * 5 * t) / 1000));
+    for (const cfg of [DEFAULT_FOLLOW, {}, TUNER_SMOOTH]) {
+      const out = run(fs, cfg).map((o) => o.f as SmoothedFrame);
+      expect(out.every((f) => f.freq !== null && !f.unstable && !f.filled)).toBe(true);
+    }
+    // ein einzelner Oktav-Ausreißer ist unstet und wird überbrückt (wie ein Aussetzer)
+    const one = held(A1, 0, 500, (_t, k) => (k === 10 ? 1200 : 0));
+    const f = run(one, DEFAULT_FOLLOW).find((o) => o.f.t === 250)!.f;
+    expect(f.filled).toBe(true);
+    expect(Math.abs(centsOf(f, A1)!)).toBeLessThan(1);
   });
 });

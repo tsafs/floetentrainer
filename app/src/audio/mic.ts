@@ -3,8 +3,22 @@
 import { PitchDetector } from "pitchy";
 import type { Frame } from "./judge";
 
-const BUF = 2048;
+/**
+ * Messfenster: die jüngsten 1024 Samples (≈ 21 ms bei 48 kHz, 23 ms bei 44,1 kHz), früher 2048
+ * (≈ 43 ms). Anlass (Rückmeldung vom 14.11.2026): Beim schnellen Wechsel g¹–a¹–h¹ überspannte das lange
+ * Fenster den Tonwechsel, pitchy lieferte einen Wert dazwischen (gis¹, b¹) mit voller Klarheit. Weil
+ * das Fenster jetzt kürzer ist als der Abstand der Messungen (25 ms), überlappen sich zwei Fenster nicht
+ * mehr: Ein Tonwechsel kann höchstens eine Messung verfälschen. Synthetische Messung (Flötenklang mit
+ * Obertönen und Rauschen, Wechsel an zufälliger Stelle zwischen zwei Messungen, je 1400 Wechsel):
+ * Wechsel mit Zwischenwert 61 % → 31 %, mit zwei Zwischenwerten in Folge 2,1 % → 0 %.
+ * Genauigkeit bleibt: Die Sopranflöte klingt ab 523 Hz, das sind mindestens 11 Perioden im Fenster.
+ * Für c¹–d³ (523–2349 Hz) bei leichtem bis kräftigem Rauschen höchstens 1–7 Cent Fehler (2048: 1–6),
+ * Klarheit mindestens 0,977 (2048: 0,979); die Klarheit fällt bei beiden Fenstern erst bei sehr starkem
+ * Rauschen unter 0,9, an derselben Stelle. Die Klarheitsschwelle (0,9) bleibt daher.
+ */
+const BUF = 1024;
 const MIN_RMS = 0.006;
+/** Messungen alle 25 ms: unverändert (Haltedauern, Aussetzer- und Einsatzregeln rechnen damit) */
 const INTERVAL_MS = 25;
 
 type Listener = (f: Frame) => void;
@@ -16,6 +30,8 @@ class Mic {
   private stream: MediaStream | null = null;
   private analyser: AnalyserNode | null = null;
   private detector: PitchDetector<Float32Array> | null = null;
+  /** Messfenster in Samples (BUF); für Vergleichsmessungen in Tests umstellbar (setWindow) */
+  private size = BUF;
   private buf = new Float32Array(BUF);
   private timer: number | null = null;
   private listeners = new Set<Listener>();
@@ -73,10 +89,8 @@ class Mic {
       const ctx = this.ctx!;
       const src = ctx.createMediaStreamSource(this.stream);
       this.analyser = ctx.createAnalyser();
-      this.analyser.fftSize = BUF;
       src.connect(this.analyser);
-      this.detector = PitchDetector.forFloat32Array(BUF);
-      this.detector.minVolumeDecibels = -45;
+      this.setWindow(this.size);
       this.timer = window.setInterval(() => this.tick(), INTERVAL_MS);
     })().finally(() => {
       this.starting = null;
@@ -92,6 +106,18 @@ class Mic {
     this.stream = null;
     this.analyser = null;
     this.ctx?.suspend().catch(() => {});
+  }
+
+  /**
+   * Messfenster umstellen (Zweierpotenz 32–32768; das AnalyserNode liefert die jüngsten n Samples).
+   * Nur für Vergleichsmessungen in Tests (tests/e2e/play.spec.ts), die App nutzt immer BUF.
+   */
+  setWindow(n: number): void {
+    this.size = n;
+    this.buf = new Float32Array(n);
+    this.detector = PitchDetector.forFloat32Array(n);
+    this.detector.minVolumeDecibels = -45;
+    if (this.analyser) this.analyser.fftSize = n;
   }
 
   listen(fn: Listener): () => void {

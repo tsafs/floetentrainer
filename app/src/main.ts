@@ -1,6 +1,7 @@
 // Einstieg: Daten laden, Seiten über #-Adressen wechseln, Updates auf der Startseite übernehmen.
 
 import "./styles.css";
+import { mic } from "./audio/mic";
 import type { Ctx, View } from "./ui/common";
 import { topbar } from "./ui/common";
 import { homeView } from "./ui/home";
@@ -121,6 +122,7 @@ function start() {
   setupServiceWorker();
   // Für automatische Tests
   (window as unknown as { __ft: Ctx }).__ft = ctx;
+  (window as unknown as { __mic: typeof mic }).__mic = mic;
 }
 
 /** Gespeicherte Daten lassen sich nicht lesen: nie still löschen, sondern Wege anbieten. */
