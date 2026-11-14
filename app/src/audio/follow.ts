@@ -22,9 +22,10 @@
 //
 // Glättung: Beide Arten schicken die Frames zuerst durch den Glätter (./smooth.ts), knapp eingestellt:
 // nur ein Median über 3 Frames (≈ 75 ms, Ausgabe 25 ms später), keine Zeitkonstante. Das entfernt
-// einzelne Ausreißer (Oktavsprung, Nachbarton), lässt aber auch Sechzehntel durch. Unklare Frames
-// bleiben „kein Ton“, Lautstärke und Stille gehen unverändert durch – der neue Einsatz (oben) wird
-// also genauso erkannt wie roh. Die geglätteten Frames behalten ihren Zeitpunkt; der Median
+// einzelne Ausreißer (Oktavsprung, Nachbarton), lässt aber auch Sechzehntel durch. Ein einzelner
+// Frame ohne gültigen Ton zwischen zwei gleichen Tönen wird überbrückt (zählt als dieser Ton, seine
+// Lautstärke aber nicht für den Einbruch-Weg); ab 50 ms ohne Ton bleibt es Stille. Lautstärke und
+// Stille gehen sonst unverändert durch – der neue Einsatz (oben) wird also genauso erkannt wie roh. Die geglätteten Frames behalten ihren Zeitpunkt; der Median
 // verschiebt keinen Tonwechsel, deshalb braucht der Takt-Modus keinen zusätzlichen Ausgleich.
 //
 // Schleife: Beide Arten werten je Durchgang getrennt (Ergebnis je Durchgang). Die Liedseite nutzt die
@@ -198,7 +199,8 @@ class Onsets {
         this.prev = seg;
         seg = this.begin(midi, f);
       }
-    } else if (rms !== undefined) {
+    } else if (rms !== undefined && !f.filled) {
+      // überbrückter Einzelaussetzer (./smooth.ts): seine Lautstärke zählt nicht, wie bisher bei einer Lücke
       if (seg.trough === null) {
         if (rms < cfg.reattackDip * seg.peak) seg.trough = rms;
         else seg.peak = Math.max(seg.peak, rms);

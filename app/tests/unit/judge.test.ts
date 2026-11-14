@@ -140,6 +140,26 @@ describe("Spielen werten", () => {
       j.newCard(note("g1").midi, 0);
       expect(events(wobbly(500, 1500, f("a1"))(j))).toEqual(["correct"]);
     });
+    it("Einzelaussetzer (jeder 6. Frame unklar, zu leise oder über 2300 Hz) starten die Haltedauer nicht neu", () => {
+      const gappy = (id: string, n: number) => (j: PlayJudge) => {
+        const out: JudgeOutput[] = [];
+        for (let t = 500, k = 0; t < 1500; t += STEP, k++) {
+          const gap = k % 6 >= 6 - n;
+          const freq = gap ? [f(id), null, 2400][Math.floor(k / 6) % 3] : f(id);
+          out.push(j.push({ t, freq, clarity: gap && freq !== null && freq < 2300 ? 0.6 : 0.95 }));
+        }
+        return out;
+      };
+      const j = new PlayJudge();
+      j.newCard(note("d2").midi, 0);
+      const o = gappy("d2", 1)(j);
+      expect(events(o)).toEqual(["correct"]);
+      expect(o.findIndex((x) => x.event === "correct") * STEP + 500).toBeLessThan(900);
+      // zwei Aussetzer in Folge (50 ms) sind weiterhin eine Lücke: die Haltedauer beginnt neu
+      const j2 = new PlayJudge();
+      j2.newCard(note("d2").midi, 0);
+      expect(events(gappy("d2", 2)(j2))).toEqual([]);
+    });
     it("ohne Glättung hätte jeder Ausreißer die Haltedauer neu beginnen lassen", () => {
       const j = new PlayJudge({ medianFrames: 1 });
       j.newCard(note("g1").midi, 0);

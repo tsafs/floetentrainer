@@ -260,6 +260,27 @@ describe("Mitspielen: Warte-Modus", () => {
       expect(wrongs).toEqual([]);
     });
 
+    it("Einzelaussetzer (jeder 6. Frame unklar): alles grün; Tonwiederholung braucht trotzdem einen echten neuen Einsatz", () => {
+      const tl = melody();
+      const unclear = (fs: Frame[], n = 1) => fs.map((f, k) => (f.freq !== null && k % 6 >= 6 - n ? { ...f, clarity: 0.6 } : f));
+      const w = new WaitFollower(tl);
+      feed(w, unclear(frames(playAll(tl, 300, 60))));
+      expect(w.results.map((r) => r?.ok)).toEqual([true, true, true, true, true]);
+      // ohne Überbrücken (kein Median) wäre jede Note an den Aussetzern hängen geblieben
+      const raw = new WaitFollower(tl, { cfg: { medianFrames: 1 } });
+      feed(raw, unclear(frames(playAll(tl, 300, 60))));
+      expect(raw.index).toBe(0);
+      // Einzelaussetzer im gehaltenen Ton sind kein neuer Einsatz, auch mit Lautstärke-Einbruch
+      const rep = buildTimeline(song("g'4 g'4 a'2 ||"));
+      const held = new WaitFollower(rep);
+      feed(held, unclear(frames([tone(G, 2000, { rms: 0.1 })])).map((f) => (f.clarity === 0.6 ? { ...f, freq: null, rms: 0.01 } : f)));
+      expect(held.index).toBe(1);
+      // zwei Aussetzer in Folge (50 ms) dagegen schon
+      const twice = new WaitFollower(rep);
+      feed(twice, frames([tone(G, 200), tone(G, 50, { clarity: 0.6 }), tone(G, 200), tone(A, 300)]));
+      expect(twice.done).toBe(true);
+    });
+
     it("ohne Glättung hätte jeder Ausreißer die Haltedauer neu beginnen lassen", () => {
       const tl = melody();
       const w = new WaitFollower(tl, { cfg: { medianFrames: 1 } });
@@ -454,6 +475,22 @@ describe("Mitspielen: Takt-Modus", () => {
     feed(b, fs);
     expect(b.passes[0]).toMatchObject({ hits: 6, total: 6 });
     expect(b.passResults[0].every((r) => r!.coverage > 0.8)).toBe(true);
+  });
+
+  it("Einzelaussetzer (jeder 6. Frame unklar) unterbrechen die erkannte Zeit nicht; zwei in Folge schon", () => {
+    const tl = melody();
+    const unclear = (n: number) => beatFrames(tl).map((f, k) => (f.freq !== null && k % 6 >= 6 - n ? { ...f, clarity: 0.6 } : f));
+    const clean = new BeatFollower(tl, { secPerQuarter: SPQ, startMs: START });
+    feed(clean, beatFrames(tl));
+    const one = new BeatFollower(tl, { secPerQuarter: SPQ, startMs: START });
+    feed(one, unclear(1));
+    expect(one.passes[0]).toMatchObject({ hits: 6, total: 6 });
+    const cov = (b: BeatFollower) => b.passResults[0].reduce((a, r) => a + r!.coverage, 0);
+    // fast so viel erkannte Zeit wie ohne Aussetzer (nur Aussetzer direkt an Tonenden fehlen)
+    expect(cov(one)).toBeGreaterThan(cov(clean) - 0.15);
+    const two = new BeatFollower(tl, { secPerQuarter: SPQ, startMs: START });
+    feed(two, unclear(2));
+    expect(cov(two)).toBeLessThan(cov(clean) * 0.75);
   });
 
   it("Glättung verschiebt nichts: Sechzehntel legato wie ohne Median erkannt, kein zusätzlicher Ausgleich nötig", () => {

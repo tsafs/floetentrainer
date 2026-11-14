@@ -161,6 +161,12 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
         angezeigten abweicht. Der Zeiger gleitet zusätzlich 0,1 s nach.
       - Neubeginn nach 50 ms ohne Ton und bei einem klaren Tonwechsel (über 70 Cent): Der Wert
         springt sofort, Töne verschmieren nicht ineinander.
+      - Einzelne Aussetzer werden überbrückt: Eine Messung ohne gültigen Ton (unklar, zu leise oder
+        außerhalb des Bereichs, z. B. ein Oktavsprung über 2300 Hz bei d²), also eine Lücke unter
+        50 ms, zählt als der umgebende Ton, wenn davor und danach derselbe Ton klingt. Sie startet
+        weder die Haltedauer noch die Anzeige neu und unterbricht im Takt die erkannte Zeit nicht.
+        Ab 50 ms ohne Ton gilt es wie bisher als Stille bzw. neuer Einsatz. Für den neuen Einsatz
+        über einen Lautstärke-Einbruch zählt eine überbrückte Messung nicht.
       - Die geglätteten Messungen behalten ihren Zeitpunkt und kommen nur um den halben Median
         später an (25 bzw. 50 ms). Haltedauer, neuer Einsatz, Nachklang-Schutz und der
         Verzögerungsausgleich im Takt bleiben dadurch unverändert. Lautstärke und Stille gehen

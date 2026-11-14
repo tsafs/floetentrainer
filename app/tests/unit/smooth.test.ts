@@ -143,6 +143,45 @@ describe("Glätter", () => {
     expect(out.filter((f) => pitched(DEFAULT_SMOOTH, f)).length).toBe(fs.filter((f) => pitched(DEFAULT_SMOOTH, f)).length);
   });
 
+  describe("Einzelaussetzer überbrücken", () => {
+    /** g¹ mit jedem 6. Frame ohne gültigen Ton (unklar, zu leise, über 2300 Hz – abwechselnd) */
+    const gappy = (n = 2, midi = G1) =>
+      held(midi, 0, 1500).map((f, k) => {
+        if (k % 6 < 6 - n) return f;
+        const kind = Math.floor(k / 6) % 3;
+        return kind === 0 ? { ...f, clarity: 0.6 } : kind === 1 ? { ...f, freq: null, clarity: 0, rms: 0.004 } : { ...f, freq: 2400 };
+      });
+
+    it("ein einzelner unklarer, zu leiser oder zu hoher Frame bekommt den Ton der Nachbarn", () => {
+      for (const cfg of [DEFAULT_FOLLOW, {}, TUNER_SMOOTH]) {
+        const fs = gappy(1);
+        const out = run(fs, cfg).map((o) => o.f);
+        // alle bis auf den letzten (dem fehlt der Nachfolger) mit Ton
+        expect(out.slice(0, -1).every((f) => pitched(DEFAULT_SMOOTH, f))).toBe(true);
+        const filled = out.filter((f) => f.filled);
+        expect(filled.length).toBe(Math.floor(fs.length / 6) - 1);
+        expect(filled.every((f) => Math.abs(centsOf(f, G1)!) < 1 && f.clarity === 0.95)).toBe(true);
+        // Zeitpunkt und Lautstärke bleiben die des Aussetzers
+        expect(out.map((f) => [f.t, f.rms])).toEqual(fs.map((f) => [f.t, f.rms]));
+      }
+    });
+
+    it("zwei Aussetzer in Folge (≥ 50 ms) bleiben Stille", () => {
+      for (const cfg of [DEFAULT_FOLLOW, {}, TUNER_SMOOTH]) {
+        const out = run(gappy(2), cfg).map((o) => o.f);
+        expect(out.some((f) => f.filled)).toBe(false);
+        expect(out.filter((f) => !pitched(DEFAULT_SMOOTH, f)).length).toBe(2 * Math.floor(out.length / 6));
+      }
+    });
+
+    it("kein Überbrücken bei einem Tonwechsel in der Lücke oder ohne Median", () => {
+      const fs = [...held(G1, 0, 200), { t: 200, freq: null, clarity: 0 }, ...held(A1, 225, 400)];
+      expect(run(fs, DEFAULT_FOLLOW).find((o) => o.f.t === 200)!.f).toEqual(fs[8]);
+      const one = [...held(G1, 0, 200), { t: 200, freq: null, clarity: 0 }, ...held(G1, 225, 400)];
+      expect(run(one, { medianFrames: 1 }).find((o) => o.f.t === 200)!.f).toEqual(one[8]);
+    });
+  });
+
   it("Ausgabe um den halben Median verzögert; ohne Median und Zeitkonstante unverändert", () => {
     expect(new Smoother({ medianFrames: 5 }).lag).toBe(2);
     expect(new Smoother({ medianFrames: 3 }).lag).toBe(1);
@@ -182,7 +221,7 @@ describe("Notenname mit Hysterese", () => {
     }
   });
 
-  it("nach Stille gilt der nächste Ton sofort", () => {
+  it("nach Stille gilt der nächste Ton sofort (Stille gemessen bis zum nächsten Ton)", () => {
     const n = new NameHold();
     n.push(FIS1, 0);
     n.push(null, 25);
@@ -192,6 +231,31 @@ describe("Notenname mit Hysterese", () => {
     n.push(null, 125);
     expect(n.midi).toBeNull();
     expect(n.push(FIS1 + 0.55, 150)).toBe(G1);
+    // zwei Aussetzer (25 + 25 ms bis zum nächsten Ton) reichen auch
+    const n2 = new NameHold();
+    n2.push(FIS1, 0);
+    n2.push(null, 25);
+    n2.push(null, 50);
+    expect(n2.push(FIS1 + 0.55, 75)).toBe(G1);
+  });
+
+  it("Stimmgerät: Einzelaussetzer lassen den Namen stehen, erst Stille ab 50 ms setzt ihn zurück", () => {
+    // fis¹ +55 Cent (Name hängt an der Hysterese), jeder 6. Frame unklar
+    const fs = held(FIS1, 0, 2000, () => 55).map((f, k) => (k % 6 === 5 ? { ...f, clarity: 0.5 } : f));
+    const names = new NameHold();
+    names.push(FIS1, -25); // bisher angezeigt: fis¹
+    const shown = new Set<number | null>();
+    for (const { f } of run(fs, TUNER_SMOOTH)) shown.add(names.push(pitched(DEFAULT_SMOOTH, f) ? freqToWrittenMidi(f.freq!) : null, f.t));
+    // die Hysterese läuft durch, nach 100 ms gilt g¹ – und bleibt dann stehen
+    expect([...shown]).toEqual([FIS1, G1]);
+    // zwei Aussetzer in Folge (50 ms) sind Stille: danach gilt der neue Ton sofort, ohne Hysterese
+    const gaps = held(FIS1, 0, 2000, () => 55).map((f, k) => (k % 6 >= 4 ? { ...f, clarity: 0.5 } : f));
+    const n2 = new NameHold();
+    n2.push(FIS1, -25);
+    const at = new Map<number, number | null>();
+    for (const { f } of run(gaps, TUNER_SMOOTH)) at.set(f.t, n2.push(pitched(DEFAULT_SMOOTH, f) ? freqToWrittenMidi(f.freq!) : null, f.t));
+    expect(at.get(75)).toBe(FIS1); // vor der Lücke: Hysterese hält fis¹ (erst 75 ms g¹)
+    expect(at.get(150)).toBe(G1); // erster Ton nach der Lücke: sofort
   });
 
   it("Stimmgerät: wackelnder Ton mit Ausreißern lässt den Namen nicht flackern", () => {

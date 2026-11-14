@@ -17,11 +17,19 @@
 //    Median und Glättung greifen nicht über diese Grenze. Liegt der Median mehr als jumpCents vom
 //    geglätteten Wert entfernt (klarer Tonwechsel), springt der Wert sofort dorthin, statt langsam
 //    hinzugleiten. So verschmieren Töne nicht ineinander, und Tonwechsel werden nicht verzögert.
+// 6. Einzelaussetzer überbrücken: Ein Frame ohne gültigen Ton (unklar, zu leise, außerhalb des Bereichs
+//    – etwa ein Oktavsprung über 2300 Hz bei d²) mitten in einem Toneinsatz, also eine Lücke unter
+//    resetMs, bekommt den Ton seiner Nachbarn, wenn davor und danach derselbe Ton erkannt wird (Median
+//    höchstens jumpCents vom zuletzt ausgegebenen Wert). Er ist dann als `filled` markiert, hat die
+//    kleinere Klarheit der beiden Nachbarn und behält seine Lautstärke. So startet ein einzelner
+//    Messfehler weder Haltedauer noch Anzeige neu und unterbricht im Takt-Modus die erkannte Zeit nicht.
+//    Ab resetMs ohne gültigen Ton bleibt es Stille wie bisher. Ohne Median (medianFrames 1) fehlt der
+//    Blick auf den nächsten Frame; dann wird nichts überbrückt.
 //
 // Zeitstempel: Weil der Median mittig liegt, gibt push() jeden Frame erst aus, wenn die
 // (medianFrames − 1) / 2 Frames danach da sind (bei 3 Frames 25 ms, bei 5 Frames 50 ms später). Der
 // ausgegebene Frame behält aber seinen eigenen Zeitpunkt t, seine Klarheit und seine Lautstärke (rms);
-// nur freq ist geglättet. Ein Tonwechsel steht damit an der richtigen Stelle (Median verschiebt ihn
+// nur freq ist geglättet (bei überbrückten Frames auch die Klarheit). Ein Tonwechsel steht damit an der richtigen Stelle (Median verschiebt ihn
 // nicht), Stille und Lautstärke-Einbrüche kommen in derselben Reihenfolge und mit denselben Zeiten an
 // wie roh. Für den Takt-Modus heißt das: Die Verzögerung des Medians ist schon ausgeglichen, latencyMs
 // bleibt die Verzögerung von Mikrofon und Erkennung.
@@ -95,6 +103,8 @@ export class Smoother {
   private gapStart: number | null = null;
   private lastT: number | null = null;
   private ema: { p: number; t: number; run: number } | null = null;
+  /** zuletzt ausgegebener Ton (für das Überbrücken) */
+  private lastOut: { p: number; run: number } | null = null;
 
   constructor(cfg: Partial<SmoothConfig> = {}) {
     this.cfg = { ...DEFAULT_SMOOTH, ...cfg };
@@ -142,19 +152,33 @@ export class Smoother {
       this.buf.splice(0, drop);
       this.next -= drop;
     }
-    return out === null ? e.f : { ...e.f, freq: out };
+    if (!out) return e.f;
+    if (e.p !== null) return { ...e.f, freq: out.freq };
+    return { ...e.f, freq: out.freq, clarity: out.clarity, filled: true };
   }
 
-  /** Geglättete Frequenz für buf[c], null ohne gültigen Ton */
-  private value(c: number): number | null {
+  /** Geglättete Frequenz für buf[c] (bei einem überbrückten Aussetzer samt Klarheit), null ohne Ton */
+  private value(c: number): { freq: number; clarity: number } | null {
     const e = this.buf[c];
-    if (e.p === null) return null;
     const lo = Math.max(0, c - this.half);
     const hi = Math.min(this.buf.length - 1, c + this.half);
-    const near: { e: Entry; d: number; i: number }[] = [];
+    let run = e.run;
+    let clarity = e.f.clarity;
+    if (e.p === null) {
+      // Einzelaussetzer? Gültige Nachbarn davor und danach im selben Toneinsatz
+      let l = c - 1;
+      while (l >= lo && this.buf[l].p === null) l--;
+      let r = c + 1;
+      while (r <= hi && this.buf[r].p === null) r++;
+      if (l < lo || r > hi || this.buf[l].run !== this.buf[r].run) return null;
+      run = this.buf[r].run;
+      if (!this.lastOut || this.lastOut.run !== run) return null;
+      clarity = Math.min(this.buf[l].f.clarity, this.buf[r].f.clarity);
+    }
+    const near: { e: Entry; d: number }[] = [];
     for (let i = lo; i <= hi; i++) {
       const x = this.buf[i];
-      if (x.p !== null && x.run === e.run) near.push({ e: x, d: Math.abs(i - c), i });
+      if (x.p !== null && x.run === run) near.push({ e: x, d: Math.abs(i - c) });
     }
     if (near.length % 2 === 0) {
       // gerade Anzahl: den am weitesten entfernten weglassen (bei Gleichstand den älteren)
@@ -165,17 +189,23 @@ export class Smoother {
     near.sort((a, b) => a.e.p! - b.e.p!);
     const med = near[(near.length - 1) / 2].e;
     const cfg = this.cfg;
-    if (cfg.tauMs <= 0) return med.f.freq!;
-    const t = e.f.t;
-    const ema = this.ema;
-    if (!ema || ema.run !== e.run || Math.abs(med.p! - ema.p) * 100 > cfg.jumpCents) {
-      this.ema = { p: med.p!, t, run: e.run };
-    } else {
-      const a = 1 - Math.exp(-Math.max(0, t - ema.t) / cfg.tauMs);
-      ema.p += a * (med.p! - ema.p);
-      ema.t = t;
+    // überbrückt nur, wenn danach derselbe Ton weiterklingt (kein Tonwechsel in der Lücke)
+    if (e.p === null && Math.abs(med.p! - this.lastOut!.p) * 100 > cfg.jumpCents) return null;
+    let p = med.p!;
+    if (cfg.tauMs > 0) {
+      const t = e.f.t;
+      const ema = this.ema;
+      if (!ema || ema.run !== run || Math.abs(p - ema.p) * 100 > cfg.jumpCents) {
+        this.ema = { p, t, run };
+      } else {
+        const a = 1 - Math.exp(-Math.max(0, t - ema.t) / cfg.tauMs);
+        ema.p += a * (p - ema.p);
+        ema.t = t;
+      }
+      p = this.ema!.p;
     }
-    return toFreq(this.ema!.p);
+    this.lastOut = { p, run };
+    return { freq: cfg.tauMs > 0 ? toFreq(p) : med.f.freq!, clarity };
   }
 }
 
@@ -216,6 +246,8 @@ export class NameHold {
       this.cand = null;
       return this.midi;
     }
+    // nach Stille (gemessen bis zum nächsten Ton, wie im Glätter) gilt der neue Ton sofort
+    if (this.gapStart !== null && t - this.gapStart >= this.cfg.resetMs) this.midi = null;
     this.gapStart = null;
     const r = Math.round(m);
     if (this.midi === null || r === this.midi || Math.abs(m - this.midi) * 100 > this.cfg.switchCents) {

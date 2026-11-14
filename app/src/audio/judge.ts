@@ -13,6 +13,11 @@ export interface Frame {
   clarity: number;
   /** Lautstärke (Effektivwert des Messfensters, 0–1); optional, das Mitspielen erkennt daran neue Einsätze */
   rms?: number;
+  /**
+   * Vom Glätter überbrückter Einzelaussetzer (./smooth.ts): roh ohne gültigen Ton, Tonhöhe und
+   * Klarheit von den Nachbarn. Seine Lautstärke zählt nicht für die Einsatz-Erkennung (../follow.ts).
+   */
+  filled?: boolean;
 }
 
 export interface JudgeConfig {
