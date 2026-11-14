@@ -13,6 +13,7 @@ import { soundingFreq } from "../../src/music/notes";
 import { songById } from "../../src/songs/library";
 import { buildTimeline, sectionTimeline, type Timeline } from "../../src/songs/timeline";
 import { song } from "./songs-helpers";
+import { fastChanges, UP_DOWN, type Played } from "./transition-helpers";
 
 const STEP = 25;
 /** klingende Frequenz zu einer notierten MIDI-Nummer, ggf. mit Cent-Abweichung */
@@ -621,5 +622,91 @@ describe("Mitspielen: Zusammenfassung eines Durchgangs", () => {
     const r = tl.tones.map((n) => ({ ok: n.midi === A }));
     expect(summarize(tl, r)).toEqual({ hits: 4, total: tl.tones.length, complete: true });
     expect(summarize(tl, r.slice(0, 5))).toEqual({ hits: 1, total: 5, complete: false });
+  });
+});
+
+// ---------------------------------------------------------------- schneller Tonwechsel
+
+describe("Mitspielen: schneller Tonwechsel mit Übergangswerten (Rückmeldung: „GIS zwischen G und A“)", () => {
+  const upDown = (n: number) => buildTimeline(song(`${Array.from({ length: n }, (_, i) => ["g'", "a'", "h'", "a'"][i % 4] + "16").join(" ")} | r1 ||`));
+  const between = (m: number) => ![G, A, H].includes(m);
+  /** Dieselben Frames, die Übergangswerte aber als unklare Frames (Klarheit 0,6) */
+  const asUnclear = (p: Played) => {
+    const tr = new Set(p.transitions);
+    return p.frames.map((f) => (tr.has(f.t) ? { ...f, clarity: 0.6 } : f));
+  };
+
+  it("Warte-Modus: Übergangswerte sind weder falscher Ton noch Zwischenton (6–10 Töne je Sekunde, auf- und abwärts)", () => {
+    for (const rate of [6, 7, 8, 9, 10]) {
+      const tl = buildTimeline(song("g'4 a'4 h'4 a'4 g'4 a'4 h'4 a'4 g'4 ||"));
+      const p = fastChanges(UP_DOWN, rate, { count: 9 });
+      const wrongs: number[] = [];
+      const heard: number[] = [];
+      const w = new WaitFollower(tl, { onWrong: (_i, m) => wrongs.push(m) });
+      p.frames.forEach((f) => {
+        const h = w.push(f);
+        if (h) heard.push(h.midi);
+      });
+      expect(heard.filter(between), `${rate} Töne/s`).toEqual([]);
+      expect(wrongs.filter(between), `${rate} Töne/s`).toEqual([]);
+      // genau wie ein unklarer Frame an derselben Stelle (der Wechsel selbst bleibt sichtbar)
+      const ref = new WaitFollower(tl);
+      feed(ref, asUnclear(p));
+      expect(w.results, `${rate} Töne/s`).toEqual(ref.results);
+      expect(w.index).toBe(ref.index);
+    }
+  });
+
+  it("Warte-Modus: schnell, aber lang genug für die Haltedauer (5 Töne je Sekunde) – alles grün, nichts rot", () => {
+    const tl = buildTimeline(song("g'4 a'4 h'4 a'4 g'4 a'4 h'4 a'4 g'4 ||"));
+    for (const seed of [1, 2, 3, 4]) {
+      const p = fastChanges(UP_DOWN, 5, { count: 9, seed });
+      const wrongs: number[] = [];
+      const w = new WaitFollower(tl, { onWrong: (_i, m) => wrongs.push(m) });
+      feed(w, p.frames);
+      expect(w.results.map((r) => r?.ok)).toEqual(Array(9).fill(true));
+      expect(wrongs).toEqual([]);
+    }
+    // früher (ohne Stabilitätsprüfung) hörte die App bei jedem Wechsel kurz einen Zwischenton
+    const p = fastChanges(UP_DOWN, 5, { count: 9 });
+    const old = new WaitFollower(tl, { cfg: { stableCents: 0 } });
+    expect(p.frames.map((f) => old.push(f)?.midi).filter((m) => m !== undefined && between(m)).length).toBeGreaterThan(4);
+  });
+
+  it("Takt-Modus: Sechzehntel g¹–a¹–h¹–a¹ legato mit Übergangswerten, 6–10 Töne je Sekunde: alle getroffen", () => {
+    const tl = upDown(16);
+    for (const bpm of [90, 108, 120, 150]) {
+      const spq = 60 / bpm;
+      const rate = 4 / spq;
+      // bei ♩ = 150 (Sechzehntel 100 ms) nur bis ±10 ms versetzt: weiter daneben bleiben nach Übergangs-
+      // Frame und Versatz manchmal unter 50 ms im Fenster – mit und ohne Stabilitätsprüfung gleich (unten)
+      for (const late of bpm > 120 ? [-10, 0, 10] : [-30, -20, -10, 0, 10, 20, 30]) {
+        for (const shift of [0, 8, 17]) {
+          // Töne ab dem Zeitplan-Beginn (+ Verzögerung, + zu spät/früh), Frames in einem davon unabhängigen Raster
+          const p = fastChanges(UP_DOWN, rate, { t0: START - 300 + shift, start: START + LAT + late, count: 16, t1: START + 4 * spq * 1000 + 600 });
+          const b = new BeatFollower(tl, { secPerQuarter: spq, startMs: START });
+          feed(b, p.frames);
+          b.finish(START + 8 * spq * 1000);
+          expect(b.passResults[0].map((r) => r?.ok), `♩ = ${bpm}, versetzt ${late} ms, Raster +${shift} ms`).toEqual(Array(16).fill(true));
+        }
+      }
+    }
+  });
+
+  it("Takt-Modus: die Stabilitätsprüfung kostet keine erkannte Zeit (gleiche Wertung wie ohne)", () => {
+    const tl = upDown(16);
+    for (const bpm of [90, 120, 150]) {
+      const spq = 60 / bpm;
+      for (const late of [-30, 0, 30]) {
+        const p = fastChanges(UP_DOWN, 4 / spq, { t0: START - 300, start: START + LAT + late, count: 16, t1: START + 4 * spq * 1000 + 600 });
+        const cov = (stableCents: number) => {
+          const b = new BeatFollower(tl, { secPerQuarter: spq, startMs: START, cfg: { stableCents } });
+          feed(b, p.frames);
+          b.finish(START + 8 * spq * 1000);
+          return b.passResults[0].map((r) => r!.coverage);
+        };
+        expect(cov(DEFAULT_FOLLOW.stableCents)).toEqual(cov(0));
+      }
+    }
   });
 });

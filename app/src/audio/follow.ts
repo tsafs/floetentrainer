@@ -16,13 +16,16 @@
 //   Höchstwerts dieses Tons und danach wieder deutlich lauter (mindestens das 1,5-fache des Tiefpunkts).
 // Begründung: Frames kommen alle 25 ms; 40 ms verlangen also mindestens zwei Aussetzer in Folge, ein
 // einzelner Messfehler mitten im gehaltenen Ton zählt nicht. Beim Anstoßen mit der Zunge bricht
-// das Signal meist kürzer ein, als das 43-ms-Messfenster von pitchy auflöst – dann bleibt die Tonhöhe
-// erkennbar, aber die Lautstärke sinkt deutlich; dafür ist der Einbruch-Weg da. Das Wiederansteigen
-// ist nötig, damit ein bloßes Leiserwerden (Ausklingen) keinen Einsatz vortäuscht.
+// das Signal meist kürzer ein, als das Messfenster von pitchy (≈ 21 ms, ./mic.ts) auflöst – dann
+// bleibt die Tonhöhe erkennbar, aber die Lautstärke sinkt deutlich; dafür ist der Einbruch-Weg da.
+// Das Wiederansteigen ist nötig, damit ein bloßes Leiserwerden (Ausklingen) keinen Einsatz vortäuscht.
 //
 // Glättung: Beide Arten schicken die Frames zuerst durch den Glätter (./smooth.ts), knapp eingestellt:
 // nur ein Median über 3 Frames (≈ 75 ms, Ausgabe 25 ms später), keine Zeitkonstante. Das entfernt
-// einzelne Ausreißer (Oktavsprung, Nachbarton), lässt aber auch Sechzehntel durch. Ein einzelner
+// einzelne Ausreißer (Oktavsprung, Nachbarton), lässt aber auch Sechzehntel durch. Vor dem Median
+// prüft der Glätter, ob ein Frame zu einem Nachbarn passt: Übergangswerte beim schnellen Tonwechsel
+// (gis¹ zwischen g¹ und a¹) kommen als „kein Ton“ an, sind also weder falscher Ton noch neuer Einsatz
+// (eine Lücke von 25 ms liegt unter reattackGapMs). Ein einzelner
 // Frame ohne gültigen Ton zwischen zwei gleichen Tönen wird überbrückt (zählt als dieser Ton, seine
 // Lautstärke aber nicht für den Einbruch-Weg); ab 50 ms ohne Ton bleibt es Stille. Lautstärke und
 // Stille gehen sonst unverändert durch – der neue Einsatz (oben) wird also genauso erkannt wie roh. Die geglätteten Frames behalten ihren Zeitpunkt; der Median
@@ -73,17 +76,21 @@ export interface FollowConfig {
   medianFrames: number;
   /** … und Zeitkonstante in ms (0 = keine) */
   tauMs: number;
+  /** Stabilitätsprüfung vor dem Median (./smooth.ts): Nachbar höchstens so viele Cent entfernt; 0 = aus */
+  stableCents: number;
 }
 
 /**
  * Standardwerte. Toleranz, Klarheit, Oktavregel und Frequenzbereich wie beim Üben (DEFAULT_JUDGE).
  * Haltedauer 120 ms statt 300 ms: Achtel bei 100 Schlägen dauern 300 ms, die Note muss deutlich
  * vorher grün werden.
- * Verzögerung 50 ms (Mikrofon und Erkennung): Messfenster von pitchy 2048 Samples (≈ 43 ms bei
- * 48 kHz; der Messwert gehört im Mittel zur Fenstermitte, also ≈ 20 ms zurück) + Mikrofon-Eingang auf
- * Android typisch 20–40 ms. Die Ausgabe der Klicks, nach denen sie spielt, kommt nicht hierher: Die
- * Oberfläche legt startMs auf den Zeitpunkt, zu dem sie den Zeitplan-Beginn *hört* (mit der vom
- * Browser gemeldeten Ausgabe-Verzögerung, wie die Markierung des Abspielers; ohne Meldung üblich
+ * Verzögerung 50 ms (Mikrofon und Erkennung): Messfenster von pitchy + Mikrofon-Eingang auf Android
+ * typisch 20–40 ms. Der Messwert gehört im Mittel zur Fenstermitte: bei 2048 Samples (bis 14.11.2026)
+ * ≈ 20 ms zurück, bei jetzt 1024 Samples (./mic.ts) ≈ 10 ms. Zusammen also 30–50 ms statt 40–60 ms;
+ * die 50 ms bleiben (oberer Rand, ohne Messung am Gerät nicht verschoben – die Wertung verträgt ±30 ms
+ * Versatz, siehe Test „angestoßene Sechzehntel“). Die Ausgabe der Klicks, nach denen sie spielt,
+ * kommt nicht hierher: Die Oberfläche legt startMs auf den Zeitpunkt, zu dem sie den Zeitplan-Beginn
+ * *hört* (mit der vom Browser gemeldeten Ausgabe-Verzögerung, wie die Markierung des Abspielers; ohne Meldung üblich
  * 30 ms, zusammen also wie bisher 80 ms). Bluetooth-Kopfhörer, die der Browser zu knapp meldet,
  * brauchen mehr – dafür später ein Abgleich-Knopf (latencyMs ist einstellbar). Der Median der
  * Glättung kommt nicht hinzu: Die geglätteten Frames behalten ihren Zeitpunkt (siehe Kopfkommentar).
@@ -108,6 +115,7 @@ export const DEFAULT_FOLLOW: FollowConfig = {
   frameMs: 25,
   medianFrames: 3,
   tauMs: 0,
+  stableCents: DEFAULT_JUDGE.stableCents,
 };
 
 /**

@@ -2,12 +2,12 @@
 // Rein rechnerisch, ohne Mikrofon – dadurch automatisch testbar.
 
 import { freqToWrittenMidi } from "../music/notes";
-import { Smoother } from "./smooth";
+import { DEFAULT_SMOOTH, Smoother } from "./smooth";
 
 export interface Frame {
   /** Zeitpunkt in ms */
   t: number;
-  /** gemessene Frequenz in Hz, null bei Stille oder zu leise */
+  /** gemessene Frequenz in Hz, null bei Stille oder zu leise (nach dem Glätter auch bei einem unsteten Übergangswert) */
   freq: number | null;
   /** Klarheit laut pitchy (0–1) */
   clarity: number;
@@ -37,6 +37,8 @@ export interface JudgeConfig {
   medianFrames: number;
   /** … und Zeitkonstante in ms (0 = keine) */
   tauMs: number;
+  /** Stabilitätsprüfung vor dem Median (./smooth.ts): Nachbar höchstens so viele Cent entfernt; 0 = aus */
+  stableCents: number;
 }
 
 export const DEFAULT_JUDGE: JudgeConfig = {
@@ -54,6 +56,8 @@ export const DEFAULT_JUDGE: JudgeConfig = {
   // fängt das Wackeln eines gehaltenen Tons schon ab, und die Anzeige soll Tonwechseln sofort folgen.
   medianFrames: 5,
   tauMs: 0,
+  // Übergangswerte beim schnellen Tonwechsel (gis¹ zwischen g¹ und a¹) gelten als „kein Ton“
+  stableCents: DEFAULT_SMOOTH.stableCents,
 };
 
 export interface Heard {

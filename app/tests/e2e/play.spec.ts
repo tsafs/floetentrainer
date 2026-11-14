@@ -164,6 +164,85 @@ test("Stimmgerät: wackelnder Ton nahe der Mitte zwischen zwei Halbtönen lässt
   await expect(page.getByTestId("tuner-cents")).toHaveText(/^\+[1-4]\d Cent$/);
 });
 
+test("Stimmgerät: schneller Wechsel g¹–a¹–h¹ auf- und abwärts (Flötenklang) zeigt nur g¹, a¹, h¹; kürzeres Fenster, weniger Zwischenwerte", async ({ page }) => {
+  test.setTimeout(60_000);
+  await setup(page);
+  await page.getByRole("link", { name: "Stimmgerät" }).click();
+  await page.waitForFunction(() => (window as never as { __osc: unknown }).__osc !== null);
+  await page.waitForFunction(() => (window as never as { __mic: { running: boolean } }).__mic.running);
+  const tones = ["g1", "a1", "h1"].map((id) => soundingFreq(note(id)));
+  /**
+   * Spielt mit Messfenster win 6 s lang g¹ a¹ h¹ a¹ g¹ … (je 2 s mit 6, 8 und 10 Tönen je Sekunde,
+   * Tonwechsel abrupt) und schreibt die angezeigten Namen und die rohen Messungen des Mikrofons mit.
+   */
+  const run = (win: number) =>
+    page.evaluate(
+      async ({ win, tones }) => {
+        type Raw = { freq: number | null; clarity: number };
+        const w = window as never as {
+          __osc: { flute(n?: number): void; schedule(l: [number, number | null][]): void };
+          __mic: { setWindow(n: number): void; listen(fn: (f: Raw) => void): () => void };
+        };
+        w.__osc.flute(0.03);
+        w.__mic.setWindow(win);
+        const el = document.querySelector('[data-testid="tuner-name"]')!;
+        const names = new Set<string>();
+        const obs = new MutationObserver(() => names.add(el.textContent ?? ""));
+        obs.observe(el, { childList: true, subtree: true, characterData: true });
+        const raw: Raw[] = [];
+        const unlisten = w.__mic.listen((f) => raw.push({ freq: f.freq, clarity: f.clarity }));
+        const order = [0, 1, 2, 1];
+        const list: [number, number | null][] = [];
+        let t = performance.now() + 200;
+        let k = 0;
+        // Tondauer je Ton zufällig ±15 %: sonst stünden die Tonwechsel immer an derselben Stelle zwischen
+        // zwei Messungen (Messabstand 25 ms, Tondauern 100/125 ms als Vielfache davon), und es hinge am
+        // zufälligen Versatz zu Beginn, ob bei jedem Wechsel ein Zwischenwert entsteht oder bei keinem
+        for (const rate of [6, 8, 10]) {
+          for (let i = 0; i < 2 * rate; i++, k++, t += (1000 / rate) * (0.85 + 0.3 * Math.random())) list.push([t, tones[order[k % 4]]]);
+        }
+        list.push([t, null]);
+        w.__osc.schedule(list);
+        await new Promise((r) => setTimeout(r, t - performance.now() + 600));
+        unlisten();
+        obs.disconnect();
+        return { names: [...names].filter((n) => n !== "–"), raw, changes: list.length - 2 };
+      },
+      { win, tones },
+    );
+  // Zwischenwert: gültige Messung (Klarheit, Bereich wie in der App), die mehr als 35 Cent von g¹, a¹
+  // und h¹ entfernt liegt – das Fenster hat einen Tonwechsel überspannt. Gezählt: alle und solche
+  // direkt hintereinander (zwei Fenster über demselben Wechsel; die kann die Stabilitätsprüfung nicht
+  // sicher entfernen).
+  const between = (raw: { freq: number | null; clarity: number }[]) => {
+    const odd = raw.map(
+      (f) =>
+        f.freq !== null &&
+        f.clarity >= 0.9 &&
+        f.freq >= 480 &&
+        f.freq <= 2300 &&
+        tones.every((x) => Math.abs(1200 * Math.log2(f.freq! / x)) > 35),
+    );
+    return { all: odd.filter(Boolean).length, pairs: odd.filter((o, i) => o && odd[i - 1]).length };
+  };
+  const long = await run(2048);
+  const short = await run(1024);
+  const nLong = between(long.raw);
+  const nShort = between(short.raw);
+  console.log(
+    `Zwischenwerte bei ${long.changes} Tonwechseln: 2048 Samples ${nLong.all} (${nLong.pairs} direkt nacheinander), ` +
+      `1024 Samples ${nShort.all} (${nShort.pairs})`,
+  );
+  // Das lange Fenster erzeugt bei fast jedem Wechsel Zwischenwerte, oft zwei in Folge; das kurze
+  // deutlich weniger und (Fenster kürzer als der Messabstand) praktisch nie zwei in Folge
+  // (gemessen: 2048 → 48–72 Zwischenwerte, davon 3–14 Paare; 1024 → 24–34, keine Paare)
+  expect(nLong.all).toBeGreaterThan(long.changes / 2);
+  expect(nShort.all).toBeLessThan(nLong.all * 0.75);
+  expect(nShort.pairs).toBeLessThanOrEqual(1);
+  // Im Stimmgerät erscheinen nur die gespielten Töne, alle drei
+  expect(short.names.sort()).toEqual(["a1", "g1", "h1"]);
+});
+
 test("Mikrofon verweigert: verständliche Erklärung", async ({ page }) => {
   await page.addInitScript(() => {
     navigator.mediaDevices.getUserMedia = () => Promise.reject(Object.assign(new Error("nein"), { name: "NotAllowedError" }));

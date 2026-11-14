@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { PlayJudge, type JudgeOutput } from "../../src/audio/judge";
 import { note, soundingFreq } from "../../src/music/notes";
+import { A, fastChanges, G, H, hzOf, STEP as T_STEP, UP_DOWN } from "./transition-helpers";
 
 const STEP = 25;
 const f = (id: string, cents = 0, tuning = 440) => soundingFreq(note(id), tuning) * Math.pow(2, cents / 1200);
@@ -183,5 +184,36 @@ describe("Spielen werten", () => {
     expect(o.slice(0, 2).every((x) => x.heard === null)).toBe(true);
     expect(o[2].heard?.midi).toBe(note("fis1").midi);
     expect(o[2].heard?.cents).toBe(-12);
+  });
+  describe("schneller Tonwechsel mit Übergangswerten (Rückmeldung: „GIS zwischen G und A“)", () => {
+    /** 1,5 s schnell g¹–a¹–h¹–a¹ (rate Töne je Sekunde, mit Übergangswerten), danach a¹ gehalten */
+    const passage = (rate: number, seed = 1) => {
+      const p = fastChanges(UP_DOWN, rate, { t0: 500, t1: 2000, seed });
+      const last = Math.round(12 * Math.log2(p.frames[p.frames.length - 1].freq! / 440) + 57);
+      const rest = [];
+      for (let t = 2000; t < 2600; t += T_STEP) {
+        // erster Frame nach dem Wechsel zu a¹: Übergangswert
+        const m = t === 2000 && last !== A ? (last + A) / 2 : A;
+        rest.push({ t, freq: hzOf(m), clarity: 0.95, rms: 0.1 });
+      }
+      return [...p.frames, ...rest];
+    };
+    it("Übung: schnelles Umspielen vor dem gesuchten Ton – kein Fehler, kein gis¹/b¹ in der Anzeige, dann richtig", () => {
+      for (const rate of [6, 7, 8, 9, 10]) {
+        const j = new PlayJudge();
+        j.newCard(A, 0);
+        const o = passage(rate).map((fr) => j.push(fr));
+        expect(events(o), `${rate} Töne/s`).toEqual(["correct"]);
+        expect(o.filter((x) => x.heard && ![G, A, H].includes(x.heard.midi)), `${rate} Töne/s`).toEqual([]);
+      }
+    });
+    it("Übung: gesuchter Ton kommt in der Passage nicht vor – trotzdem kein Fehler durch Übergangswerte", () => {
+      for (const rate of [6, 8, 10]) {
+        const j = new PlayJudge();
+        j.newCard(note("c2").midi, 0);
+        expect(events(fastChanges(UP_DOWN, rate, { t0: 500, t1: 2500 }).frames.map((fr) => j.push(fr))), `${rate} Töne/s`).toEqual([]);
+        expect(j.wrongCounted).toBe(false);
+      }
+    });
   });
 });
