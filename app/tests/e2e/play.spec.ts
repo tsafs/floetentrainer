@@ -36,7 +36,7 @@ async function startPlaying(page: Page) {
   await page.waitForFunction(() => (window as never as { __osc: unknown }).__osc !== null);
 }
 
-test("richtig gespielt: grünes Feld, geht von selbst weiter, zeigt was die App hört", async ({ page }) => {
+test("richtig gespielt: grüne Bestätigung, geht von selbst weiter, zeigt was die App hört", async ({ page }) => {
   await setup(page);
   await startPlaying(page);
   const t = await target(page);
