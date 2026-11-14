@@ -12,7 +12,7 @@ import { choiceCount, makeChoices } from "../srs/choices";
 import { errorHint, GRIP_TIPS, introSentence } from "../srs/hints";
 import type { Session, Step } from "../srs/session";
 import { activeFlute, cardKey } from "../store/data";
-import { ICON_CHECK, ICON_X, type View } from "./common";
+import { ICON_CHECK, ICON_X, pressGuard, type View } from "./common";
 
 const QUESTION: Record<Kind, string> = {
   name: "Wie heißt diese Note?",
@@ -171,12 +171,15 @@ export const practiceView: View = (root, ctx) => {
 </main>`;
     const main = root.querySelector("main")!;
     bindCommon(main);
+    const pressedHere = pressGuard(main);
     const done = () => {
       s.introDone(id);
       advance();
     };
-    main.querySelector('[data-act="intro-ok"]')!.addEventListener("click", (e) => {
+    const ok = main.querySelector('[data-act="intro-ok"]')!;
+    ok.addEventListener("click", (e) => {
       e.stopPropagation();
+      if (!pressedHere(e, ok)) return;
       done();
     });
     if (playing) {
@@ -239,6 +242,7 @@ export const practiceView: View = (root, ctx) => {
 </main>`;
     const main = root.querySelector("main")!;
     bindCommon(main);
+    const pressedHere = pressGuard(main);
     const slot = main.querySelector(".slot")!;
     const idkRow = main.querySelector(".idkrow")!;
 
@@ -267,6 +271,8 @@ export const practiceView: View = (root, ctx) => {
       const go = slot.querySelector<HTMLButtonElement>('[data-act="next"]');
       go?.addEventListener("click", (e) => {
         e.stopPropagation();
+        // beim Spielen erscheint das Feld ohne Tippen (falscher Ton gehört): liegender Finger zählt nicht
+        if (!pressedHere(e, go)) return;
         advance();
       });
       // die Antwortknöpfe sind jetzt verdeckt: Fokus auf „Weiter“, damit er nicht verloren geht
@@ -290,7 +296,7 @@ export const practiceView: View = (root, ctx) => {
     main.querySelectorAll<HTMLButtonElement>(".btns button").forEach((b) =>
       b.addEventListener("click", (e) => {
         e.stopPropagation();
-        if (phase !== "ask") return;
+        if (phase !== "ask" || !pressedHere(e, b)) return;
         const c = b.dataset.choice!;
         const ok = c === id;
         s.answer(ok);
@@ -307,9 +313,10 @@ export const practiceView: View = (root, ctx) => {
       }),
     );
 
-    main.querySelector('[data-act="idk"]')!.addEventListener("click", (e) => {
+    const idkBtn = main.querySelector('[data-act="idk"]')!;
+    idkBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      if (phase !== "ask") return;
+      if (phase !== "ask" || !pressedHere(e, idkBtn)) return;
       s.answer(false);
       markButtons(null);
       setPhase("err");
