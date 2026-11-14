@@ -120,6 +120,20 @@ export const practiceView: View = (root, ctx) => {
     );
   }
 
+  /**
+   * Klicks auf Knöpfe nur zählen, wenn auch der Druck auf diesem Knopf begann. Sonst landet ein Tipp,
+   * der noch auf der alten Karte anfing (z. B. „Richtig“ wegtippen, während sie gerade von selbst
+   * weitergeht), als Antwort auf dem Knopf, der auf der neuen Karte an derselben Stelle liegt.
+   * Tastatur (Enter/Leertaste, detail = 0) geht immer.
+   */
+  function pressGuard(main: HTMLElement): (e: MouseEvent, el: Element) => boolean {
+    let pressed: Element | null = null;
+    main.addEventListener("pointerdown", (e) => {
+      pressed = (e.target as Element).closest("button");
+    });
+    return (e, el) => e.detail === 0 || pressed === el;
+  }
+
   function bindCommon(main: HTMLElement) {
     main.querySelector('[data-act="close"]')!.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -171,12 +185,15 @@ export const practiceView: View = (root, ctx) => {
 </main>`;
     const main = root.querySelector("main")!;
     bindCommon(main);
+    const pressedHere = pressGuard(main);
     const done = () => {
       s.introDone(id);
       advance();
     };
-    main.querySelector('[data-act="intro-ok"]')!.addEventListener("click", (e) => {
+    const ok = main.querySelector('[data-act="intro-ok"]')!;
+    ok.addEventListener("click", (e) => {
       e.stopPropagation();
+      if (!pressedHere(e as MouseEvent, ok)) return;
       done();
     });
     if (playing) {
@@ -239,6 +256,7 @@ export const practiceView: View = (root, ctx) => {
 </main>`;
     const main = root.querySelector("main")!;
     bindCommon(main);
+    const pressedHere = pressGuard(main);
     const slot = main.querySelector(".slot")!;
     const idkRow = main.querySelector(".idkrow")!;
 
@@ -290,7 +308,7 @@ export const practiceView: View = (root, ctx) => {
     main.querySelectorAll<HTMLButtonElement>(".btns button").forEach((b) =>
       b.addEventListener("click", (e) => {
         e.stopPropagation();
-        if (phase !== "ask") return;
+        if (phase !== "ask" || !pressedHere(e, b)) return;
         const c = b.dataset.choice!;
         const ok = c === id;
         s.answer(ok);
@@ -307,9 +325,10 @@ export const practiceView: View = (root, ctx) => {
       }),
     );
 
-    main.querySelector('[data-act="idk"]')!.addEventListener("click", (e) => {
+    const idkBtn = main.querySelector('[data-act="idk"]')!;
+    idkBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      if (phase !== "ask") return;
+      if (phase !== "ask" || !pressedHere(e as MouseEvent, idkBtn)) return;
       s.answer(false);
       markButtons(null);
       setPhase("err");

@@ -152,6 +152,34 @@ test.describe("Üben", () => {
   });
 });
 
+test.describe("Tippen am Kartenwechsel", () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 412, height: 839 } });
+
+  test("Tipp, der auf der alten Karte beginnt, zählt nicht als Antwort auf der neuen", async ({ page }) => {
+    await seed(page, sampleData());
+    await page.goto("./");
+    await page.getByRole("button", { name: /Üben/ }).click();
+    await skipIntros(page);
+    const i = await info(page);
+    const m = page.locator(`main[data-seq="${i.seq}"]`);
+    await m.locator(`.btns button[data-choice="${i.note}"]`).tap();
+    await expect(page.getByTestId("panel")).toContainText("Richtig");
+    // Finger setzt auf, während „Richtig“ noch steht, und hebt erst ab, wenn die nächste Karte da ist –
+    // genau dort, wo auf der neuen Karte ein Antwortknopf liegt
+    const box = (await m.locator(".btns button").first().boundingBox())!;
+    const pt = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    const cdp = await page.context().newCDPSession(page);
+    await page.waitForTimeout(1500);
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [pt] });
+    await waitNext(page, i.seq);
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await page.waitForTimeout(300);
+    await skipIntros(page);
+    await expect(page.locator("main")).toHaveClass(/\bask\b/);
+    await expect(page.locator(".btns button:disabled")).toHaveCount(0);
+  });
+});
+
 test.describe("Daten", () => {
   test("beschädigte Daten werden nicht gelöscht", async ({ page }) => {
     await seed(page, "{kaputt");
