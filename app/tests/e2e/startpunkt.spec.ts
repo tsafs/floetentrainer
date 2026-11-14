@@ -23,15 +23,20 @@ test("„Ich kann schon Noten“: Meilenstein wählen, die erste Sitzung kennt d
   await page.goto("./");
   await page.getByRole("button", { name: /Ich kann schon Noten/ }).click();
   await expect(page.getByRole("heading", { name: "Wo steigst du ein?" })).toBeVisible();
-  await expect(page.locator(".ms")).toHaveCount(6);
-  await expect(page.locator(".ms .staff.preview")).toHaveCount(6);
+  await expect(page.locator(".ms")).toHaveCount(5);
+  // „Ganz von vorn“ ohne Notenzeile; „Alle Töne“ (25) in drei Zeilen
+  await expect(page.locator(".ms").first().locator(".staff")).toHaveCount(0);
+  await expect(page.locator(".ms").last().locator(".staff")).toHaveCount(3);
+  await expect(page.locator(".ms").nth(1).locator(".staff .old")).toHaveCount(0);
+  await expect(page.locator(".ms").nth(2).locator(".staff .old")).toHaveCount(5);
+  await expect(page.getByTestId("between")).toContainText("Dazwischen?");
   // Abbrechen
-  await page.getByRole("button", { name: /^Vorzeichen/ }).click();
-  await expect(page.getByTestId("confirm")).toContainText("Alles davor gilt als bekannt");
+  await page.getByRole("button", { name: /^Hohe Töne bis/ }).click();
+  await expect(page.getByTestId("confirm")).toContainText("gelten als bekannt");
   await page.getByRole("button", { name: "Abbrechen" }).click();
   await expect(page.getByTestId("confirm")).toHaveCount(0);
   // Wählen
-  await page.getByRole("button", { name: /^Vorzeichen/ }).click();
+  await page.getByRole("button", { name: /^Hohe Töne bis/ }).click();
   await page.getByRole("button", { name: "Hier beginnen" }).click();
   await expect(page.getByRole("heading", { name: "Flötentrainer" })).toBeVisible();
   await expect(page.locator(".track").first()).toContainText("Stufe 9");
@@ -68,16 +73,17 @@ test("Startpunkt ändern über Fortschritt: zurück, nur Lesen, Spielen geht mit
   await expect(page.getByTestId("current")).toContainText("Lesen: Stufe 4");
   // Spielen-Meilensteine über der Lesen-Stufe sind gesperrt
   await page.getByRole("button", { name: "nur Spielen" }).click();
-  await expect(page.getByRole("button", { name: /^Hohe Töne/ })).toBeDisabled();
+  await expect(page.getByRole("button", { name: /^Hohe Töne bis/ })).toBeDisabled();
+  await expect(page.getByRole("button", { name: /^Erste Oktave/ })).toBeDisabled();
   await page.getByRole("button", { name: "nur Lesen" }).click();
-  await page.getByRole("button", { name: /^Das tiefe c/ }).click();
+  await page.getByRole("button", { name: /^Erste Oktave/ }).click();
   await page.getByRole("button", { name: "Hier beginnen" }).click();
-  await expect(page.locator(".track").first()).toContainText("Stufe 6");
+  await expect(page.locator(".track").first()).toContainText("Stufe 7");
   await expect(page.locator(".track").nth(1)).toContainText("Stufe 4");
   // ganz von vorn (beide): Lesen und Spielen auf 1, geübte Töne behalten ihre Karten
   await page.goto("./#/startpunkt");
-  await expect(page.locator(".ms.cur")).toContainText("Das tiefe");
-  await page.getByRole("button", { name: /^Erste Töne/ }).click();
+  await expect(page.locator(".ms.cur")).toContainText("Erste Oktave");
+  await page.getByRole("button", { name: /^Ganz von vorn/ }).click();
   await expect(page.getByTestId("confirm")).toContainText("Deine bisherigen Antworten bleiben erhalten");
   await page.getByRole("button", { name: "Hier beginnen" }).click();
   await expect(page.locator(".track").first()).toContainText("Stufe 1");

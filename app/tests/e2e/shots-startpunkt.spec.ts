@@ -36,7 +36,7 @@ for (const s of SIZES) {
       await page.evaluate(() => document.fonts.ready);
       await page.screenshot({ path: p("4-startpunkt") });
       await page.getByRole("button", { name: "nur Spielen" }).click();
-      await page.getByRole("button", { name: /^Erste Töne/ }).click();
+      await page.getByRole("button", { name: /^Ganz von vorn/ }).click();
       await page.waitForTimeout(400);
       await page.screenshot({ path: p("5-zurueck"), fullPage: true });
       await page.goto("./#/fortschritt");

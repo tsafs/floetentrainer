@@ -106,14 +106,15 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   - Daten von Tönen, die dadurch wieder gesperrt sind, bleiben erhalten.
   - Senken unter den Startpunkt zieht den Startpunkt mit; Erhöhen von Hand lässt ihn stehen (die Töne der
     übersprungenen Stufe kommen dann als neue Töne mit Vorstellung).
-- **Startpunkt** (seit 14.11.2026, Plan und Begründung in `docs/app-startpunkt.md`): Sechs benannte
-  Meilensteine – Erste Töne (Stufe 1), Hinunter bis d¹ (3), Das tiefe c¹ (6), Hohe Töne (7), Vorzeichen (9),
-  Schwierige hohe Griffe (11). Wählbar für Lesen und Spielen gemeinsam (Standard), nur Lesen oder nur Spielen
+- **Startpunkt** (seit 14.11.2026, Plan und Begründung in `docs/app-startpunkt.md`): Fünf Meilensteine
+  „Ich kann schon …“, Start jeweils die Stufe danach – Ganz von vorn (Start 1), Linke Hand: g¹ bis d² (3),
+  Erste Oktave: c¹ bis e², mit fis¹ (7), Hohe Töne bis c³, mit cis² (9), Alle Töne von c¹ bis c³, auch b, es
+  und gis (12; Spielen dann ganz oben, auch Stufe 11 bekannt). Wählbar für Lesen und Spielen gemeinsam (Standard), nur Lesen oder nur Spielen
   (Spielen höchstens bis zur Lesen-Stufe).
   - Die Töne vor dem Startpunkt gelten als bekannt: als vorgestellt vermerkt, Karten in Fach 3 (Abschnitt 2).
-  - **Fürs Freischalten zählen nur die Töne ab dem Startpunkt** (bei „Vorzeichen“ zunächst nur b¹ und es¹).
+  - **Fürs Freischalten zählen nur die Töne ab dem Startpunkt** (bei „Hohe Töne bis c³“ zunächst nur b¹ und es¹).
     Ohne Startpunkt (ältere Daten) gilt Stufe 1 – alles wie bisher.
-  - Zurückgehen (auch „ganz von vorn“ = Erste Töne): Zählung fürs Freischalten beginnt neu; Töne ab dem neuen
+  - Zurückgehen (auch „Ganz von vorn“): Zählung fürs Freischalten beginnt neu; Töne ab dem neuen
     Startpunkt, die nie wirklich beantwortet wurden, werden wieder ganz neu (mit Vorstellung). Töne mit
     Antworten behalten Karten und Antworten. Alles löschen bleibt „Alles zurücksetzen“.
 - **Stufen** (die Stufe „Rest“ aus dem Auftrag ist auf Wunsch in vier Stufen geteilt):
@@ -335,16 +336,18 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
 
 - **Willkommensseite** (seit 14.11.2026): erscheint anstelle der Startseite, solange noch kein Startpunkt
   gewählt und noch nie geübt wurde (keine Sitzung, keine Karten, keine Übungstage). „Willkommen“, ein Satz,
-  die ersten drei Töne als Notenzeile, Knöpfe „Von vorn beginnen“ (setzt den Startpunkt Erste Töne) und „Ich
+  die ersten drei Töne als Notenzeile, Knöpfe „Von vorn beginnen“ (setzt den Startpunkt Stufe 1) und „Ich
   kann schon Noten“ (→ `#/startpunkt/neu`, Meilensteine für beide Spuren gemeinsam). Im Querformat stehen die
   Knöpfe nebeneinander. Auch nach „Neu beginnen“ bei unlesbaren Daten kommt sie.
 - **Startpunkt** (`#/startpunkt`): Erreichbar über „Startpunkt ändern“ unten auf der Fortschrittsseite und
   „Startpunkt wählen“ in den Einstellungen unter „Stufen“. Oben der aktuelle Stand beider Spuren, darunter
-  die Wahl „Lesen und Spielen · nur Lesen · nur Spielen“ und die sechs Meilensteine als Karten: Name, „ab
-  Stufe n“ bzw. „dein Startpunkt“ (stärker umrandet), was als bekannt gilt, und eine kleine Notenzeile mit
-  den Tönen, die dort neu kommen (alle im selben Maßstab). Antippen öffnet darunter die Bestätigung („Alles
-  davor gilt als bekannt …“; beim Zurückgehen zusätzlich, dass ungeübte Töne wieder mit Vorstellung kommen
-  und Antworten bleiben) mit „Hier beginnen“ und „Abbrechen“; danach zur Startseite. Für „nur Spielen“ sind
+  die Wahl „Lesen und Spielen · nur Lesen · nur Spielen“ und die fünf Meilensteine als Karten: Name, „Start
+  bei Stufe n“ bzw. „dein Startpunkt“ (stärker umrandet), alle enthaltenen Töne als Notenzeile nach Tonhöhe
+  (neue schwarz, frühere blass, alle im selben Maßstab, höchstens 9 je Zeile) und „17 Töne · danach neu: b¹
+  und es¹“. Unten „Dazwischen? Wähle den kleineren und stelle in den Einstellungen unter „Stufen“ eine Stufe
+  höher.“ Antippen öffnet darunter die Bestätigung („Diese Töne gelten als bekannt …“; beim Zurückgehen
+  zusätzlich, dass ungeübte Töne wieder mit Vorstellung kommen und Antworten bleiben) mit „Hier beginnen“ und
+  „Abbrechen“; danach zur Startseite. Für „nur Spielen“ sind
   Meilensteine über der Lesen-Stufe ausgegraut („Erst, wenn Lesen so weit ist.“).
 - **Startseite** (Entwurf `?s=home`):
   - Titel, rechts daneben der Menüknopf; die fälligen Karten für Lesen und Spielen jeweils auf ihrem Knopf.

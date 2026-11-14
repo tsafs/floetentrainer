@@ -13,19 +13,19 @@ import { level, startLevel } from "./progress";
 export interface Milestone {
   /** feste Kennung */
   id: string;
-  /** Name als HTML-freier Text mit Platzhaltern {d1} für Notennamen (siehe milestoneTitle in der Oberfläche) */
+  /** „Ich kann schon …“ als Text mit Platzhaltern {g1} für Notennamen (Oberfläche: milestoneTitle) */
   title: string;
-  /** Kennung der Stufe, bei der der Meilenstein beginnt */
+  /** Kennung der Stufe, bei der man beginnt; enthalten (= gilt als bekannt) sind alle Stufen davor */
   stage: string;
 }
 
+/** Abgestimmt am 14.11.2026 (docs/app-startpunkt.md): Grenzen genau auf Stufengrenzen. */
 export const MILESTONES: Milestone[] = [
-  { id: "erste-toene", title: "Erste Töne", stage: "erste-toene" },
-  { id: "bis-d1", title: "Hinunter bis {d1}", stage: "e1-d1" },
-  { id: "tiefes-c1", title: "Das tiefe {c1}", stage: "c1" },
-  { id: "hohe-toene", title: "Hohe Töne", stage: "cis2-f2-g2" },
-  { id: "vorzeichen", title: "Vorzeichen", stage: "b-toene" },
-  { id: "hohe-griffe", title: "Schwierige hohe Griffe", stage: "hohe-griffe" },
+  { id: "von-vorn", title: "Ganz von vorn", stage: "erste-toene" },
+  { id: "linke-hand", title: "Linke Hand: {g1} bis {d2}", stage: "e1-d1" },
+  { id: "erste-oktave", title: "Erste Oktave: {c1} bis {e2}, mit {fis1}", stage: "cis2-f2-g2" },
+  { id: "hohe-toene", title: "Hohe Töne bis {c3}, mit {cis2}", stage: "b-toene" },
+  { id: "alle-toene", title: "Alle Töne von {c1} bis {c3}, auch b, es und gis", stage: "andere-schreibweisen" },
 ];
 
 /** Fach der als bekannt angenommenen Karten */
@@ -37,25 +37,31 @@ export function milestone(id: string): Milestone | undefined {
   return MILESTONES.find((m) => m.id === id);
 }
 
-/** Stufe, bei der ein Meilenstein in einer Spur beginnt */
+/** Stufe, bei der ein Meilenstein in einer Spur beginnt (Spielen: höchstens die oberste Stufe) */
 export function milestoneLevel(m: Milestone, track: Track): number {
   return Math.min(levelOf("lesen", m.stage), maxLevel(track));
 }
 
-/** Töne, die bei diesem Meilenstein als bekannt gelten (Lesen-Zählung) */
-export function knownNotes(m: Milestone): string[] {
-  return unlockedNotes("lesen", milestoneLevel(m, "lesen") - 1);
+/** Enthält der Meilenstein in dieser Spur alle Stufen? (Spielen bei „Alle Töne“: dann ganz oben, alles bekannt) */
+function coversAll(m: Milestone, track: Track): boolean {
+  return levelOf("lesen", m.stage) > maxLevel(track);
 }
 
-/** Töne der Stufen des Meilensteins bis zum nächsten Meilenstein (für „Neu dort“) */
-export function milestoneNotes(m: Milestone): string[] {
+/** Töne, die bei diesem Meilenstein als bekannt gelten (Stufenreihenfolge) */
+export function knownNotes(m: Milestone): string[] {
+  return unlockedNotes("lesen", levelOf("lesen", m.stage) - 1);
+}
+
+/** Töne, die dieser Meilenstein gegenüber dem vorigen dazubringt */
+export function addedNotes(m: Milestone): string[] {
   const i = MILESTONES.indexOf(m);
-  const from = milestoneLevel(m, "spielen");
-  const next = MILESTONES[i + 1];
-  const to = next ? milestoneLevel(next, "spielen") - 1 : maxLevel("spielen");
-  return stagesOf("spielen")
-    .slice(from - 1, to)
-    .flatMap((s) => s.notes);
+  const before = i > 0 ? knownNotes(MILESTONES[i - 1]) : [];
+  return knownNotes(m).filter((n) => !before.includes(n));
+}
+
+/** Töne der Stufe, mit der es danach weitergeht (Lesen) */
+export function nextNotes(m: Milestone): string[] {
+  return stagesOf("lesen")[levelOf("lesen", m.stage) - 1].notes;
 }
 
 /** Der Meilenstein, bei dem die Spur gerade „steht“: der höchste, der nicht über dem Startpunkt liegt */
@@ -84,7 +90,7 @@ function practised(data: AppData, track: Track, note: string): boolean {
  * - Geübte Töne behalten Karten und Antworten.
  * - Beim Zurückgehen zählen fürs Freischalten nur Antworten ab jetzt (wie beim Senken von Hand).
  */
-function applyTrack(data: AppData, track: Track, target: number, now: number, today: string): void {
+function applyTrack(data: AppData, track: Track, target: number, now: number, today: string, all = false): void {
   const before = level(data, track);
   data.stages[track] = stageId(track, target);
   data.start = data.start ?? { lesen: stageId("lesen", 1), spielen: stageId("spielen", 1) };
@@ -92,9 +98,9 @@ function applyTrack(data: AppData, track: Track, target: number, now: number, to
   if (target < before) data.countFrom[track] = now;
 
   const intro = data.introduced[track];
-  const known = unlockedNotes(track, target - 1);
+  const known = unlockedNotes(track, all ? target : target - 1);
   const rest = stagesOf(track)
-    .slice(target - 1)
+    .slice(all ? target : target - 1)
     .flatMap((s) => s.notes);
   for (const n of rest) {
     if (practised(data, track, n)) continue;
@@ -132,7 +138,9 @@ export function chooseStart(data: AppData, m: Milestone, tracks: StartTracks, no
   const lesen = level(data, "lesen");
   const sp = level(data, "spielen");
   if (tracks !== "lesen") {
-    applyTrack(data, "spielen", Math.min(milestoneLevel(m, "spielen"), lesen, maxLevel("spielen")), now, today);
+    const target = Math.min(milestoneLevel(m, "spielen"), lesen, maxLevel("spielen"));
+    // „Alle Töne“: Spielen steht ganz oben, und auch die oberste Stufe gilt als bekannt
+    applyTrack(data, "spielen", target, now, today, coversAll(m, "spielen") && target === maxLevel("spielen"));
   } else if (sp > lesen) {
     applyTrack(data, "spielen", Math.min(lesen, maxLevel("spielen")), now, today);
   }

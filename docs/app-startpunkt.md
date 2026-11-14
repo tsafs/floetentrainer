@@ -1,6 +1,6 @@
 # Flötentrainer-App: Startpunkt im Lernplan
 
-Abgestimmt mit der Nutzerin am 14.11.2026 (alle Empfehlungen angenommen), am selben Tag umgesetzt. Ergänzt
+Abgestimmt am 14.11.2026, am selben Tag umgesetzt; die Meilensteine danach noch einmal neu gefasst (siehe unten). Ergänzt
 `docs/app-entscheidungen.md` (Abschnitte 2, 3, 6); nach der Umsetzung dort nachtragen. Unabhängig von
 `docs/app-navigation.md` (Menü) und `docs/app-tonfolgen.md` (Tonfolgen in `session.ts`/`practice.ts`):
 Diese Arbeit fasst `session.ts` und `practice.ts` nicht an und die Startseite nur so weit, dass beim
@@ -8,7 +8,7 @@ allerersten Start die Willkommensseite kommt.
 
 ## Anlass
 
-Wunsch der Nutzerin: Wer schon Noten kann, soll nicht ganz vorn anfangen müssen, sondern einen Meilenstein
+Wunsch des Nutzers (Anrede im Gespräch: „du“): Wer schon Noten kann, soll nicht ganz vorn anfangen müssen, sondern einen Meilenstein
 wählen. Ist es zu leicht, geht man weiter, ist es zu schwer, zurück oder ganz von vorn. Außerdem zum
 Ausprobieren: weiter hinten anfangen und prüfen, ob alles funktioniert.
 
@@ -27,20 +27,33 @@ In den Einstellungen lässt sich die Stufe mit + erhöhen. Springt man so auf St
 
 ### Meilensteine
 
-Sechs benannte Einstiegspunkte, jeder beginnt bei einer Stufe. Alles davor gilt als bekannt.
+Gefragt wird „Ich kann schon …“; der Start ist die Stufe danach. Die Grenzen fallen genau auf Stufengrenzen
+in `app/src/music/levels.ts`.
 
-| Meilenstein | beginnt bei | Neu dort | Gilt als bekannt |
-|---|---|---|---|
-| Erste Töne | Stufe 1 | h¹ a¹ g¹ | – |
-| Hinunter bis d¹ | Stufe 3 | e¹ d¹, dann fis¹, e² f¹ | h¹ a¹ g¹ c² d² |
-| Das tiefe c¹ | Stufe 6 | c¹ | d¹–e² mit fis¹ und f¹ |
-| Hohe Töne | Stufe 7 | cis² f² g², dann a² h² c³ | c¹–e² |
-| Vorzeichen | Stufe 9 | b¹ es¹, dann cis¹ gis¹ fis² | alle Stammtöne c¹–c³ |
-| Schwierige hohe Griffe | Stufe 11 | es² gis² b² | alles bis auf es² gis² b² |
+| Meilenstein | enthält Stufen | neue Töne | zusammen | Start bei Stufe |
+|---|---|---|---|---|
+| Ganz von vorn | – | – | – | 1 |
+| Linke Hand: g¹ bis d² | 1–2 | 5 | 5 | 3 |
+| Erste Oktave: c¹ bis e², mit fis¹ | 1–6 | 6 | 11 | 7 |
+| Hohe Töne bis c³, mit cis² | 1–8 | 6 | 17 | 9 |
+| Alle Töne von c¹ bis c³, auch b, es und gis | 1–11 | 8 | 25 | 12 |
 
-Jeder Meilenstein zeigt eine kleine Notenvorschau der Töne, mit denen man dort beginnt, und darunter in
-einer Zeile, was als bekannt gilt. Die einzelnen Stufen bleiben in den Einstellungen mit − / + einstellbar
-(Feinsteuerung), Stufe 12 (andere Schreibweisen) erreicht man von „Schwierige hohe Griffe“ aus wie bisher.
+Bei „Alle Töne“ steht Spielen ganz oben (Stufe 11), und auch dessen Töne gelten als bekannt; Lesen beginnt
+mit den anderen Schreibweisen.
+
+**Notenvorschau** je Meilenstein: alle enthaltenen Töne nach Tonhöhe wie eine Tonleiter, die neuen dieses
+Meilensteins schwarz, die aus früheren blass (so kann man sich selbst prüfen: „Kannst du diese Noten lesen?“).
+Alle Vorschauen im selben Maßstab; höchstens 9 Töne je Zeile, längere Reihen werden gleichmäßig umbrochen.
+Darunter „17 Töne · danach neu: b¹ und es¹“.
+
+**Feinabstimmung** zwischen den Meilensteinen bleibt − / + unter „Stufen“ in den Einstellungen; die
+Auswahlseite weist darauf hin („Dazwischen? Wähle den kleineren und stelle in den Einstellungen eine Stufe
+höher.“).
+
+Erste Fassung (ersetzt): sechs Meilensteine, benannt nach dem, was dort neu kommt (Erste Töne · Hinunter bis
+d¹ · Das tiefe c¹ · Hohe Töne · Vorzeichen · Schwierige hohe Griffe, Start 1/3/6/7/9/11). Auf den
+Bildschirmfotos wirkten die Notenzeilen (Stufenreihenfolge) wie ein Durcheinander, zwei Meilensteine brachten
+nur je 3 Töne, und „Ich kann schon …“ lässt sich für Einsteiger leichter beantworten.
 
 ### Wo gewählt wird
 
@@ -64,7 +77,7 @@ für „nur Spielen“ ausgegraut.
   gestaffelt, **höchstens 3 Karten je Spur und Tag**, ab morgen, damit die fälligen Karten die neuen Töne
   nicht verdrängen. Wer sie richtig weiß, schiebt sie weiter nach hinten (7, 14, 30 Tage); wer sie nicht
   weiß, bekommt sie wie üblich öfter.
-- Fürs **Freischalten** zählen nur die Töne ab dem Startpunkt. Wer bei „Vorzeichen“ beginnt, braucht für
+- Fürs **Freischalten** zählen nur die Töne ab dem Startpunkt. Wer bei „Hohe Töne bis c³“ beginnt (Start Stufe 9), braucht für
   die nächste Stufe also nur b¹ und es¹ mit je 10 Antworten und 90 %.
 - Hat ein Ton schon echte Antworten (z. B. nach einem Zurückgehen), bleibt seine Karte wie sie ist.
 
@@ -74,7 +87,7 @@ für „nur Spielen“ ausgegraut.
   von Hand nur Antworten ab jetzt. Töne ab dem neuen Startpunkt, die nur als bekannt angenommen und **nie
   wirklich beantwortet** wurden, werden wieder ganz neu (mit Vorstellung) – man geht ja zurück, weil sie
   nicht sitzen. Geübte Töne behalten ihre Karten und Antworten.
-- **„Ganz von vorn“** ist der Meilenstein „Erste Töne“: dasselbe wie oben, also bisherige Antworten
+- **„Ganz von vorn“** ist der erste Meilenstein: dasselbe wie oben, also bisherige Antworten
   bleiben, aber angenommene Töne werden wieder neu. Wer wirklich alles löschen will, nimmt wie bisher
   Einstellungen → „Alles zurücksetzen“.
 - **Weiter zu einem späteren Meilenstein:** wie beim ersten Wählen; Töne mit echten Antworten bleiben
@@ -89,6 +102,11 @@ für „nur Spielen“ ausgegraut.
 - Ob die Willkommensseite kommt: kein `start` und noch keine Sitzung.
 - Die angenommenen Karten sind gewöhnliche Karten in `cards`, die Töne stehen in `introduced`. „Nie
   wirklich beantwortet“ heißt: keine Antworten in `history` dieser Spur.
+
+### Ideen für später
+
+- Kurzer **Einstufungstest**: einige Noten aus einem Meilenstein abfragen und daraus den Startpunkt
+  vorschlagen.
 
 ### Bekannte Grenze (nicht in dieser Arbeit)
 
