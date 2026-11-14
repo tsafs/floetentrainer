@@ -954,6 +954,21 @@ svg.acc {
 .panel .names .bad {
   color: var(--err);
 }
+/* Fehlerfeld: alles mittig. Mit Bild (Griff- und Griff→Note-Karten) stehen Bild und Name als Gruppe
+   mittig nebeneinander, sonst nur der Text. */
+.panel.center {
+  justify-content: center;
+  text-align: center;
+}
+.panel.center.solo {
+  grid-template-columns: 1fr;
+}
+.panel.center .txt {
+  justify-items: center;
+}
+.panel.center .head {
+  justify-content: center;
+}
 .gorow {
   display: flex;
   gap: 8px;

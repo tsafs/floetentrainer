@@ -356,12 +356,12 @@ describe("Tonfolgen", () => {
     }
     expect(st?.type).toBe("folge");
     if (st?.type !== "folge") return;
-    // Folge mit Wiederholung von Hand setzen
-    st.folge.notes = ["g1", "a1", "a1", "h1"];
+    // Folge, in der ein Ton zweimal vorkommt, von Hand setzen
+    st.folge.notes = ["g1", "a1", "h1", "a1"];
     const len = (n: string) => d.history.lesen[n]?.length ?? 0;
     const before = { g1: len("g1"), a1: len("a1"), h1: len("h1") };
     const graded = s.graded;
-    s.answerFolge([true, true, false, true]); // a¹ einmal falsch
+    s.answerFolge([true, true, true, false]); // a¹ einmal falsch
     expect(len("g1")).toBe(before.g1 + 1);
     expect(len("a1")).toBe(before.a1 + 1);
     expect(len("h1")).toBe(before.h1 + 1);

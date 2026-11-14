@@ -157,7 +157,7 @@ for (const s of SIZES) {
       for (const k of Object.keys(d.cards)) d.cards[k] = { box: 5, day: today, session: 5 };
       await page.addInitScript(FAKE_MIC);
       await seed(page, d);
-      const folgen = [["fis1", "g1", "a1", "a1", "h1"], ["e1", "fis1", "g1", "fis1", "e1"], ["d1", "e1", "fis1", "g1"], ["g1", "a1", "h1", "c2", "h1"]];
+      const folgen = [["fis1", "g1", "a1", "g1", "h1"], ["e1", "fis1", "g1", "fis1", "e1"], ["d1", "e1", "fis1", "g1"], ["g1", "a1", "h1", "c2", "h1"]];
       await page.addInitScript((f) => {
         if (!sessionStorage.getItem("folgen")) {
           sessionStorage.setItem("folgen", "1");
@@ -183,7 +183,7 @@ for (const s of SIZES) {
       await tap("h1"); // falsch (a¹)
       await page.waitForTimeout(400);
       await page.screenshot({ path: p("t3-folge-fehler") });
-      await tap("a1");
+      await tap("g1");
       await tap("h1");
       await page.waitForTimeout(300);
       await page.screenshot({ path: p("t4-folge-aufgeloest") });
@@ -194,7 +194,7 @@ for (const s of SIZES) {
       await page.screenshot({ path: p("t5-folge-richtig") });
       // Spielen
       await page.goto("./");
-      await page.evaluate(() => ((window as never as { __folgen: string[][] }).__folgen = [["g1", "a1", "a1", "h1", "c2"]]));
+      await page.evaluate(() => ((window as never as { __folgen: string[][] }).__folgen = [["g1", "a1", "g1", "h1", "c2"]]));
       await page.getByRole("button", { name: /Weiter spielen/ }).click();
       await page.waitForFunction(() => (window as never as { __osc: unknown }).__osc !== null);
       const osc = (id: string | null) =>
@@ -220,7 +220,7 @@ for (const s of SIZES) {
       await page.waitForTimeout(900);
       await page.screenshot({ path: p("t6-spielen-mitten") });
       await osc(null);
-      for (const id of ["a1", "h1", "c2"]) {
+      for (const id of ["g1", "h1", "c2"]) {
         await page.waitForTimeout(150);
         await osc(id);
         await page.waitForTimeout(650);

@@ -1,6 +1,5 @@
 // Texte: Lage einer Note, Vorstellung neuer Töne und Hinweise nach Fehlern (feste Vorlagen).
 
-import type { Kind } from "../music/levels";
 import { joinNames, nameHtml } from "../music/names";
 import { note, type Note } from "../music/notes";
 import { accidentalInline } from "../music/staff";
@@ -66,49 +65,6 @@ export const GRIP_TIPS: Record<string, string> = {
   gis2: "Daumen nur einen Spalt offen. Etwas kräftiger blasen.",
   b2: "Daumen nur einen Spalt offen. Etwas kräftiger blasen.",
 };
-
-function interval(t: Note, c: Note): string {
-  const d = c.midi - t.midi;
-  const dir = d > 0 ? "höher" : "tiefer";
-  const a = Math.abs(d);
-  if (a === 1) return `einen Halbton ${dir}`;
-  if (a === 2) return `einen Ganzton ${dir}`;
-  if (a === 12) return `eine Oktave ${dir}`;
-  return `${dir}`;
-}
-
-/**
- * Hinweis nach einem Fehler. target: gesuchter Ton, chosen: gewählter/gespielter Ton (null bei
- * „Weiß nicht“). Ergebnis ist HTML.
- */
-export function errorHint(targetId: string, chosenId: string | null, kind: Kind): string {
-  const t = note(targetId);
-  const T = nameHtml(targetId);
-  if (!chosenId) return `${T} ${positionPhrase(t)}.`;
-  const c = note(chosenId);
-  const C = nameHtml(chosenId);
-  const lead = kind === "griff" ? `Du hast den Griff von ${C} gewählt.` : kind === "spiel" ? "" : `Du hast ${C} gewählt.`;
-  let body: string;
-  if (t.name === c.name && t.octave !== c.octave) {
-    // andere Oktave
-    if (kind === "griff" || kind === "spiel") {
-      body =
-        t.fingering[0] !== c.fingering[0]
-          ? `${C} klingt ${interval(t, c)}. Den Unterschied macht vor allem der Daumen.`
-          : `${C} klingt ${interval(t, c)} als ${T}.`;
-    } else {
-      body = `${T} ${positionPhrase(t)}, ${C} ${positionPhrase(c)} – eine Oktave Unterschied.`;
-    }
-  } else if (t.pos === c.pos) {
-    // gleiche Stelle, anderes Vorzeichen
-    body = `Achte auf das Vorzeichen: ${T} hat ${accText(t)}, ${C} hat ${accText(c)}.`;
-  } else if (kind === "griff" || kind === "spiel") {
-    body = `${C} liegt ${interval(t, c)} als ${T}. ${T} ${positionPhrase(t)}.`;
-  } else {
-    body = `${T} ${positionPhrase(t)}, ${C} ${positionPhrase(c)}.`;
-  }
-  return lead ? `${lead} ${body}` : body;
-}
 
 /** „Neu: c² und d²“ */
 export function newNotesText(ids: string[]): string {

@@ -84,18 +84,17 @@ describe("Erzeugen", () => {
     expect(pairs.has("fis1-g1")).toBe(true);
     expect(pairs.has("c2-cis2")).toBe(true);
   });
-  it("Tonwiederholungen in etwa jeder vierten Folge, nie dreimal derselbe Ton in Reihe", () => {
-    const list = many(POOL8, 4, 800);
-    let withRepeat = 0;
-    for (const f of list) {
-      let reps = 0;
-      for (let i = 1; i < f.length; i++) if (f[i] === f[i - 1]) reps++;
-      for (let i = 2; i < f.length; i++) expect(f[i] === f[i - 1] && f[i] === f[i - 2]).toBe(false);
-      expect(reps).toBeLessThanOrEqual(1);
-      if (reps) withRepeat++;
+  it("nie derselbe Ton zweimal direkt hintereinander, später wieder ist erlaubt", () => {
+    for (const pool of [POOL8, POOL_F]) {
+      const list = many(pool, 5, 800);
+      let returns = 0;
+      for (const f of list) {
+        for (let i = 1; i < f.length; i++) expect(f[i]).not.toBe(f[i - 1]);
+        if (new Set(f).size < f.length) returns++;
+      }
+      // d¹ g¹ d¹ u. ä. kommt vor
+      expect(returns).toBeGreaterThan(0);
     }
-    expect(withRepeat / list.length).toBeGreaterThan(0.15);
-    expect(withRepeat / list.length).toBeLessThan(0.35);
   });
   it("beginnt nicht mit dem Ton davor", () => {
     const rng = seeded(5);
@@ -123,7 +122,7 @@ describe("Erzeugen", () => {
     const a = many(POOL8, 4, 5, 42);
     const b = many(POOL8, 4, 5, 42);
     expect(a).toEqual(b);
-    expect(a[0]).toEqual(["a1", "c2", "h1", "a1"]);
+    expect(a[0]).toEqual(["a1", "g1", "h1", "c2"]);
   });
 });
 

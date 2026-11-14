@@ -13,7 +13,7 @@ import { nameSvgText, staffRange, staffSeqSvg, staffSvg, type Range } from "../m
 import { choiceCount, makeChoices } from "../srs/choices";
 import { folgeChoices } from "../srs/sequences";
 import { toneTimeline } from "../songs/timeline";
-import { errorHint, GRIP_TIPS, introSentence } from "../srs/hints";
+import { GRIP_TIPS, introSentence } from "../srs/hints";
 import type { Session, Step } from "../srs/session";
 import { activeFlute, cardKey } from "../store/data";
 import { ICON_CHECK, ICON_X, pressGuard, type View } from "./common";
@@ -285,12 +285,18 @@ export const practiceView: View = (root, ctx) => {
       idkRow.innerHTML = `<span class="okline" data-testid="panel">${ICON_CHECK}<span>${head}</span><span class="name">${nameHtml(id)}</span></span>`;
     };
 
-    const errPanel = (head: string, hint: string) => {
-      // Bei Griff→Note steht der Griff schon oben: im Feld die Note zeigen
-      const pic = kind === "note" ? staffSvg(id, { variant: "narrow", label: `Note ${nameText(id)}` }) : flute(id);
+    const errPanel = (head: string) => {
+      // Nur der richtige Name, mittig. Wo die Antwort ein Bild ist (Griff wählen, Note zum Griff wählen),
+      // bleibt sie als Bild daneben – das Feld verdeckt ja die Antwortknöpfe.
+      const pic =
+        kind === "griff"
+          ? `<div class="fl">${flute(id)}</div>`
+          : kind === "note"
+            ? `<div class="fl st">${staffSvg(id, { variant: "narrow", label: `Note ${nameText(id)}` })}</div>`
+            : "";
       return (
-        `<div class="panel err" data-testid="panel"><div class="fl${kind === "note" ? " st" : ""}">${pic}</div><div class="txt"><span class="head">${head}</span>` +
-        `<span class="name">${nameHtml(id)}</span><span class="sub">${hint}</span></div></div>` +
+        `<div class="panel err center${pic ? "" : " solo"}" data-testid="panel">${pic}<div class="txt"><span class="head">${head}</span>` +
+        `<span class="name">${nameHtml(id)}</span></div></div>` +
         `<button class="go" data-act="next">Weiter</button>`
       );
     };
@@ -335,7 +341,7 @@ export const practiceView: View = (root, ctx) => {
           autoAdvance();
         } else {
           setPhase("err");
-          slot.innerHTML = errPanel("Nicht ganz", errorHint(id, c, kind));
+          slot.innerHTML = errPanel("Nicht ganz");
           bindNext();
         }
       }),
@@ -348,7 +354,7 @@ export const practiceView: View = (root, ctx) => {
       s.answer(false);
       markButtons(null);
       setPhase("err");
-      slot.innerHTML = errPanel("Auflösung", errorHint(id, null, kind));
+      slot.innerHTML = errPanel("Auflösung");
       bindNext();
       if (kind === "spiel") judge.markWrong();
     });
@@ -360,10 +366,7 @@ export const practiceView: View = (root, ctx) => {
         if (o.event === "wrong" && phase === "ask") {
           s.answer(false);
           setPhase("err");
-          const heardId = chartNoteByMidi(o.wrongMidi!)?.id;
-          const head = `Du spielst ${midiNameHtml(o.wrongMidi!)}`;
-          const hint = heardId ? errorHint(id, heardId, "spiel") : "";
-          slot.innerHTML = errPanel(head, hint);
+          slot.innerHTML = errPanel(`Du spielst ${midiNameHtml(o.wrongMidi!)}`);
           bindNext();
         } else if (o.event === "correct") {
           onJudge = null;
@@ -418,7 +421,7 @@ export const practiceView: View = (root, ctx) => {
     const slot = main.querySelector(".slot")!;
     const idkRow = main.querySelector(".idkrow")!;
     const q = main.querySelector(".q")!;
-    /** je Note: richtig? (undefined = noch offen) und was getippt bzw. zuerst falsch gespielt wurde */
+    /** je Note: richtig? (undefined = noch offen) und was zuerst falsch getippt bzw. gespielt wurde */
     const ok: (boolean | undefined)[] = [];
     const wrongAt: (string | null)[] = [];
     let cur = 0;
@@ -430,13 +433,17 @@ export const practiceView: View = (root, ctx) => {
       main.dataset.i = String(k);
       main.dataset.note = notes[k] ?? "";
     };
-    /** Note k abhaken (bzw. als falsch markieren), darunter ihr richtiger Name */
-    const mark = (k: number, good: boolean, withName = true) => {
+    /**
+     * Note k abhaken (bzw. als falsch markieren). Darunter steht *ihre Antwort* (getippt bzw. gespielt),
+     * nicht die Lösung – die steht am Ende im Feld, so lassen sich beide Reihen vergleichen.
+     * answer null: nichts darunter (Weiß nicht, Ton außerhalb der Grifftabelle).
+     */
+    const mark = (k: number, good: boolean, answer: string | null) => {
       const el = g(k);
       if (!el) return;
       el.classList.remove("hit", "miss");
       el.classList.add(good ? "hit" : "miss");
-      if (withName) el.querySelector(".sl")!.innerHTML = nameSvgText(notes[k]);
+      el.querySelector(".sl")!.innerHTML = answer ? nameSvgText(answer) : "";
     };
     setCur(0);
 
@@ -473,15 +480,11 @@ export const practiceView: View = (root, ctx) => {
         return;
       }
       setPhase("err");
-      const k = res.indexOf(false);
-      const id = notes[k];
+      // Die ganze richtige Folge, Fehler rot; ihre Antworten stehen darüber unter den Noten
       const names = notes.map((x, j) => `<span class="${res[j] ? "" : "bad"}">${nameHtml(x)}</span>`).join(" ");
-      const w = wrongAt[k] ?? null;
-      // beim Spielen sagt der Hinweis nicht, was sie gespielt hat (bei der Karte steht es in der Überschrift)
-      const hint = (playing && w ? `Du hast ${nameHtml(w)} gespielt. ` : "") + errorHint(id, w, playing ? "spiel" : "name");
       slot.innerHTML =
-        `<div class="panel err" data-testid="panel"><div class="fl">${flute(id)}</div><div class="txt"><span class="head">${head}</span>` +
-        `<span class="names">${names}</span><span class="sub">${hint}</span></div></div>` +
+        `<div class="panel err center solo" data-testid="panel"><div class="txt"><span class="head">${head}</span>` +
+        `<span class="names">${names}</span></div></div>` +
         `<div class="gorow">${listenBtn}<button class="go" data-act="next">Weiter</button></div>`;
       bindListen(slot);
       const go = slot.querySelector<HTMLButtonElement>('[data-act="next"]')!;
@@ -501,7 +504,8 @@ export const practiceView: View = (root, ctx) => {
       onFolgeFrame = null;
       for (let k = cur; k < n; k++) {
         ok[k] = false;
-        mark(k, false);
+        // beim Spielen: ein schon falsch gespielter Ton bleibt stehen
+        mark(k, false, wrongAt[k] ?? null);
       }
       done("Auflösung");
     });
@@ -517,7 +521,7 @@ export const practiceView: View = (root, ctx) => {
           const good = c === notes[cur];
           ok[cur] = good;
           wrongAt[cur] = good ? null : c;
-          mark(cur, good);
+          mark(cur, good, c);
           b.classList.remove("tap-ok", "tap-err");
           void b.offsetWidth; // Animation neu starten
           b.classList.add(good ? "tap-ok" : "tap-err");
@@ -543,7 +547,8 @@ export const practiceView: View = (root, ctx) => {
       onNote: (k, r) => {
         if (phase !== "ask") return;
         if (ok[k] === undefined) ok[k] = r.ok;
-        mark(k, ok[k]!);
+        if (!ok[k] && wrongAt[k] == null && r.wrongMidi !== undefined) wrongAt[k] = chartNoteByMidi(r.wrongMidi)?.id ?? null;
+        mark(k, ok[k]!, ok[k] ? notes[k] : (wrongAt[k] ?? null));
         q.textContent = question;
         q.classList.remove("warn", "hint");
         cur = k + 1;
@@ -552,8 +557,11 @@ export const practiceView: View = (root, ctx) => {
       onWrong: (k, midi) => {
         if (phase !== "ask") return;
         ok[k] = false;
-        wrongAt[k] = chartNoteByMidi(midi)?.id ?? null;
-        mark(k, false, false);
+        // der erste falsche Ton bleibt unter der Note stehen
+        if (wrongAt[k] == null) {
+          wrongAt[k] = chartNoteByMidi(midi)?.id ?? null;
+          mark(k, false, wrongAt[k]);
+        }
         q.innerHTML = `Du spielst ${midiNameHtml(midi)}`;
         q.classList.remove("hint");
         q.classList.add("warn");

@@ -13,8 +13,6 @@ export const FOLGE_MIN_NOTES = 5;
 export const FOLGE_MIN_LEN = 2;
 /** Größter Sprung in Halbtönen (Quinte) */
 export const FOLGE_MAX_LEAP = 7;
-/** Anteil der Folgen mit einer Tonwiederholung */
-export const FOLGE_REPEAT_SHARE = 0.25;
 /** So viele Antwortknöpfe beim Lesen (höchstens) */
 export const FOLGE_CHOICES = 8;
 /** … davon mindestens so viele, die nicht in der Folge vorkommen */
@@ -84,13 +82,8 @@ function makeOne(pool: Note[], len: number, rng: Rng, opt: FolgeOptions): string
   const startFrom = idx.filter((i) => pool[i].id !== opt.avoidFirst);
   let cur = pickWeighted(startFrom.length ? startFrom : idx, (i) => wNote(pool[i]), rng)!;
   const out = [cur];
-  // In etwa jeder vierten Folge (ab 3 Tönen) einmal eine Tonwiederholung, an zufälliger Stelle
-  const repeatAt = len >= 3 && rng() < FOLGE_REPEAT_SHARE ? 1 + Math.floor(rng() * (len - 1)) : -1;
+  // Nie derselbe Ton zweimal direkt hintereinander (zu leicht); später in der Folge darf er wiederkommen.
   while (out.length < len) {
-    if (out.length === repeatAt) {
-      out.push(cur);
-      continue;
-    }
     const next = pickWeighted(
       idx.filter((j) => j !== cur),
       (j) => stepWeight(pool, cur, j) * wNote(pool[j]),
@@ -106,7 +99,7 @@ function makeOne(pool: Note[], len: number, rng: Rng, opt: FolgeOptions): string
 /**
  * Melodische Folge aus dem Pool (folgePool): meist Nachbarn in der Tonhöhen-Reihe, oft eine Terz, selten
  * ein größerer Sprung (höchstens eine Quinte), Halbtonschritte bevorzugt, schwache Töne dreifach. Nie
- * dreimal derselbe Ton in Reihe, höchstens eine Wiederholung je Folge. Möglichst keine schon benutzte
+ * derselbe Ton zweimal direkt hintereinander (wohl aber später wieder: d¹ g¹ d¹). Möglichst keine schon benutzte
  * Folge (opt.used); gelingt das nicht, trotzdem eine.
  */
 export function makeFolge(poolIds: string[], len: number, rng: Rng, opt: FolgeOptions = {}): string[] {

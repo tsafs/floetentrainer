@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { isAltSpelling, kindsForNote, unlockedNotes, type Kind } from "../../src/music/levels";
 import { note } from "../../src/music/notes";
 import { choiceCount, makeChoices } from "../../src/srs/choices";
-import { errorHint, introSentence, positionPhrase } from "../../src/srs/hints";
+import { introSentence, positionPhrase } from "../../src/srs/hints";
 import { seeded } from "./helpers";
 
 function check(ids: string[], target: string) {
@@ -80,24 +80,6 @@ describe("Texte", () => {
     expect(positionPhrase(note("c2"))).toBe("liegt im dritten Zwischenraum");
     expect(positionPhrase(note("h1"))).toBe("liegt auf der dritten Linie");
     expect(positionPhrase(note("c3"))).toBe("hat zwei Hilfslinien über den Linien");
-  });
-  it("Beispielhinweis aus den Entscheidungen", () => {
-    const h = errorHint("c1", "d1", "name").replace(/<[^>]+>/g, "");
-    expect(h).toBe("Du hast d1 gewählt. c1 hat eine eigene Hilfslinie unter den Linien, d1 hängt unter der untersten Linie.");
-  });
-  it("Vorzeichen-Verwechslung", () => {
-    expect(errorHint("fis1", "f1", "name")).toContain("Achte auf das Vorzeichen");
-  });
-  it("Oktave beim Griff: Daumen", () => {
-    expect(errorHint("e2", "e1", "griff")).toContain("Daumen");
-  });
-  it("Hinweise beschreiben nie einzelne Löcher", () => {
-    for (const t of unlockedNotes("lesen", 11)) {
-      for (const c of ["c1", "e2", "fis1", "b1"]) {
-        if (c === t) continue;
-        for (const k of ["name", "griff", "note", "spiel"] as Kind[]) expect(errorHint(t, c, k)).not.toMatch(/Loch/);
-      }
-    }
   });
   it("Vorstellung nennt die Lage", () => {
     expect(introSentence("c2").replace(/<[^>]+>/g, "")).toBe("c2 liegt im dritten Zwischenraum.");

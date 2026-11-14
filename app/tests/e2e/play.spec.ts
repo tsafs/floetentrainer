@@ -56,7 +56,9 @@ test("erst falsch, dann richtig: zählt als Fehler", async ({ page }) => {
   await page.waitForTimeout(450);
   await play(page, wrong);
   await expect(page.getByTestId("panel")).toContainText(`Du spielst ${note(wrong).name}`);
-  await expect(page.locator(".panel .flute")).toHaveAttribute("data-fingering", note(t).fingering);
+  // der richtige Name, kein Griffbild
+  await expect(page.locator(".panel .name")).toContainText(t);
+  await expect(page.locator(".panel .flute")).toHaveCount(0);
   await play(page, t);
   await expect(page.getByTestId("panel")).toContainText("Jetzt stimmt es");
   expect(await lastAnswer(page, t)).toBe(0);
@@ -115,13 +117,15 @@ test("wackelnder Ton (Vibrato ±30 Cent) wird als richtig gewertet", async ({ pa
   expect(await lastAnswer(page, t)).toBe(1);
 });
 
-test("„Weiß nicht“ beim Spielen: Griffbild, danach darf gespielt werden", async ({ page }) => {
+test("„Weiß nicht“ beim Spielen: richtiger Name, danach darf gespielt werden", async ({ page }) => {
   await setup(page);
   await startPlaying(page);
   const t = await target(page);
   await page.getByRole("button", { name: "Weiß nicht" }).click();
   await expect(page.getByTestId("panel")).toContainText("Auflösung");
-  await expect(page.locator(".panel .flute")).toHaveAttribute("data-fingering", note(t).fingering);
+  // der richtige Name, kein Griffbild
+  await expect(page.locator(".panel .name")).toContainText(t);
+  await expect(page.locator(".panel .flute")).toHaveCount(0);
   await play(page, t);
   await expect(page.getByTestId("panel")).toContainText("Jetzt stimmt es");
   expect(await lastAnswer(page, t)).toBe(0);

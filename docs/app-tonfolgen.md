@@ -21,7 +21,9 @@ wie f¹ – fis¹ – g¹.
    **jeder Ton höchstens einmal pro Folge**. Kommt ein Ton mehrfach vor, ist er richtig, wenn er an allen
    Stellen richtig war. Die Fächer und Termine (Leitner) bleiben unberührt – wie bei Zusatzkarten heute.
 4. **Lesen und Spielen**, beides.
-5. **Tonwiederholungen** (wie bei „Hänschen klein“: g¹ e¹ e¹) sind ausdrücklich erwünscht. Beim Spielen
+5. ~~**Tonwiederholungen** (wie bei „Hänschen klein“: g¹ e¹ e¹) sind ausdrücklich erwünscht.~~ **Geändert
+   (Nutzerin, später am 14.11.2026):** In keiner Übung kommt derselbe Ton zweimal direkt hintereinander –
+   das ist zu leicht. Später in der Folge darf er wiederkommen (d¹ g¹ d¹, a¹ h¹ c² a¹). Ursprünglich: Beim Spielen
    braucht es dafür einen neuen Einsatz (kurz absetzen oder neu anstoßen); die Warte-Wertung kann das
    schon (`WaitFollower` in `app/src/audio/follow.ts`).
 
@@ -59,7 +61,7 @@ wie f¹ – fis¹ – g¹.
   ebenfalls.
 - **Halbtonschritte** bevorzugen, wo beide Töne freigeschaltet sind (f¹–fis¹, fis¹–g¹, cis²–d², b¹–h¹ …):
   Gerade diese Griffwechsel sind schwer.
-- **Tonwiederholung** in etwa jeder vierten Folge einmal (nie dreimal derselbe Ton in Reihe).
+- ~~**Tonwiederholung** in etwa jeder vierten Folge einmal~~ – entfällt (siehe Entscheidung 5).
 - **Schwache Töne** (`isWeak`) häufiger einbauen (wie bei Zusatzkarten dreifach gewichtet).
 - In einer Sitzung keine Folge zweimal (außer der Wiederholung nach einem Fehler).
 - Zufall nur über das übergebene `rng`, damit Tests feste Folgen bekommen.
@@ -160,12 +162,13 @@ Umgesetzt wie oben beschrieben; Regeln nachgetragen in `docs/app-entscheidungen.
 - **Wiederholung und „nie zweimal derselbe Ton“:** Eine neue Folge endet möglichst nicht mit dem ersten Ton
   einer gleich fälligen Wiederholung, sonst müsste diese länger warten.
 - **Länge** ändert sich nur durch gewertete Folgen, nicht durch die Wiederholung nach einem Fehler.
-- **Lesen, falscher Tipp:** Unter der Note steht ihr richtiger Name in Rot; der getippte falsche Name steht
-  nicht noch zusätzlich dort (zwei Namen übereinander wären unruhig). Er steht im Hinweis am Ende („Du hast
-  fis¹ gewählt …“, für die erste falsche Note). Der getippte Knopf leuchtet kurz grün bzw. rötlich auf.
-- **Rückmeldung bei Fehlern:** Im rötlichen Feld steht das Griffbild der *ersten* falschen Note, die ganze
-  Folge (falsche Töne rot) und der Hinweis wie bei Karten; beim Spielen beginnt er mit „Du hast d²
-  gespielt.“, weil keine Überschrift „Du spielst …“ wie bei der Karte da ist.
+- **Unter den Noten stehen ihre Antworten, im Feld die Lösung** (geändert am 14.11.2026 auf Wunsch der
+  Nutzerin; vorher stand unter der Note der richtige Name und im Feld Griffbild und Hinweis nur zur ersten
+  falschen Note, das war bei mehreren Fehlern unvollständig): Lesen – unter jeder Note der getippte Name
+  (richtig grün, falsch rot); Spielen – unter einer falschen Note der erste falsch gespielte Ton (Ton
+  außerhalb der Grifftabelle oder „Weiß nicht“: nichts). Das rötliche Feld zeigt mittig „Nicht ganz“
+  bzw. „Auflösung“ und die ganze richtige Folge, falsche Töne rot – kein Griffbild, kein Hinweistext.
+  Der getippte Knopf leuchtet kurz grün bzw. rötlich auf.
 - **Spielen, Klarheit 0,9** wie bei der Spielen-Karte (das Mitspielen nimmt 0,85): Abschnitt 4 sagt, dass die
   Übung Toleranz, Haltedauer und Klarheit 0,9 behält. Übrige Werte der Warte-Wertung (falsch erst nach
   250 ms und neuem Einsatz usw.) wie beim Mitspielen.
