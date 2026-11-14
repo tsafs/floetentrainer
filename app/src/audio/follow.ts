@@ -30,8 +30,13 @@
 // Neuer Einsatz (nur Warte-Modus, für Tonwiederholungen): Ein Ton gilt als neu angestoßen nach
 // - einer Unterbrechung von mindestens reattackGapMs (40 ms) ohne gültigen Ton (Stille, zu leise,
 //   unklar, außerhalb des Bereichs) oder mit einem anderen Ton, oder
-// - einem Lautstärke-Einbruch (falls Frames rms mitbringen): unter die Hälfte des bisherigen
-//   Höchstwerts dieses Tons und danach wieder deutlich lauter (mindestens das 1,5-fache des Tiefpunkts).
+// - einem Lautstärke-Einbruch (falls Frames rms mitbringen): unter 12 % des bisherigen Höchstwerts
+//   dieses Tons und danach wieder deutlich lauter (mindestens das 1,5-fache des Tiefpunkts).
+//   Grenze gemessen (Diagnose „Hänschen klein“ vom 14.11.2026, Android-Handy, neue Sopranflöte, 49 Noten):
+//   Echte Zungenstöße drückten die Lautstärke auf 0–9 % des Höchstwerts, oft ohne dass die Tonhöhe
+//   verloren ging; innerhalb eines gehaltenen Tons fiel sie nach dem Anstoß dagegen oft auf 17–49 % und
+//   schwoll wieder an. Mit der früheren Grenze (die Hälfte) zählte dieses Schwanken als neuer Einsatz,
+//   und bei Tonwiederholungen (h¹ h¹ h¹ h¹) sprang die Markierung mit einem Ton zwei Noten weiter.
 // Begründung: Frames kommen alle 25 ms; 40 ms verlangen also mindestens zwei Aussetzer in Folge, ein
 // einzelner Messfehler mitten im gehaltenen Ton zählt nicht. Beim Anstoßen mit der Zunge bricht
 // das Signal meist kürzer ein, als das Messfenster von pitchy (≈ 21 ms, ./mic.ts) auflöst – dann
@@ -157,7 +162,7 @@ export const DEFAULT_FOLLOW: FollowConfig = {
   wrongHoldMs: 250,
   wrongMarginCents: 10,
   reattackGapMs: 40,
-  reattackDip: 0.5,
+  reattackDip: 0.12,
   reattackRise: 1.5,
   latencyMs: DEFAULT_INPUT_LATENCY,
   headMs: 60,
@@ -423,10 +428,10 @@ export interface WaitOptions {
  * - Alter Ton: Der Ton der eben getroffenen Note zählt für die nächste nie als falsch, auch nicht nach
  *   einem scheinbar neuen Einsatz. Anlass (Befund am Gerät vom 14.11.2026, „Kuckuck“, neue Flöte): Nach
  *   jeder halben Note (d² bzw. c², ≈ 1,2 s gehalten) wurde die folgende Note (h¹ bzw. a¹) rot, obwohl
- *   das Stimmgerät alles richtig zeigte. In einem lange gehaltenen Ton erkennt die Einsatz-Regel leicht
- *   einen „neuen Einsatz“ – die Lautstärke fällt nach dem kräftigen Anstoß unter die Hälfte und schwillt
- *   wieder an, oder zwei Messungen in Folge sind kurz unklar –, und nach 250 ms galt der gehaltene Ton
- *   dann als falscher Ton. Den vorigen Ton noch einmal anzustoßen ist ohnehin kein Fehlgriff. Bei einer
+ *   das Stimmgerät alles richtig zeigte. In einem lange gehaltenen Ton erkannte die Einsatz-Regel leicht
+ *   einen „neuen Einsatz“ – die Lautstärke fiel nach dem kräftigen Anstoß unter die Hälfte (seither gilt
+ *   erst unter 12 %, siehe Kopfkommentar) und schwoll wieder an, oder zwei Messungen in Folge waren kurz
+ *   unklar –, und nach 250 ms galt der gehaltene Ton dann als falscher Ton. Den vorigen Ton noch einmal anzustoßen ist ohnehin kein Fehlgriff. Bei einer
  *   Tonwiederholung ist der alte Ton der Zielton; dort braucht es weiter einen neuen Einsatz.
  * - Eine Oktave zu hoch (Überblasen beim Zielton) ist kein Fehler: Es ist der richtige Griff mit zu
  *   viel Luft, und gerade Anfängerinnen passiert es oft. Er zählt aber auch nicht als Treffer – die

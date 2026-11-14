@@ -81,7 +81,8 @@ Silben, Atemzeichen, Seitenumbrüche.
      nach 250 ms und neuem Einsatz, im Takt Wertung nach Anteil im mittleren Teil oder Einsatz am Notenbeginn,
      Verzögerung 120 ms (mit Kopfhörern 200 ms) bzw. am Gerät abgeglichen; im Warte-Modus zählt der Ton der eben
      getroffenen Note für die nächste nie als falsch (sonst wurde nach langen Noten die folgende rot, weil im
-     gehaltenen Ton ein scheinbar neuer Einsatz erkannt wurde) („Verzögerung abgleichen“ im
+     gehaltenen Ton ein scheinbar neuer Einsatz erkannt wurde); neuer Einsatz per Lautstärke erst unter 12 % des
+     Höchstwerts (vorher die Hälfte: bei Tonwiederholungen sprang die Markierung weiter; Grenze aus einer Diagnose) („Verzögerung abgleichen“ im
      Mitspiel-Bereich, `app/src/audio/latency.ts`; Wert je Kopfhörer-Zustand in `settings.inputLatencyMs`, nur
      im Browser, nicht in der Sicherung). **Flötenprofile** (`flutes`/`activeFlute` in den Daten, mit Sicherung):
      Einstellungen → Flöte, „Flöte einstellen“ (`#/floete`, `app/src/ui/flute.ts`); angewandt im Mitspielen
