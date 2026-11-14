@@ -188,6 +188,24 @@ test("Warte-Modus mit falschen Tönen: Note rot, „Du spielst …“, geht weit
   expect(await colors(page)).toEqual(Array(7).fill(""));
 });
 
+test("Warte-Modus und Takt-Modus: wackelnder Ton (Vibrato ±30 Cent) wird richtig gewertet, nichts rot", async ({ page }) => {
+  await open(page);
+  await start(page, "Wartet auf mich");
+  await page.evaluate(() => (window as unknown as { __osc: { wobble(c: number): void } }).__osc.wobble(30));
+  await playSeq(page, waitPieces());
+  await finished(page, 8000);
+  expect(await colors(page)).toEqual(Array(7).fill("hit"));
+  await expect(page.getByTestId("follow-wrong")).toHaveText("");
+  // im Takt; jeder Mikrofon-Start bringt einen neuen Oszillator, also das Vibrato wieder einschalten
+  await page.getByRole("button", { name: "Im Takt" }).click();
+  await go(page).click();
+  await page.waitForFunction(() => (window as unknown as { __lied: { follow(): FollowDebug } }).__lied.follow().started);
+  await page.evaluate(() => (window as unknown as { __osc: { wobble(c: number): void } }).__osc.wobble(30));
+  await playBeat(page);
+  await finished(page);
+  expect(await colors(page)).toEqual(Array(7).fill("hit"));
+});
+
 test("Mitspielen: ein Neustart löscht die Farben des letzten Durchgangs", async ({ page }) => {
   await open(page);
   await start(page, "Wartet auf mich");

@@ -225,6 +225,59 @@ describe("Mitspielen: Warte-Modus", () => {
     });
   });
 
+  describe("wackelnder Ton (Glättung)", () => {
+    /**
+     * Jeden Ton ms lang mit Vibrato ±30 Cent (5 Hz), jeder 6. Frame ein Ausreißer um outlier Halbtöne
+     * (Oktave höher; wo die über 2300 Hz läge – bei d² –, eine tiefer, sonst wäre es ein ungültiger
+     * Frame statt eines Ausreißers), danach gap ms Stille.
+     */
+    const wobbly = (tl: Timeline, ms = 300, gap = 60, outlier = 12): Frame[] => {
+      const out: Frame[] = [];
+      let t = 0;
+      for (const n of tl.tones) {
+        for (let k = 0; k < ms / STEP; k++, t += STEP) {
+          const o = hz(n.midi + outlier) <= DEFAULT_FOLLOW.maxFreq ? n.midi + outlier : n.midi - outlier;
+          const freq = k % 6 === 5 ? hz(o) : hz(n.midi, 30 * Math.sin((2 * Math.PI * 5 * t) / 1000));
+          out.push({ t, freq, clarity: 0.95, rms: 0.1 });
+        }
+        for (let k = 0; k < gap / STEP; k++, t += STEP) out.push({ t, freq: null, clarity: 0, rms: 0.001 });
+      }
+      return out;
+    };
+
+    it("±30 Cent mit einzelnen Ausreißern: alles grün, nichts rot", () => {
+      const tl = melody();
+      const wrongs: number[] = [];
+      const w = new WaitFollower(tl, { onWrong: (i) => wrongs.push(i) });
+      feed(w, wobbly(tl));
+      expect(w.done).toBe(true);
+      expect(w.results.map((r) => r?.ok)).toEqual([true, true, true, true, true]);
+      expect(wrongs).toEqual([]);
+      // auch mit Ausreißern auf den Nachbarton (sonst „Du spielst …“)
+      const w2 = new WaitFollower(tl, { onWrong: (i) => wrongs.push(i) });
+      feed(w2, wobbly(tl, 300, 60, 2));
+      expect(w2.summary()).toMatchObject({ hits: 5, total: 5 });
+      expect(wrongs).toEqual([]);
+    });
+
+    it("ohne Glättung hätte jeder Ausreißer die Haltedauer neu beginnen lassen", () => {
+      const tl = melody();
+      const w = new WaitFollower(tl, { cfg: { medianFrames: 1 } });
+      feed(w, wobbly(tl));
+      expect(w.index).toBe(0);
+    });
+
+    it("Tonwiederholung braucht weiterhin einen neuen Einsatz (Stille und Lautstärke-Einbruch kommen durch)", () => {
+      const rep = buildTimeline(song("g'4 g'4 a'2 ||"));
+      const held = new WaitFollower(rep);
+      feed(held, wobbly(buildTimeline(song("g'1 ||")), 2000, 0));
+      expect(held.index).toBe(1);
+      const dip = new WaitFollower(rep);
+      feed(dip, frames([tone(G, 300, { rms: 0.1 }), tone(G, 25, { rms: 0.04 }), tone(G, 200, { rms: 0.09 }), tone(A, 200, { rms: 0.1 })]));
+      expect(dip.done).toBe(true);
+    });
+  });
+
   it("Schleife: Bewertung je Durchgang, die erste Note braucht nach gleicher letzter einen neuen Einsatz", () => {
     const tl = buildTimeline(song("g'2 a'2 | g'1 ||"));
     const passes: FollowSummary[] = [];
@@ -390,6 +443,29 @@ describe("Mitspielen: Takt-Modus", () => {
     feed(b, beatFrames(tl, { clarity: 0.6 }));
     expect(b.passes[0].hits).toBe(0);
     expect(b.passResults[0].every((r) => r?.coverage === 0)).toBe(true);
+  });
+
+  it("wackelnder Ton (±30 Cent, einzelne Oktav-Ausreißer): alles getroffen", () => {
+    const tl = melody();
+    const b = new BeatFollower(tl, { secPerQuarter: SPQ, startMs: START });
+    const fs = beatFrames(tl).map((f, k) =>
+      f.freq === null ? f : { ...f, freq: k % 6 === 5 ? f.freq * 2 : f.freq * Math.pow(2, (30 * Math.sin((2 * Math.PI * 5 * f.t) / 1000)) / 1200) },
+    );
+    feed(b, fs);
+    expect(b.passes[0]).toMatchObject({ hits: 6, total: 6 });
+    expect(b.passResults[0].every((r) => r!.coverage > 0.8)).toBe(true);
+  });
+
+  it("Glättung verschiebt nichts: Sechzehntel legato wie ohne Median erkannt, kein zusätzlicher Ausgleich nötig", () => {
+    const tl = buildTimeline(song("g'16 a'16 h'16 c''16 d''16 c''16 h'16 a'16 g'2. ||"));
+    const spq = 0.6; // Sechzehntel = 150 ms
+    const fs = beatFrames(tl, { spq, gap: 0 });
+    const smooth = new BeatFollower(tl, { secPerQuarter: spq, startMs: START });
+    const raw = new BeatFollower(tl, { secPerQuarter: spq, startMs: START, cfg: { medianFrames: 1 } });
+    feed(smooth, fs);
+    feed(raw, fs);
+    expect(smooth.passes[0].hits).toBe(9);
+    expect(smooth.passResults[0].map((r) => r!.coverage)).toEqual(raw.passResults[0].map((r) => r!.coverage));
   });
 
   it("Heft-Lied „Alle meine Entchen“: Treffer im ganzen Lied", () => {

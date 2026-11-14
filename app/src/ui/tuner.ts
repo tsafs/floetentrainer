@@ -1,16 +1,26 @@
 // Stimmgerät: freies Spielen mit laufender Anzeige der gehörten Note.
+//
+// Ruhige Anzeige (Rückmeldung vom 14.11.2026, „der Ton wackelt zu viel hin und her“): Die Frames
+// laufen durch den Glätter (../audio/smooth.ts) mit kräftiger Einstellung – Median über 5 Frames
+// (≈ 125 ms) und Zeitkonstante 175 ms – für Zeiger und Cent-Anzeige. Ein klarer Tonwechsel (über
+// 70 Cent) und ein neuer Einsatz nach Stille gelten trotzdem sofort. Der Notenname hat eine Hysterese
+// (NameHold): Er wechselt erst, wenn der neue Ton 100 ms anliegt oder mehr als 60 Cent vom angezeigten
+// abweicht; die Cent-Anzeige bezieht sich immer auf den angezeigten Namen. Dazu gleitet der Zeiger per
+// CSS kurz (100 ms) nach, ohne die Anzeige zu verzögern.
 
-import { PlayJudge } from "../audio/judge";
 import { keepAwake, mic } from "../audio/mic";
+import { NameHold, pitched, Smoother, TUNER_SMOOTH } from "../audio/smooth";
 import { fluteSvg } from "../music/flute";
 import { midiNameHtml } from "../music/names";
-import { CHART, chartNoteByMidi } from "../music/notes";
+import { CHART, chartNoteByMidi, freqToWrittenMidi } from "../music/notes";
 import { staffRange, staffSvg } from "../music/staff";
 import { topbar, type View } from "./common";
 
 export const tunerView: View = (root, ctx) => {
   const range = staffRange(CHART.map((n) => n.id));
-  const judge = new PlayJudge({ tuning: ctx.data.settings.tuningHz });
+  const tuning = ctx.data.settings.tuningHz;
+  const smoother = new Smoother(TUNER_SMOOTH);
+  const names = new NameHold();
   const tol = ctx.data.settings.toleranceCents;
   root.innerHTML = `
 <main class="screen fit tuner">
@@ -37,9 +47,12 @@ export const tunerView: View = (root, ctx) => {
   let shown: number | null = null;
   let lastAt = 0;
 
-  const unlisten = mic.listen((f) => {
-    const o = judge.push(f);
-    const h = o.heard;
+  const unlisten = mic.listen((raw) => {
+    const f = smoother.push(raw);
+    if (!f) return;
+    const m = pitched(smoother.cfg, f) ? freqToWrittenMidi(f.freq, tuning) : null;
+    const midi = names.push(m, f.t);
+    const h = m === null || midi === null ? null : { midi, cents: Math.round((m - midi) * 100) };
     if (!h) {
       if (f.t - lastAt > 400 && shown !== null) {
         shown = null;

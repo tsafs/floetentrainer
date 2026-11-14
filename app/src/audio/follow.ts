@@ -20,6 +20,13 @@
 // erkennbar, aber die Lautstärke sinkt deutlich; dafür ist der Einbruch-Weg da. Das Wiederansteigen
 // ist nötig, damit ein bloßes Leiserwerden (Ausklingen) keinen Einsatz vortäuscht.
 //
+// Glättung: Beide Arten schicken die Frames zuerst durch den Glätter (./smooth.ts), knapp eingestellt:
+// nur ein Median über 3 Frames (≈ 75 ms, Ausgabe 25 ms später), keine Zeitkonstante. Das entfernt
+// einzelne Ausreißer (Oktavsprung, Nachbarton), lässt aber auch Sechzehntel durch. Unklare Frames
+// bleiben „kein Ton“, Lautstärke und Stille gehen unverändert durch – der neue Einsatz (oben) wird
+// also genauso erkannt wie roh. Die geglätteten Frames behalten ihren Zeitpunkt; der Median
+// verschiebt keinen Tonwechsel, deshalb braucht der Takt-Modus keinen zusätzlichen Ausgleich.
+//
 // Schleife: Beide Arten werten je Durchgang getrennt (Ergebnis je Durchgang). Die Liedseite nutzt die
 // Schleife seit der Nachsteuerung vom 14.11.2026 nicht mehr (ein Durchgang, danach bleiben die Farben
 // stehen); die Wertung kann es weiterhin. Gezeigt werden nur noch die Farben je Note – die Zusammenfassung
@@ -29,6 +36,7 @@ import { freqToWrittenMidi } from "../music/notes";
 import type { Settings } from "../store/data";
 import type { Timeline } from "../songs/timeline";
 import { DEFAULT_JUDGE, type Frame, type Heard } from "./judge";
+import { Smoother } from "./smooth";
 
 export interface FollowConfig {
   tuning: number;
@@ -54,6 +62,10 @@ export interface FollowConfig {
   minHitMs: number;
   /** Takt-Modus: übliches Frame-Intervall in ms (Mikrofon: 25); größere Lücken zählen nur bis 2×. */
   frameMs: number;
+  /** Glättung (./smooth.ts): Median über so viele Frames (ungerade, 1 = keiner) … */
+  medianFrames: number;
+  /** … und Zeitkonstante in ms (0 = keine) */
+  tauMs: number;
 }
 
 /**
@@ -66,7 +78,10 @@ export interface FollowConfig {
  * Oberfläche legt startMs auf den Zeitpunkt, zu dem sie den Zeitplan-Beginn *hört* (mit der vom
  * Browser gemeldeten Ausgabe-Verzögerung, wie die Markierung des Abspielers; ohne Meldung üblich
  * 30 ms, zusammen also wie bisher 80 ms). Bluetooth-Kopfhörer, die der Browser zu knapp meldet,
- * brauchen mehr – dafür später ein Abgleich-Knopf (latencyMs ist einstellbar).
+ * brauchen mehr – dafür später ein Abgleich-Knopf (latencyMs ist einstellbar). Der Median der
+ * Glättung kommt nicht hinzu: Die geglätteten Frames behalten ihren Zeitpunkt (siehe Kopfkommentar).
+ * Median über 3 Frames statt 5 wie beim Üben: Schnelle Noten (Sechzehntel ≈ 150 ms) sollen erkannt
+ * werden, und ein Ausreißer kostet hier höchstens die kurze Haltedauer bzw. 25 ms erkannte Zeit.
  */
 export const DEFAULT_FOLLOW: FollowConfig = {
   tuning: DEFAULT_JUDGE.tuning,
@@ -83,6 +98,8 @@ export const DEFAULT_FOLLOW: FollowConfig = {
   minCoverage: 0.5,
   minHitMs: 80,
   frameMs: 25,
+  medianFrames: 3,
+  tauMs: 0,
 };
 
 /**
@@ -243,6 +260,7 @@ export class WaitFollower {
   wrongMidi: number | null = null;
   done = false;
   private onsets: Onsets;
+  private smoother: Smoother;
   private inTolStart: number | null = null;
   /** Zeitpunkt des letzten Treffers: nur spätere Einsätze zählen */
   private armedAt = -Infinity;
@@ -253,6 +271,7 @@ export class WaitFollower {
   ) {
     this.cfg = { ...DEFAULT_FOLLOW, ...opts.cfg };
     this.onsets = new Onsets(this.cfg);
+    this.smoother = new Smoother(this.cfg);
     this.done = tl.tones.length === 0;
   }
 
@@ -262,8 +281,11 @@ export class WaitFollower {
     this.inTolStart = null;
   }
 
-  push(f: Frame): Heard | null {
+  /** Roher Frame vom Mikrofon; gibt den gehörten (geglätteten) Ton zurück. */
+  push(raw: Frame): Heard | null {
     const cfg = this.cfg;
+    const f = this.smoother.push(raw);
+    if (!f) return null;
     if (!isValid(cfg, f)) {
       this.onsets.gap(f.t);
       this.inTolStart = null;
@@ -374,6 +396,7 @@ export class BeatFollower {
   private cur: PassState;
   private lastTc: number | null = null;
   private readonly L: number;
+  private smoother: Smoother;
 
   constructor(
     readonly tl: Timeline,
@@ -382,6 +405,7 @@ export class BeatFollower {
     this.cfg = { ...DEFAULT_FOLLOW, ...opts.cfg };
     this.anchor = { t: opts.startMs, g: 0, spq: opts.secPerQuarter };
     this.L = tl.total;
+    this.smoother = new Smoother(this.cfg);
     this.cur = this.newPass();
     this.done = tl.tones.length === 0 || this.L <= 0;
   }
@@ -415,7 +439,13 @@ export class BeatFollower {
     this.anchor = { t, g: this.quarterAt(t), spq: secPerQuarter };
   }
 
-  push(f: Frame): Heard | null {
+  /** Roher Frame vom Mikrofon; gibt den gehörten (geglätteten) Ton zurück. */
+  push(raw: Frame): Heard | null {
+    const f = this.smoother.push(raw);
+    return f ? this.take(f) : null;
+  }
+
+  private take(f: Frame): Heard | null {
     const cfg = this.cfg;
     const tc = f.t - cfg.latencyMs;
     const dt = this.lastTc === null ? cfg.frameMs : Math.min(Math.max(tc - this.lastTc, 0), 2 * cfg.frameMs);
@@ -438,6 +468,9 @@ export class BeatFollower {
    * Ende, die Auswertung des letzten Durchgangs.
    */
   finish(t: number): FollowSummary | null {
+    if (this.done) return this.passes[this.passes.length - 1] ?? null;
+    // was der Glätter noch zurückhält, zählt mit
+    for (const f of this.smoother.flush()) this.take(f);
     if (this.done) return this.passes[this.passes.length - 1] ?? null;
     const g = this.quarterAt(t - this.cfg.latencyMs);
     this.settle(g);

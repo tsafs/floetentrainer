@@ -968,6 +968,8 @@ svg.acc {
   width: 12px;
   height: 12px;
   margin-left: -6px;
+  /* weich nachgleiten (die Werte sind schon geglättet, src/ui/tuner.ts); kurz, damit nichts hinterherhinkt */
+  transition: left 0.1s ease-out;
 }
 .tuner .meter::before {
   top: 6px;
@@ -1434,7 +1436,9 @@ svg.bm {
 @media (prefers-reduced-motion: reduce) {
   .cardbody,
   .cardhd,
-  .cardhd .chev {
+  .cardhd .chev,
+  .meter i,
+  .tuner .meter i {
     transition: none;
   }
 }

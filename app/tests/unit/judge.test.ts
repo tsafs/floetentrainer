@@ -112,10 +112,56 @@ describe("Spielen werten", () => {
     j.markWrong();
     expect(events([...play(j, f("a1"), 500, 1200), ...play(j, f("g1"), 1200, 1700)])).toEqual(["correct"]);
   });
-  it("Anzeige: gehörter Ton und Cent", () => {
+  describe("wackelnder Ton (Glättung)", () => {
+    /** g¹ mit Vibrato ±30 Cent (5 Hz), jeder 6. Frame ein Ausreißer (Oktave bzw. Nachbarton) */
+    const wobbly = (t0: number, t1: number, outlier = f("g2")) => {
+      const out: JudgeOutput[] = [];
+      return (j: PlayJudge) => {
+        for (let t = t0, k = 0; t < t1; t += STEP, k++) {
+          const freq = k % 6 === 5 ? outlier : f("g1", 30 * Math.sin((2 * Math.PI * 5 * t) / 1000));
+          out.push(j.push({ t, freq, clarity: 0.95 }));
+        }
+        return out;
+      };
+    };
+    it("±30 Cent mit einzelnen Oktav-Ausreißern: richtig, kein Fehler", () => {
+      const j = new PlayJudge();
+      j.newCard(note("g1").midi, 0);
+      const o = wobbly(500, 1500)(j);
+      expect(events(o)).toEqual(["correct"]);
+      // ungefähr nach der Haltedauer (300 ms) plus Ausgabe des Medians (50 ms)
+      const at = o.findIndex((x) => x.event === "correct") * STEP + 500;
+      expect(at).toBeLessThan(900);
+      // Anzeige bleibt beim gesuchten Ton
+      expect(o.filter((x) => x.heard).every((x) => x.heard!.midi === note("g1").midi)).toBe(true);
+    });
+    it("Ausreißer auf den Nachbarton: weiterhin richtig, kein Fehler", () => {
+      const j = new PlayJudge();
+      j.newCard(note("g1").midi, 0);
+      expect(events(wobbly(500, 1500, f("a1"))(j))).toEqual(["correct"]);
+    });
+    it("ohne Glättung hätte jeder Ausreißer die Haltedauer neu beginnen lassen", () => {
+      const j = new PlayJudge({ medianFrames: 1 });
+      j.newCard(note("g1").midi, 0);
+      expect(events(wobbly(500, 1500)(j))).toEqual([]);
+    });
+    it("Nachklang der vorigen Karte, dann direkt der wackelnde richtige Ton: richtig, kein Fehler", () => {
+      const j = new PlayJudge();
+      j.newCard(note("a1").midi, 0);
+      const o = [...play(j, f("a1"), 0, 800)];
+      expect(events(o)).toEqual(["correct"]);
+      j.newCard(note("g1").midi, 800);
+      // a¹ klingt nach (mit Ausreißern), dann direkt g¹
+      const rest = [...play(j, f("a1"), 800, 1300), ...wobbly(1300, 2000)(j)];
+      expect(events(rest)).toEqual(["correct"]);
+    });
+  });
+  it("Anzeige: gehörter Ton und Cent (geglättet, kommt um den halben Median später)", () => {
     const j = new PlayJudge();
     const o = play(j, f("fis1", -12), 0, 100);
-    expect(o[0].heard?.midi).toBe(note("fis1").midi);
-    expect(o[0].heard?.cents).toBe(-12);
+    // Median über 5 Frames: der erste Frame kommt mit dem dritten heraus
+    expect(o.slice(0, 2).every((x) => x.heard === null)).toBe(true);
+    expect(o[2].heard?.midi).toBe(note("fis1").midi);
+    expect(o[2].heard?.cents).toBe(-12);
   });
 });
