@@ -634,7 +634,7 @@ svg.acc {
 .prac.ok .btns .right {
   background: var(--ok-tint);
 }
-.btns .tick {
+.btns .okmark {
   position: absolute;
   top: -8px;
   right: -8px;
@@ -852,19 +852,6 @@ svg.acc {
 }
 .meter.off i {
   display: none;
-}
-.prac.err .listen,
-.prac.ok .listen {
-  min-height: 0;
-  padding: 6px 14px;
-}
-.prac.err .listen .meter,
-.prac.ok .listen .meter {
-  display: none;
-}
-.prac.err .listen .heard,
-.prac.ok .listen .heard {
-  font-size: 1.35rem;
 }
 
 /* Vorstellung */

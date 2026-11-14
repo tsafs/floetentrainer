@@ -31,7 +31,7 @@ function flute(id: string): string {
 }
 
 /** kleines Häkchen am richtigen Antwortknopf */
-const TICK = `<span class="tick" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 7.4l2.6 2.6L11 4.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
+const TICK = `<span class="okmark" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 7.4l2.6 2.6L11 4.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
 
 function listenBox(): string {
   return `<div class="listen" aria-live="off"><span class="hl">Ich höre</span><span class="heard">–</span><span class="cents"></span><div class="meter off"><i></i></div></div>`;
@@ -229,8 +229,8 @@ export const practiceView: View = (root, ctx) => {
     const idk = `<div class="idkrow" aria-live="polite"><button class="textbtn" data-act="idk">Weiß nicht</button></div>`;
     const answer =
       kind === "spiel"
-        ? `<div class="answer"><div class="anchor"><div class="slot"></div></div>${listenBox()}${idk}</div>`
-        : `<div class="answer">${btns}${idk}<div class="slot"></div></div>`;
+        ? `<div class="answer"><div class="anchor"><div class="slot" aria-live="polite"></div></div>${listenBox()}${idk}</div>`
+        : `<div class="answer">${btns}${idk}<div class="slot" aria-live="polite"></div></div>`;
     root.innerHTML = `
 <main class="screen fit prac ask kind-${kind}" data-step="card" data-kind="${kind}" data-note="${id}" data-retry="${retry}" data-seq="${++seq}">
   ${header(label)}
@@ -263,11 +263,15 @@ export const practiceView: View = (root, ctx) => {
       );
     };
 
-    const bindNext = () =>
-      slot.querySelector('[data-act="next"]')?.addEventListener("click", (e) => {
+    const bindNext = () => {
+      const go = slot.querySelector<HTMLButtonElement>('[data-act="next"]');
+      go?.addEventListener("click", (e) => {
         e.stopPropagation();
         advance();
       });
+      // die Antwortknöpfe sind jetzt verdeckt: Fokus auf „Weiter“, damit er nicht verloren geht
+      go?.focus({ preventScroll: true });
+    };
 
     const markButtons = (chosen: string | null) => {
       main.querySelectorAll<HTMLButtonElement>(".btns button").forEach((b) => {
