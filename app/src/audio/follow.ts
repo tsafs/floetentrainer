@@ -30,8 +30,13 @@
 // Neuer Einsatz (nur Warte-Modus, für Tonwiederholungen): Ein Ton gilt als neu angestoßen nach
 // - einer Unterbrechung von mindestens reattackGapMs (40 ms) ohne gültigen Ton (Stille, zu leise,
 //   unklar, außerhalb des Bereichs) oder mit einem anderen Ton, oder
-// - einem Lautstärke-Einbruch (falls Frames rms mitbringen): unter die Hälfte des bisherigen
-//   Höchstwerts dieses Tons und danach wieder deutlich lauter (mindestens das 1,5-fache des Tiefpunkts).
+// - einem Lautstärke-Einbruch (falls Frames rms mitbringen): unter 12 % des bisherigen Höchstwerts
+//   dieses Tons und danach wieder deutlich lauter (mindestens das 1,5-fache des Tiefpunkts).
+//   Grenze gemessen (Diagnose „Hänschen klein“ vom 14.11.2026, Android-Handy, neue Sopranflöte, 49 Noten):
+//   Echte Zungenstöße drückten die Lautstärke auf 0–9 % des Höchstwerts, oft ohne dass die Tonhöhe
+//   verloren ging; innerhalb eines gehaltenen Tons fiel sie nach dem Anstoß dagegen oft auf 17–49 % und
+//   schwoll wieder an. Mit der früheren Grenze (die Hälfte) zählte dieses Schwanken als neuer Einsatz,
+//   und bei Tonwiederholungen (h¹ h¹ h¹ h¹) sprang die Markierung mit einem Ton zwei Noten weiter.
 // Begründung: Frames kommen alle 25 ms; 40 ms verlangen also mindestens zwei Aussetzer in Folge, ein
 // einzelner Messfehler mitten im gehaltenen Ton zählt nicht. Beim Anstoßen mit der Zunge bricht
 // das Signal meist kürzer ein, als das Messfenster von pitchy (≈ 21 ms, ./mic.ts) auflöst – dann
@@ -157,7 +162,7 @@ export const DEFAULT_FOLLOW: FollowConfig = {
   wrongHoldMs: 250,
   wrongMarginCents: 10,
   reattackGapMs: 40,
-  reattackDip: 0.5,
+  reattackDip: 0.12,
   reattackRise: 1.5,
   latencyMs: DEFAULT_INPUT_LATENCY,
   headMs: 60,
@@ -417,9 +422,17 @@ export interface WaitOptions {
  *   Tonwiederholung braucht es also einen neuen Einsatz.
  * - Rot wird die Note nur, wenn ein anderer Ton (a) mindestens einen Halbton daneben liegt (nach der
  *   Regel des nächsten Halbtons, mit 10 Cent Abstand zur Grenze), (b) nach dem Weiterspringen neu
- *   eingesetzt hat – der gehaltene alte Ton zählt nie – und (c) wrongHoldMs (250 ms) lang stabil
- *   bleibt. Übergangsklänge beim Fingerwechsel (wenige Frames) und kurze Fehlgriffe bleiben so ohne
- *   Folgen. Ein Oktavfehler nach unten zählt nur bei hoher Klarheit (wie beim Üben).
+ *   eingesetzt hat und (c) wrongHoldMs (250 ms) lang stabil bleibt. Übergangsklänge beim
+ *   Fingerwechsel (wenige Frames) und kurze Fehlgriffe bleiben so ohne Folgen. Ein Oktavfehler nach
+ *   unten zählt nur bei hoher Klarheit (wie beim Üben).
+ * - Alter Ton: Der Ton der eben getroffenen Note zählt für die nächste nie als falsch, auch nicht nach
+ *   einem scheinbar neuen Einsatz. Anlass (Befund am Gerät vom 14.11.2026, „Kuckuck“, neue Flöte): Nach
+ *   jeder halben Note (d² bzw. c², ≈ 1,2 s gehalten) wurde die folgende Note (h¹ bzw. a¹) rot, obwohl
+ *   das Stimmgerät alles richtig zeigte. In einem lange gehaltenen Ton erkannte die Einsatz-Regel leicht
+ *   einen „neuen Einsatz“ – die Lautstärke fiel nach dem kräftigen Anstoß unter die Hälfte (seither gilt
+ *   erst unter 12 %, siehe Kopfkommentar) und schwoll wieder an, oder zwei Messungen in Folge waren kurz
+ *   unklar –, und nach 250 ms galt der gehaltene Ton dann als falscher Ton. Den vorigen Ton noch einmal anzustoßen ist ohnehin kein Fehlgriff. Bei einer
+ *   Tonwiederholung ist der alte Ton der Zielton; dort braucht es weiter einen neuen Einsatz.
  * - Eine Oktave zu hoch (Überblasen beim Zielton) ist kein Fehler: Es ist der richtige Griff mit zu
  *   viel Luft, und gerade Anfängerinnen passiert es oft. Er zählt aber auch nicht als Treffer – die
  *   Markierung wartet, und onOctave gibt den Hinweis „eine Oktave zu hoch – sanfter blasen“.
@@ -482,7 +495,11 @@ export class WaitFollower {
     const seg = this.onsets.push(f, heard.midi);
     const info: JudgedFrame = { t: f.t, freq: f.freq, filled: f.filled, midi: hp.midi, cents: Math.round(hp.cents), note };
     const report = (cls: JudgedFrame["cls"]) => this.opts.onFrame?.({ ...info, cls });
-    if (this.done || seg.start <= this.armedAt) {
+    const target = this.done ? null : this.tl.tones[this.index].midi;
+    // Der Ton der eben getroffenen Note (bei einer Tonwiederholung nicht: dort ist er der Zielton) zählt
+    // immer als „alt“, auch wenn er scheinbar neu eingesetzt hat – siehe WaitFollower, „alter Ton“.
+    const old = heard.midi === this.lastTarget && heard.midi !== target;
+    if (target === null || seg.start <= this.armedAt || old) {
       // Nachklang der vorigen Note bzw. Ton ohne neuen Einsatz. Hält sie die eben getroffene Note weiter,
       // sind das gute Messungen dieses Tons fürs Nachführen.
       this.inTolStart = null;
@@ -493,7 +510,6 @@ export class WaitFollower {
       }
       return heard;
     }
-    const target = this.tl.tones[this.index].midi;
     const dev = (m - target) * 100 - this.tuning.offsetOf(target);
     if (Math.abs(dev) < cfg.toleranceCents) {
       report("ziel");

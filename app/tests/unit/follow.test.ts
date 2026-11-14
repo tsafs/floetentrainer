@@ -229,9 +229,21 @@ describe("Mitspielen: Warte-Modus", () => {
     });
 
     it("Lautstärke-Einbruch und neuer Anstoß bei durchgehend erkanntem Ton", () => {
+      // gemessen an der echten Flöte (Diagnose „Hänschen klein“): der Zungenstoß drückt die Lautstärke
+      // auf 0–9 % des Höchstwerts, auch wenn die Tonhöhe durchgehend erkannt bleibt
       const w = new WaitFollower(rep());
-      feed(w, frames([tone(G, 300, { rms: 0.1 }), tone(G, 25, { rms: 0.04 }), tone(G, 200, { rms: 0.09 })]));
+      feed(w, frames([tone(G, 300, { rms: 0.1 }), tone(G, 25, { rms: 0.008 }), tone(G, 200, { rms: 0.09 })]));
       expect(w.index).toBe(2);
+    });
+
+    it("Anschwellen und Abschwellen im gehaltenen Ton (Einbruch auf 17–49 %) ist kein neuer Einsatz", () => {
+      // ebenfalls aus der Diagnose: innerhalb eines Tons fällt die Lautstärke nach dem Anstoß oft auf ein
+      // Viertel bis die Hälfte und schwillt wieder an – früher (Grenze 50 %) sprang die Markierung dann weiter
+      for (const low of [0.017, 0.025, 0.045]) {
+        const w = new WaitFollower(rep());
+        feed(w, frames([tone(G, 150, { rms: 0.1 }), tone(G, 50, { rms: low }), tone(G, 150, { rms: 0.14 }), tone(G, 50, { rms: low }), tone(G, 150, { rms: 0.1 })]));
+        expect(w.index).toBe(1);
+      }
     });
 
     it("bloßes Leiserwerden ohne neuen Anstoß zählt nicht", () => {
@@ -310,7 +322,7 @@ describe("Mitspielen: Warte-Modus", () => {
       feed(held, wobbly(buildTimeline(song("g'1 ||")), 2000, 0));
       expect(held.index).toBe(1);
       const dip = new WaitFollower(rep);
-      feed(dip, frames([tone(G, 300, { rms: 0.1 }), tone(G, 25, { rms: 0.04 }), tone(G, 200, { rms: 0.09 }), tone(A, 200, { rms: 0.1 })]));
+      feed(dip, frames([tone(G, 300, { rms: 0.1 }), tone(G, 25, { rms: 0.008 }), tone(G, 200, { rms: 0.09 }), tone(A, 200, { rms: 0.1 })]));
       expect(dip.done).toBe(true);
     });
   });

@@ -281,6 +281,16 @@ bleiben bei ihren Regeln, außer dem Flötenprofil in der Übung):
 - **Warte-Modus, weniger „falsch“:** Rot nur, wenn ein anderer Ton (a) mindestens einen Halbton daneben
   liegt (nächster Halbton, dazu 10 Cent Abstand zur Grenze, damit nichts an der Kante kippt), (b) nach dem
   Weiterspringen neu eingesetzt hat – der gehaltene alte Ton zählt nie – und (c) 250 ms stabil bleibt.
+  **Der Ton der eben getroffenen Note zählt für die nächste nie als falsch**, auch nach einem scheinbar
+  neuen Einsatz (Nachtrag 14.11.2026, Befund mit der neuen Flöte bei „Kuckuck“: nach jeder halben Note
+  wurde die folgende Terz abwärts rot, das Stimmgerät zeigte alles richtig. Im lange gehaltenen Ton
+  hatte die Einsatz-Regel – Lautstärke-Einbruch und Wiederanstieg, zwei unklare Messungen – einen neuen
+  Einsatz gesehen.) Bei einer Tonwiederholung braucht es weiter einen echten neuen Einsatz.
+  **Neuer Einsatz per Lautstärke erst unter 12 % des Höchstwerts** (statt unter der Hälfte; Diagnose
+  „Hänschen klein“ vom 14.11.2026): Bei h¹ h¹ h¹ h¹ sprang die Markierung mit einem Ton zwei Noten weiter.
+  Echte Zungenstöße drückten die Lautstärke auf 0–9 %, das Schwanken innerhalb eines gehaltenen Tons nur
+  auf 17–49 %. Mit der Aufnahme nachgespielt: vorher 8 rote Noten und 11 Sprünge, jetzt keine rote Note
+  und kein Sprung bei Tonwiederholungen, alle 49 Noten erkannt.
   „Richtig“ braucht weiter nur 120 ms. Übergangsklänge beim Fingerwechsel dauern auf der Blockflöte typisch
   20–80 ms (die Nachbarprüfung im Glätter entfernt einzelne schon vorher) und bleiben folgenlos.
   **Eine Oktave zu hoch** beim Zielton (Überblasen): nicht rot – es ist der richtige Griff mit zu viel Luft –,
