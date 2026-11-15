@@ -184,6 +184,7 @@ test.describe("Üben", () => {
     await answer(page, true);
     await page.getByRole("button", { name: "Sitzung beenden" }).click();
     await expect(page.getByTestId("unlock")).toContainText("Neu: c2 und d2");
+    await expect(page.getByTestId("unlock")).toContainText("Lesen · Stufe 2 erreicht");
   });
 });
 
