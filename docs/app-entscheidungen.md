@@ -425,6 +425,19 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   - Unten die großen Knöpfe Üben und Spielen. Die frühere Zeile „Lieder · Stimmgerät · Grifftabelle ·
     Einstellungen“ ist seit 14.11.2026 durch das Menü ersetzt (wurde auf schmalen Handys zweizeilig);
     der Platz kommt der Tonübersicht zugute.
+  - Darunter klein „Hören: vorgespielte Töne erkennen“ (seit 15.11.2026) → `#/hoeren`.
+- **Hören** (`#/hoeren`, seit 15.11.2026, `docs/app-uebungen.md` Abschnitt 4; Rückmeldung: „Wenn ich einen
+  Ton höre, fällt es mir schwer zu sagen, welcher das ist.“): Auswahl „Nachspielen (mit Flöte und Mikrofon)“
+  oder „Namen tippen (leise, auch unterwegs)“. Je Durchgang 10 Aufgaben: Die App spielt eine Folge vor
+  (0,6 s je Ton, Stimmton der aktiven Flöte); **der erste Ton ist genannt** („Der erste Ton ist g¹.“) und als
+  Note zu sehen, die anderen sind verdeckt und werden beim Antworten aufgedeckt (grün/rot, darunter die
+  Antwort). Während des Vorspielens sind die Knöpfe gesperrt bzw. hört das Mikrofon nicht zu (danach 0,35 s
+  Nachklang abwarten – so geht es ohne Kopfhörer). Tippen: ab dem zweiten Ton, Namenknöpfe wie bei Folgen
+  (höchstens 5, eine Zeile); Nachspielen: alle Töne, Warte-Wertung wie bei Folgen. „Anhören“ beliebig oft,
+  „Weiß nicht“ löst auf. Länge 2–3 Töne zu Beginn, nach zwei richtigen +1, nach einem Fehler −1, bis 5;
+  melodisch wie die Folgen (meist Schritte). Töne: freigeschaltete der Spielen- bzw. Lesen-Spur. Zählt
+  **nicht** für Trefferquote, Fächer und Übungstage. Am Ende „7 von 10 richtig gehört“, „Nochmal“ und „Zur
+  Startseite“. Kein Menüeintrag (die Menüreihenfolge ist abgestimmt; bei Bedarf nachtragen).
 - **Menü** (seit 14.11.2026, `docs/app-navigation.md`): Knopf mit drei feinen Strichen **immer oben rechts in
   der Bildschirmecke**, auf allen Seiten hoch wie quer an derselben Stelle (Nachsteuerung: quer stand er auf der
   Startseite mitten im Bild) – nicht in der Übung, auf dem Sitzungsende, der Willkommensseite, „Wo steigst du

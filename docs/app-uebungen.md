@@ -150,7 +150,8 @@ Ab welcher Stufe die Heft-Lieder spielbar sind (Stand 15.11.2026):
 
 ## 4. Echo: hören → nachspielen
 
-- Eigener Modus, erreichbar über das Menü und einen kleinen dritten Knopf „Hören“ auf der Startseite.
+- Eigener Modus, erreichbar über einen kleinen Link „Hören: vorgespielte Töne erkennen“ unter den Knöpfen
+  der Startseite (umgesetzt ohne Menüeintrag, weil die Menüreihenfolge abgestimmt ist).
 - Zwei Arten: **nachspielen** (Mikrofon) und **Namen tippen** (leise, auch unterwegs).
 - Ablauf: Der **erste Ton ist genannt** (Name und Note), die App spielt die Folge einmal vor (Flötenklang,
   Stimmton der aktiven Flöte), danach hört sie zu bzw. es wird getippt. „Nochmal anhören“ beliebig oft.

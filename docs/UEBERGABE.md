@@ -158,3 +158,7 @@ Silben, Atemzeichen, Seitenumbrüche.
      `data-testid="follow-ready"`), zwei Takte Einzählen (`withExtraCountInBar`), Verzögerung nebenbei
      (`autoLatency`, `nudgeLatency` in `song-follow.ts`). Regeln am Ende von `docs/app-lieder.md`.
      Browser-Tests im Takt-Modus tippen „Los“: `beatStarted(page)` in `tests/e2e/util.ts`.
+   - **Abschnitt 4 umgesetzt (Hören/Echo):** Seite `#/hoeren` in `app/src/ui/echo.ts` (Link auf der
+     Startseite, kein Menüeintrag), Tests `app/tests/e2e/echo.spec.ts`. Zählt nicht für die Lernspuren.
+   - Damit sind alle Abschnitte von `docs/app-uebungen.md` umgesetzt. Offen: Abschnitte der Stufenlieder mit
+     Rhythmus, Lied für Stufe 1 und 8, Abgleich ohne Kopfhörer per Lautsprecher-Klick, Rhythmus in Folgen.

@@ -3115,3 +3115,18 @@ input:focus-visible + svg.ck {
   font-size: 0.9rem;
   min-height: 1.3em;
 }
+
+/* ---------------------------------------------------------------- Hören (Echo, docs/app-uebungen.md) */
+.staff.seq.echo .sn:not(.shown) > :not(.sl):not(.seqcur) {
+  visibility: hidden;
+}
+.echo .first {
+  margin: 0;
+  color: var(--soft);
+  font-style: italic;
+}
+.home .hearlink {
+  display: block;
+  text-align: center;
+  padding: 6px 0 0;
+}

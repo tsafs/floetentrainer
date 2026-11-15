@@ -16,6 +16,7 @@ import { startpointView, welcomeView } from "./ui/startpoint";
 import { needsWelcome } from "./srs/startpoint";
 import { applyTheme } from "./ui/theme";
 import { tunerView } from "./ui/tuner";
+import { echoView } from "./ui/echo";
 import { defaultData } from "./store/data";
 import { dayKey } from "./store/dates";
 import { backupFileName, keepBrokenCopy, loadData, parseBackup, requestPersistence, saveData } from "./store/storage";
@@ -29,6 +30,7 @@ const ROUTES: Record<string, View> = {
   fortschritt: progressView,
   griffe: chartView,
   stimmgeraet: tunerView,
+  hoeren: echoView, // Echo: hören → nachspielen bzw. Namen tippen
   einstellungen: settingsView,
   floete: fluteView, // #/floete bzw. #/floete/<Ton>: Flöte einstellen
   mikrofon: micHelpView,
