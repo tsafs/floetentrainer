@@ -38,8 +38,15 @@ function flute(id: string): string {
   return fluteSvg(note(id).fingering, `Griffbild ${nameText(id)}`);
 }
 
-/** Nach einem Tippfehler: Antwort zurücknehmen (zählt nicht als Fehler) */
-const TYPO_BTN = `<button class="textbtn" data-act="typo" data-testid="typo">Vertippt</button>`;
+/**
+ * Tippfehler: letzten Tipp zurücknehmen und neu tippen. inRow: in der Zeile „Weiß nicht“ einer Tonfolge,
+ * dort vor dem ersten Tipp unsichtbar (eigene Test-Kennung, das Fehlerfeld hat einen zweiten Knopf).
+ */
+function typoBtn(inRow = false): string {
+  return inRow
+    ? `<button class="textbtn typo" data-act="typo" data-testid="typo-row" style="visibility:hidden">Vertippt</button>`
+    : `<button class="textbtn" data-act="typo" data-testid="typo">Vertippt</button>`;
+}
 
 /** kleines Häkchen am richtigen Antwortknopf */
 const TICK = `<span class="okmark" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 7.4l2.6 2.6L11 4.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
@@ -141,14 +148,32 @@ export const practiceView: View = (root, ctx) => {
     advanceArmed = true;
   }
 
-  /** „Vertippt“: die falsche Antwort zählt nicht (Session.undoLast), weiter zur nächsten Karte */
-  function bindTypo(scope: Element, pressedHere: (e: Event, el: Element) => boolean) {
+  /**
+   * Nach „Vertippt“ (Session.undoLast schon aufgerufen): Rückmeldung weg, Antwortknöpfe wieder frei,
+   * Fokus auf den ersten. clear: Klassen, die von den Knöpfen weg müssen.
+   */
+  function reopen(main: HTMLElement, clear: string[]) {
+    clearTimer();
+    advanceArmed = false;
+    phase = "ask";
+    main.classList.remove("err", "ok");
+    main.classList.add("ask");
+    main.querySelector(".slot")!.innerHTML = "";
+    main.querySelectorAll<HTMLButtonElement>(".btns button").forEach((b) => {
+      b.disabled = false;
+      b.classList.remove(...clear);
+      b.querySelector(".okmark")?.remove();
+    });
+    main.querySelector<HTMLButtonElement>(".btns button")?.focus({ preventScroll: true });
+  }
+
+  /** Knopf „Vertippt“ in scope: Tipp zurücknehmen (undo), es geht nicht weiter – sie tippt neu */
+  function bindTypo(scope: Element, pressedHere: (e: Event, el: Element) => boolean, undo: () => void) {
     const b = scope.querySelector<HTMLButtonElement>('[data-act="typo"]');
     b?.addEventListener("click", (e) => {
       e.stopPropagation();
-      if (!pressedHere(e, b) || !s.canUndo) return;
-      s.undoLast();
-      advance();
+      if (!pressedHere(e, b)) return;
+      undo();
     });
   }
 
@@ -311,7 +336,7 @@ export const practiceView: View = (root, ctx) => {
       return (
         `<div class="panel err center${pic ? "" : " solo"}" data-testid="panel">${pic}<div class="txt"><span class="head">${head}</span>` +
         `<span class="name">${nameHtml(id)}</span></div></div>` +
-        (s.canUndo ? `<div class="gorow">${TYPO_BTN}<button class="go" data-act="next">Weiter</button></div>` : `<button class="go" data-act="next">Weiter</button>`)
+        (s.canUndo ? `<div class="gorow">${typoBtn()}<button class="go" data-act="next">Weiter</button></div>` : `<button class="go" data-act="next">Weiter</button>`)
       );
     };
 
@@ -323,9 +348,16 @@ export const practiceView: View = (root, ctx) => {
         if (!pressedHere(e, go)) return;
         advance();
       });
-      bindTypo(slot, pressedHere);
+      bindTypo(slot, pressedHere, retype);
       // die Antwortknöpfe sind jetzt verdeckt: Fokus auf „Weiter“, damit er nicht verloren geht
       go?.focus({ preventScroll: true });
+    };
+
+    /** „Vertippt“: Antwort zurücknehmen (zählt nicht), Karte wieder offen – sie tippt neu */
+    const retype = () => {
+      if (!s.canUndo) return;
+      s.undoLast();
+      reopen(main, ["right", "dim", "chosen"]);
     };
 
     const markButtons = (chosen: string | null) => {
@@ -420,7 +452,9 @@ export const practiceView: View = (root, ctx) => {
         .map((c) => `<button data-choice="${c}" aria-label="${nameText(c)}">${nameHtml(c)}</button>`)
         .join("")}</div>`;
     }
-    const idk = `<div class="idkrow" aria-live="polite"><button class="textbtn" data-act="idk">Weiß nicht</button></div>`;
+    // Lesen: „Vertippt“ neben „Weiß nicht“, sichtbar sobald eine Note getippt ist (nimmt den letzten Tipp
+    // zurück). Vorher nur unsichtbar; „Weiß nicht“ steht mittig wie auf den Karten (.idkrow.three).
+    const idk = `<div class="idkrow${playing ? "" : " three"}" aria-live="polite">${playing ? "" : "<span></span>"}<button class="textbtn" data-act="idk">Weiß nicht</button>${playing ? "" : typoBtn(true)}</div>`;
     const answer = playing
       ? `<div class="answer"><div class="anchor"><div class="slot" aria-live="polite"></div></div>${listenBox()}${idk}</div>`
       : `<div class="answer">${btns}${idk}<div class="slot" aria-live="polite"></div></div>`;
@@ -461,6 +495,23 @@ export const practiceView: View = (root, ctx) => {
       el.querySelector(".sl")!.innerHTML = answer ? nameSvgText(answer) : "";
     };
     setCur(0);
+    const rowTypo = idkRow.querySelector<HTMLButtonElement>('[data-act="typo"]');
+    /** Lesen, „Vertippt“: die Tipps ab Note k zurücknehmen (ohne k: den letzten), Note k ist wieder dran */
+    const untap = (k = cur - 1) => {
+      if (k < 0) return;
+      for (let j = k; j < cur; j++) {
+        ok[j] = undefined;
+        wrongAt[j] = null;
+        const el = g(j);
+        el?.classList.remove("hit", "miss");
+        const sl = el?.querySelector(".sl");
+        if (sl) sl.innerHTML = "";
+      }
+      cur = k;
+      setCur(cur);
+      if (rowTypo) rowTypo.style.visibility = cur === 0 ? "hidden" : "";
+    };
+    if (rowTypo) bindTypo(idkRow, pressedHere, () => phase === "ask" && untap());
 
     const setPhase = (p: "ok" | "err") => {
       phase = p;
@@ -501,9 +552,16 @@ export const practiceView: View = (root, ctx) => {
       slot.innerHTML =
         `<div class="panel err center solo" data-testid="panel"><div class="txt"><span class="head">${head}</span>` +
         `<span class="names">${names}</span></div></div>` +
-        `<div class="gorow">${listenBtn}${s.canUndo ? TYPO_BTN : ""}<button class="go" data-act="next">Weiter</button></div>`;
+        `<div class="gorow">${listenBtn}${s.canUndo ? typoBtn() : ""}<button class="go" data-act="next">Weiter</button></div>`;
       bindListen(slot);
-      bindTypo(slot, pressedHere);
+      // „Vertippt“ nach dem Ende: Wertung zurücknehmen, Folge wieder offen ab der ersten falschen Note
+      // (die Tipps danach sind mit weg; sie tippt von dort weiter)
+      bindTypo(slot, pressedHere, () => {
+        if (!s.canUndo) return;
+        s.undoLast();
+        reopen(main, ["dim", "tap-ok", "tap-err"]);
+        untap(Math.max(0, ok.findIndex((x) => x === false)));
+      });
       const go = slot.querySelector<HTMLButtonElement>('[data-act="next"]')!;
       go.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -543,6 +601,7 @@ export const practiceView: View = (root, ctx) => {
           void b.offsetWidth; // Animation neu starten
           b.classList.add(good ? "tap-ok" : "tap-err");
           cur++;
+          if (rowTypo) rowTypo.style.visibility = "";
           if (cur < n) setCur(cur);
           else done("Nicht ganz", true);
         }),

@@ -46,17 +46,21 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   - Eine Tonfolge mit Fehler kommt nach 2–3 anderen Schritten **einmal** wieder (ungewertet, wie bei
     Karten). Diese Wiederholung darf direkt nach einer anderen Folge stehen.
 - **Vertippt** (seit 15.11.2026, auf Rückmeldung: „Die meisten Fehler kommen wegen Tippfehlern
-  zustande.“): Nach einer falsch *getippten* Antwort steht neben „Weiter“ der Knopf „Vertippt“ (Lesen,
-  Karten und Tonfolgen; nicht nach „Weiß nicht“, nicht beim Spielen, nicht bei Wiederholungen). Er nimmt
-  den Fehler zurück und geht weiter: Er verschwindet aus den letzten 20 (Trefferquote, Freischalten; auch
-  die dadurch verdrängte älteste Antwort ist wieder da), das Fach der Karte bleibt wie vorher (eine
-  fällige Karte bleibt fällig), die Wiederholung entfällt, der Ton fehlt in „Schwierig waren“. Bei einer
-  Tonfolge gilt das nur für die falsch getippten Töne; die richtigen bleiben gewertet. Im Ergebnis der
-  Sitzung zählt der Schritt als richtig. Nur solange die Rückmeldung steht; danach nicht mehr. Ohne den
-  Fehler kann die nächste Stufe sofort freigeschaltet sein. Umgekehrt gilt eine Stufe, die erst der Fehler
-  freigeschaltet hat (9 von 9 sind zu wenige Antworten, 9 von 10 reichen), danach nicht mehr; ein
-  Übungstag, den nur diese Antwort eingetragen hat, ebenso. Die App vertraut ihr hier: Wer es ausnutzt,
-  betrügt nur sich selbst.
+  zustande.“): Nimmt den letzten Tipp zurück, und sie tippt neu – es geht **nicht** weiter (zuerst sprang
+  die App nach „Vertippt“ zur nächsten Aufgabe; Rückmeldung: „kann nicht korrigieren“). Nur beim Lesen
+  und nur für getippte Antworten (nicht nach „Weiß nicht“, nicht beim Spielen).
+  - **Karte:** Nach einer falschen Antwort steht „Vertippt“ neben „Weiter“. Die Antwort wird ganz
+    zurückgenommen (Verlauf samt der dadurch verdrängten ältesten Antwort, Fach, Übungstag, Stufe und
+    Meldung, Wiederholung, „Schwierig waren“, Zähler), die Karte ist wieder offen. Die neue Antwort wird
+    ganz normal gewertet, auch falsch.
+  - **Tonfolge:** „Vertippt“ steht neben „Weiß nicht“, sobald eine Note getippt ist (vorher unsichtbar,
+    damit nichts verrutscht), und nimmt den letzten Tipp zurück – mehrmals hintereinander bis zur ersten
+    Note. Gewertet wird erst am Ende der Folge; das Ergebnis erscheint mit dem letzten Tipp. Hat die Folge
+    einen Fehler, steht „Vertippt“ auch dort: Es nimmt die Wertung der ganzen Folge zurück und macht sie ab
+    der ersten falschen Note wieder auf (die Tipps danach sind mit weg, sie tippt von dort weiter).
+    „Weiß nicht“ steht dabei mittig wie auf den Karten, „Vertippt“ rechts daneben.
+  - Nur solange die Karte bzw. Folge da ist; danach nicht mehr. Die App vertraut ihr hier: Wer es
+    ausnutzt, betrügt nur sich selbst.
 - **Abbrechen mit ×:** Bereits beantwortete Karten bleiben gewertet, alles andere bleibt unverändert.
 - **Nichts fällig, nichts neu:** Der Knopf heißt dann „Weiter üben“ bzw. „Weiter spielen“, darunter
   „Fälliges erledigt · zählt für Stufe n“, auch wenn Spielen gerade an der Lesen-Stufe ansteht (die

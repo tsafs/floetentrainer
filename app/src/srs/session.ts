@@ -43,20 +43,23 @@ type Retry = { at: number } & ({ item: PlanItem; folge?: undefined } | { folge: 
 const firstOf = (r: Retry) => (r.folge ? r.folge.notes[0] : r.item!.note);
 
 /**
- * Was eine gewertete falsche Antwort verändert hat, damit „Vertippt“ es zurücknehmen kann: Verlauf der
- * falschen Töne, Fach der Karte, Wiederholung, „Schwierig waren“, Länge der Tonfolgen.
+ * Stand vor einer gewerteten getippten Antwort, damit „Vertippt“ sie ganz zurücknehmen kann: Verlauf der
+ * betroffenen Töne, Fach der Karte, Übungstage, Stufen und Meldungen, Wiederholungen, „Schwierig waren“,
+ * Zähler, Länge der Tonfolgen.
  */
 interface Undo {
   uid: number;
   history: [string, Answer[] | undefined][];
   card?: { key: string; prev: CardState | undefined };
-  difficult: string[];
-  folgeLen?: { len: number; streak: number };
-  /** Stufen vorher und Zahl der Meldungen: auch eine falsche Antwort kann freischalten (9 von 9 → 9 von 10) */
+  days: string[];
   stages: AppData["stages"];
   unlocks: number;
-  /** Übungstag entfernen, wenn erst diese Antwort ihn eingetragen hat und nichts von ihr gewertet bleibt */
-  dropDay: boolean;
+  difficult: string[];
+  retries: Retry[];
+  retryCount: number | undefined;
+  graded: number;
+  correct: number;
+  folgeLen?: { len: number; streak: number };
 }
 
 export interface SessionResult {
@@ -154,7 +157,7 @@ export class Session {
   /** Länge der Tonfolgen (erst bei der ersten Folge angelegt) */
   private folgeLen: FolgeLength | null = null;
   private usedFolgen = new Set<string>();
-  /** letzte gewertete falsche Antwort, solange sie noch zurückgenommen werden kann */
+  /** Stand vor der letzten getippten falschen Antwort, solange sie noch zurückgenommen werden kann */
   private undo: Undo | null = null;
   current: Step | null = null;
   graded = 0;
@@ -324,8 +327,8 @@ export class Session {
     if (!step || step.type !== "card") return;
     const { item, retry } = step;
     this.undo = null;
-    if (!retry && !ok && typed && this.track === "lesen") {
-      this.undo = this.snapshot(item.uid, [item.note], true, item.type !== "extra" ? cardKey(item.note, item.kind) : undefined);
+    if (typed && !ok && this.track === "lesen") {
+      this.undo = this.snapshot(item.uid, [item.note], { key: !retry && item.type !== "extra" ? cardKey(item.note, item.kind) : undefined });
     }
     if (!retry) {
       this.graded += 1;
@@ -364,10 +367,7 @@ export class Session {
     folge.notes.forEach((n, i) => per.set(n, (per.get(n) ?? true) && !!ok[i]));
     const all = [...per.values()].every(Boolean);
     this.undo = null;
-    if (!retry && !all && typed && this.track === "lesen") {
-      const wrong = [...per].filter(([, good]) => !good).map(([n]) => n);
-      this.undo = this.snapshot(folge.uid, wrong, wrong.length === per.size);
-    }
+    if (typed && !all && this.track === "lesen") this.undo = this.snapshot(folge.uid, [...per.keys()], { folgeLen: true });
     if (!retry) {
       this.graded += 1;
       if (all) this.correct += 1;
@@ -390,31 +390,39 @@ export class Session {
     }
   }
 
-  /** Stand vor einer gewerteten falschen Antwort. notes: die falschen Töne; allWrong: nichts davon bleibt gewertet. */
-  private snapshot(uid: number, notes: string[], allWrong: boolean, key?: string): Undo {
+  /**
+   * Stand vor einer getippten falschen Antwort. notes: die Töne, deren Verlauf sie ändert; key: Karte, deren
+   * Fach sie ändert; folgeLen: auch die Länge der Tonfolgen merken.
+   */
+  private snapshot(uid: number, notes: string[], opt: { key?: string; folgeLen?: boolean }): Undo {
+    const key = opt.key;
     const h = this.data.history[this.track];
     return {
       uid,
       history: notes.map((n) => [n, h[n]?.slice()]),
       card: key ? { key, prev: this.data.cards[key] && { ...this.data.cards[key] } } : undefined,
-      difficult: this.difficult.slice(),
-      folgeLen: this.current?.type === "folge" ? this.folgeLen?.snapshot() : undefined,
+      days: this.data.days.slice(),
       stages: { ...this.data.stages },
       unlocks: this.unlocks.length,
-      dropDay: allWrong && !this.data.days.includes(this.opt.today),
+      difficult: this.difficult.slice(),
+      retries: this.retries.slice(),
+      retryCount: this.retryCount.get(uid),
+      graded: this.graded,
+      correct: this.correct,
+      folgeLen: opt.folgeLen ? this.folgeLen?.snapshot() : undefined,
     };
   }
 
-  /** Lässt sich die letzte Antwort als „Vertippt“ zurücknehmen? (gewertet und falsch, noch auf derselben Karte) */
+  /** Lässt sich die letzte Antwort als „Vertippt“ zurücknehmen? (getippt, falsch, Lesen, noch auf derselben Karte) */
   get canUndo(): boolean {
     return this.undo !== null;
   }
 
   /**
-   * „Vertippt“: die falsche Antwort zählt nicht. Der Fehler verschwindet aus dem Verlauf (Trefferquote,
-   * Freischalten), das Fach der Karte bleibt wie vorher (sie bleibt also fällig), die Wiederholung entfällt.
-   * Bei einer Tonfolge nur die falsch getippten Töne; die richtigen bleiben gewertet. Im Ergebnis der
-   * Sitzung („7 von 20“, „18 richtig“) zählt der Schritt als richtig.
+   * „Vertippt“: die letzte getippte Antwort zurücknehmen, als wäre sie nie gegeben. Die Karte bzw. Folge
+   * bleibt die aktuelle; die neue Antwort darauf wird ganz normal gewertet (answer bzw. answerFolge).
+   * Zurück kommen Verlauf, Fach, Übungstage, Stufen und Meldungen (auch eine Stufe, die erst diese Antwort
+   * freigeschaltet hat), Wiederholung, „Schwierig waren“ und die Zähler.
    */
   undoLast(): void {
     const u = this.undo;
@@ -429,21 +437,16 @@ export class Session {
       if (u.card.prev) this.data.cards[u.card.key] = u.card.prev;
       else delete this.data.cards[u.card.key];
     }
-    if (u.dropDay) this.data.days = this.data.days.filter((x) => x !== this.opt.today);
-    // Hat erst diese Antwort freigeschaltet, gilt das nicht mehr; was ohne sie gilt, prüft checkUnlocks unten
+    this.data.days = u.days;
     this.data.stages = u.stages;
     this.unlocks.length = u.unlocks;
     this.difficult = u.difficult;
-    this.retries = this.retries.filter((r) => (r.folge ? r.folge.uid : r.item!.uid) !== u.uid);
-    this.retryCount.delete(u.uid);
-    // Im Ergebnis der Sitzung zählt der Schritt als richtig (sie wusste es ja)
-    this.correct += 1;
-    if (u.folgeLen && this.folgeLen) {
-      this.folgeLen.restore(u.folgeLen);
-      this.folgeLen.update(true);
-    }
-    // Ohne den Fehler kann die Bedingung jetzt erfüllt sein
-    this.unlocks.push(...checkUnlocks(this.data));
+    this.retries = u.retries;
+    if (u.retryCount === undefined) this.retryCount.delete(u.uid);
+    else this.retryCount.set(u.uid, u.retryCount);
+    this.graded = u.graded;
+    this.correct = u.correct;
+    if (u.folgeLen) this.folgeLen?.restore(u.folgeLen);
     this.onChange();
   }
 
