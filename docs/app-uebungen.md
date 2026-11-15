@@ -139,10 +139,12 @@ Ab welcher Stufe die Heft-Lieder spielbar sind (Stand 15.11.2026):
 - Je Stufe mit Lied ein fest gewähltes **Stufenlied** (das bekannteste und einfachste, z. B. Stufe 2
   „Hänschen klein“, Stufe 3 „Bi-Ba-Butzemann“, Stufe 5 „Alle meine Entchen“); Liste im Code.
   Stufe 1 und 8 haben keins (offen: eigene kleine Melodie oder Heft-Übung).
-- **Abschnitte:** Das Lied wird an den Atemzeichen geteilt (sonst alle 2 Takte). Beim Spielen ist etwa
+- **Abschnitte:** Das Lied wird an den Atemzeichen und Pausen geteilt, zu lange Stücke an Taktgrenzen
+  (höchstens 8 Töne). *Umgesetzt zunächst ohne Rhythmus* (ganze Noten wie die anderen Folgen); mit echtem
+  Rhythmus später. Beim Spielen ist etwa
   jede vierte Folge ein Abschnitt des Stufenlieds der aktuellen Stufe (ohne eigenes Lied: eines aus dem
-  Kapitel, das schon spielbar ist). Notenbild mit echtem Rhythmus, gewertet nur die Töne (Warte-Wertung),
-  je Ton einmal für die Trefferquote. Überschrift „Aus: Hänschen klein“.
+  Kapitel, das schon spielbar ist). Gewertet nur die Töne (Warte-Wertung), je Ton einmal für die
+  Trefferquote. Frage „Aus „Hänschen klein“ – spiel diese Töne.“
 - **Beim Freischalten** einer Stufe: im Ergebnis zusätzlich „Jetzt kannst du *Hänschen klein* ganz
   spielen“ mit Link auf die Liedseite (Mitspielen, Warte-Modus).
 

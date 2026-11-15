@@ -572,6 +572,22 @@ describe("Tonfolgen", () => {
       expect(d.cards["a1|spiel"].day).toBe(TODAY);
     }
   });
+  it("Spielen: etwa jede vierte Folge ist ein Abschnitt des Stufenlieds (nur vorgestellte Töne)", () => {
+    let withSong = 0;
+    for (let seed = 1; seed <= 20; seed++) {
+      const d = onlyExtras("spielen");
+      const s = mkSession(d, "spielen", { seed });
+      const steps = run(s).filter((x) => x.type === "folge" && !x.retry) as Extract<Step, { type: "folge" }>[];
+      const songs = steps.filter((x) => x.folge.song);
+      expect(songs.length).toBeLessThanOrEqual(4);
+      for (const x of songs) {
+        expect(x.folge.song).toBe("Alle Vögel sind schon da");
+        expect(x.folge.notes.every((n) => d.introduced.spielen.includes(n))).toBe(true);
+      }
+      withSong += songs.length;
+    }
+    expect(withSong).toBeGreaterThan(20);
+  });
   it("Spielen: Griffwechsel werden gemerkt (nach einem richtigen Ton), höchstens 10 je Paar", () => {
     const d = onlyExtras("spielen");
     const s = mkSession(d, "spielen", { seed: 3 });

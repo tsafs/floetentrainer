@@ -4,6 +4,8 @@ import { levelOf, type Kind, type Track } from "../music/levels";
 import { cardKey, PAIR_LEN, type Answer, type AppData, type CardState } from "../store/data";
 import { applyAnswer, dueCards, newCards, trackCards, type CardRef } from "./leitner";
 import { checkUnlocks, noteWeight, recordAnswer, type Unlock } from "./progress";
+import { snippetSong } from "./chapters";
+import { songSnippets } from "../songs/snippets";
 import type { Rng } from "./choices";
 import {
   drillNotes,
@@ -36,6 +38,8 @@ export interface PlanItem extends CardRef {
   folge?: boolean;
   /** Spielen: Dieser Folge-Platz wird ein Wechsel-Drill (höchstens einer je Sitzung) */
   drill?: boolean;
+  /** Spielen: Dieser Folge-Platz wird ein Abschnitt des Stufenlieds (etwa jede vierte Folge) */
+  snippet?: boolean;
 }
 
 /** Eine Tonfolge in der Sitzung (keine Leitner-Karte) */
@@ -51,6 +55,8 @@ export interface Folge {
   carry?: string;
   /** Wechsel-Drill: zwei Töne im Wechsel */
   drill?: boolean;
+  /** Abschnitt aus diesem Lied (Titel) */
+  song?: string;
   /** fortlaufende Nummer in der Sitzung (Wiederholung: dieselbe) */
   uid: number;
 }
@@ -154,6 +160,10 @@ export function buildPlan(data: AppData, track: Track, today: string, sessionNo:
     // ein Wechsel-Drill je Sitzung: der mittlere Folge-Platz unter den Zusatzkarten
     const slots = plan.filter((p) => p.type === "extra" && p.folge);
     if (slots.length) slots[Math.floor(slots.length / 2)].drill = true;
+    // etwa jede vierte übrige Folge ein Abschnitt des Stufenlieds (die 2., 6., …)
+    slots.filter((p) => !p.drill).forEach((p, i) => {
+      if (i % 4 === 1) p.snippet = true;
+    });
   }
   return plan;
 }
@@ -284,6 +294,17 @@ export class Session {
     if (p.drill) {
       const pair = drillPair(pool, this.data.pairs, rng);
       if (pair) return { notes: drillNotes(pair, rng, this.lastNote), uid: p.uid, kind: p.kind, drill: true };
+    }
+    if (p.snippet) {
+      const song = snippetSong(this.track, levelOf(this.track, this.data.stages[this.track]));
+      const options = song
+        ? songSnippets(song).filter((f) => f.every((n) => pool.includes(n)) && f[0] !== this.lastNote && !this.usedFolgen.has(folgeKey(f)))
+        : [];
+      if (song && options.length) {
+        const notes = options[Math.floor(rng() * options.length)];
+        this.usedFolgen.add(folgeKey(notes));
+        return { notes, uid: p.uid, kind: p.kind, song: song.title };
+      }
     }
     const carry = p.type === "due" ? p.note : undefined;
     this.folgeLen ??= new FolgeLength(pool.length, folgeMaxLen(levelOf(this.track, this.data.stages[this.track])), rng);
@@ -440,7 +461,7 @@ export class Session {
       // Fällige Karte, die die Folge trägt: richtig nur, wenn ihr Ton an allen Stellen richtig war
       if (cardKeyOf) this.data.cards[cardKeyOf] = applyAnswer(this.data.cards[cardKeyOf], per.get(folge.carry!)!, this.opt.today, this.sessionNo);
       if (this.track === "spielen") recordPairs(this.data, folge.notes, ok);
-      if (!folge.drill) this.folgeLen?.update(all);
+      if (!folge.drill && !folge.song) this.folgeLen?.update(all);
       this.unlocks.push(...checkUnlocks(this.data));
       this.onChange();
     }

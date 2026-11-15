@@ -462,7 +462,9 @@ export const practiceView: View = (root, ctx) => {
     const question = playing
       ? st.folge.drill
         ? "Wechsle ruhig hin und her."
-        : "Spiel diese Töne nacheinander."
+        : st.folge.song
+          ? `Aus „${st.folge.song}“ – spiel diese Töne.`
+          : "Spiel diese Töne nacheinander."
       : fkind === "griff"
         ? "Welche Griffe sind das? Der Reihe nach."
         : fkind === "note"
@@ -492,7 +494,7 @@ export const practiceView: View = (root, ctx) => {
       ? `<div class="answer"><div class="anchor"><div class="slot" aria-live="polite"></div></div>${listenBox()}${idk}</div>`
       : `<div class="answer">${btns}${idk}<div class="slot" aria-live="polite"></div></div>`;
     root.innerHTML = `
-<main class="screen fit prac ask kind-folge folge-${fkind}" data-step="folge" data-kind="folge" data-fkind="${fkind}"${st.folge.drill ? ' data-drill="true"' : ""} data-notes="${notes.join(" ")}" data-note="${notes[0]}" data-i="0" data-retry="${st.retry}" data-seq="${++seq}">
+<main class="screen fit prac ask kind-folge folge-${fkind}" data-step="folge" data-kind="folge" data-fkind="${fkind}"${st.folge.drill ? ' data-drill="true"' : ""}${st.folge.song ? ` data-song="${st.folge.song}"` : ""} data-notes="${notes.join(" ")}" data-note="${notes[0]}" data-i="0" data-retry="${st.retry}" data-seq="${++seq}">
   ${header(label)}
   <div class="stage">${staff}<p class="q" aria-live="polite">${question}</p></div>
   ${answer}

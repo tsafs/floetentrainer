@@ -149,3 +149,8 @@ Silben, Atemzeichen, Seitenumbrüche.
      `drillPair`/`counterMotion` in `sequences.ts`; Versuche je Tonpaar in `data.pairs`, optional, über
      `recordPairs` in `session.ts`). Browser-Tests für Einzelkarten beim Spielen brauchen weniger als 5
      vorgestellte Töne (`singleCards()` in `play.spec.ts`).
+   - **Abschnitt 3 umgesetzt (Kapitel, Stufenlieder):** `app/src/srs/chapters.ts` (Kapitel aus den
+     Meilensteinen, `STAGE_SONG_TITLES`, `snippetSong`), Abschnitte `app/src/songs/snippets.ts`
+     (`songSnippets`), in der Sitzung `PlanItem.snippet`/`Folge.song`; Fortschrittsseite und Ergebnis in
+     `app/src/ui/pages.ts`. Tests `chapters.test.ts`, `session.test.ts`, `play.spec.ts` („Stufe geschafft“).
+     Offen: Abschnitte mit echtem Rhythmus; Lied für Stufe 1 und 8.

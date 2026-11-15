@@ -1217,6 +1217,14 @@ svg.acc {
 .prow.weak .pb b {
   background: var(--err);
 }
+.chap {
+  margin: 2px 0 0;
+  line-height: 1.35;
+}
+.chap a,
+.summary .new a {
+  color: inherit;
+}
 .stagebar {
   display: grid;
   grid-template-columns: 1fr auto;
