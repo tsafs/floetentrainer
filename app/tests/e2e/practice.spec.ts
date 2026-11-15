@@ -93,20 +93,32 @@ test.describe("Üben", () => {
     expect(idx).toBeLessThanOrEqual(3);
   });
 
-  test("„Vertippt“ nimmt den Fehler zurück", async ({ page }) => {
+  test("„Vertippt“: Antwort zurück, dieselbe Karte bleibt offen, neu tippen", async ({ page }) => {
     await seed(page, sampleData());
     await page.goto("./");
     await page.getByRole("button", { name: /Üben/ }).click();
     await skipIntros(page);
-    const i = await info(page);
+    let i = await info(page);
+    if (i.step === "folge") {
+      await answer(page, true);
+      await next(page);
+      await skipIntros(page);
+      i = await info(page);
+    }
     const before = (await stored(page)).history.lesen[i.note]?.length ?? 0;
     await answer(page, false);
     await expect(page.getByTestId("panel")).toContainText("Nicht ganz");
     expect((await stored(page)).history.lesen[i.note].at(-1)[0]).toBe(0);
     await page.getByTestId("typo").click();
-    await waitNext(page, i.seq);
-    const d = await stored(page);
-    expect(d.history.lesen[i.note]?.length ?? 0).toBe(before);
+    // kein Sprung: dieselbe Karte, Antworten wieder frei, kein Feld
+    await expect(page.getByTestId("panel")).toHaveCount(0);
+    expect(await info(page)).toMatchObject({ seq: i.seq, note: i.note });
+    expect((await stored(page)).history.lesen[i.note]?.length ?? 0).toBe(before);
+    await expect(page.locator(".btns button:disabled")).toHaveCount(0);
+    await expect(page.locator(".btns .right, .btns .dim, .btns .chosen")).toHaveCount(0);
+    await answer(page, true);
+    await expect(page.getByTestId("panel")).toContainText("Richtig");
+    expect((await stored(page)).history.lesen[i.note].at(-1)[0]).toBe(1);
   });
 
   test("„Weiß nicht“ zeigt die Auflösung und zählt als Fehler", async ({ page }) => {

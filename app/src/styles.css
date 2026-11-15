@@ -770,6 +770,7 @@ svg.acc {
 .idkrow {
   display: flex;
   justify-content: center;
+  gap: 8px;
   margin: -6px 0 -10px;
   min-height: 48px;
 }

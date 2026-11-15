@@ -147,16 +147,22 @@ describe("Vertippt", () => {
     for (const n of ["h1", "a1", "g1"]) for (const k of ["name", "griff", "note"]) d.cards[`${n}|${k}`] = { box: 4, day: TODAY, session: 1 };
     return d;
   }
-  it("Karte: der Fehler verschwindet aus dem Verlauf, keine Wiederholung, zählt im Ergebnis als richtig", () => {
+  /** Bis zur ersten Karte mit diesem Ton alles richtig beantworten */
+  function untilCard(s: Session, note: string) {
+    let st = s.next()!;
+    while (st.type !== "card" || st.item.note !== note) {
+      if (st.type === "folge") s.answerFolge(st.folge.notes.map(() => true));
+      else s.answer(true);
+      st = s.next()!;
+    }
+    return st;
+  }
+  it("Karte: Antwort ganz zurückgenommen, dieselbe Karte bleibt offen und wird neu gewertet", () => {
     const d = extrasOnly();
     d.history.lesen.g1 = answers(20, 2, [TODAY]);
     const before = d.history.lesen.g1.slice();
     const s = mkSession(d);
-    let st = s.next()!;
-    while (st.type !== "card" || st.item.note !== "g1") {
-      s.answer(true);
-      st = s.next()!;
-    }
+    const st = untilCard(s, "g1");
     const graded = s.graded;
     const correct = s.correct;
     expect(s.canUndo).toBe(false);
@@ -166,14 +172,33 @@ describe("Vertippt", () => {
     expect(s.canUndo).toBe(false);
     // auch die älteste Antwort, die der Fehler aus den letzten 20 verdrängt hatte, ist wieder da
     expect(d.history.lesen.g1).toEqual(before);
+    expect(s.graded).toBe(graded);
+    expect(s.correct).toBe(correct);
+    expect(s.result().difficult).not.toContain("g1");
+    expect(s.current).toBe(st);
+    // neu getippt: richtig, ganz normal gewertet
+    s.answer(true, true);
     expect(s.graded).toBe(graded + 1);
     expect(s.correct).toBe(correct + 1);
-    expect(s.result().difficult).not.toContain("g1");
+    expect(d.history.lesen.g1.at(-1)![0]).toBe(1);
+    expect(d.history.lesen.g1).toHaveLength(20);
     // keine Wiederholung von g1 in dieser Sitzung
     const rest = run(s);
     expect(rest.some((x) => x.type === "card" && x.retry)).toBe(false);
   });
-  it("fällige Karte: Fach bleibt wie vorher", () => {
+  it("neu getippt und wieder falsch: zählt als Fehler, Wiederholung kommt", () => {
+    const d = extrasOnly();
+    const s = mkSession(d);
+    untilCard(s, "g1");
+    s.answer(false, true);
+    s.undoLast();
+    s.answer(false, true);
+    expect(d.history.lesen.g1.filter((x) => x[0] === 0)).toHaveLength(1);
+    expect(s.result().difficult).toContain("g1");
+    const rest = run(s);
+    expect(rest.filter((x) => x.type === "card" && x.retry && x.item.note === "g1")).toHaveLength(1);
+  });
+  it("fällige Karte: Fach wie vorher, bis neu getippt ist", () => {
     const d = defaultData();
     d.cards["h1|name"] = { box: 3, day: addDays(TODAY, -5), session: 1 };
     const s = mkSession(d);
@@ -183,38 +208,29 @@ describe("Vertippt", () => {
     expect(d.cards["h1|name"].box).toBe(1);
     s.undoLast();
     expect(d.cards["h1|name"]).toEqual({ box: 3, day: addDays(TODAY, -5), session: 1 });
+    s.answer(true, true);
+    expect(d.cards["h1|name"].box).toBe(4);
   });
-  it("nur direkt nach einer gewerteten falschen Antwort", () => {
+  it("nur auf der aktuellen Karte", () => {
     const d = extrasOnly();
     const s = mkSession(d);
-    s.next();
-    s.answer(true);
-    expect(s.canUndo).toBe(false);
     s.next();
     s.answer(false, true);
     expect(s.canUndo).toBe(true);
     s.next(); // weitergegangen: zu spät
     expect(s.canUndo).toBe(false);
   });
-  /** Bis zur ersten Karte mit diesem Ton alles richtig beantworten */
-  function untilCard(s: Session, note: string) {
-    let st = s.next()!;
-    while (st.type !== "card" || st.item.note !== note) {
-      if (st.type === "folge") s.answerFolge(st.folge.notes.map(() => true));
-      else s.answer(true);
-      st = s.next()!;
-    }
-  }
-  it("kann die nächste Stufe freischalten", () => {
+  it("kann die nächste Stufe freischalten (dann neu richtig getippt)", () => {
     const d = extrasOnly();
     master(d, "lesen", ["h1", "a1"]);
-    d.history.lesen.g1 = [[0, TODAY, 1], ...answers(9, 0, [TODAY], 10)];
+    d.history.lesen.g1 = answers(9, 0, [TODAY]);
     const s = mkSession(d);
-    // vorher kein g1: sonst zählte eine richtige Antwort schon
     untilCard(s, "g1");
-    s.answer(false, true); // 9 von 11
+    d.history.lesen.g1 = [[0, TODAY, 1], ...answers(8, 0, [TODAY], 10)]; // 8 von 9
+    s.answer(false, true); // 8 von 10
     expect(d.stages.lesen).toBe("erste-toene");
-    s.undoLast(); // 9 von 10
+    s.undoLast();
+    s.answer(true, true); // 9 von 10
     expect(d.stages.lesen).toBe("c2-d2");
     expect(s.result().unlocks.map((u) => u.level)).toEqual([2]);
   });
@@ -252,7 +268,7 @@ describe("Vertippt", () => {
     sp.answer(false, true);
     expect(sp.canUndo).toBe(false);
   });
-  it("Tonfolge: nur die falsch getippten Töne fallen weg, die richtigen bleiben gewertet", () => {
+  it("Tonfolge: Wertung ganz zurückgenommen, neu getippt wird sie normal gewertet", () => {
     const d = defaultData();
     d.stages.lesen = "fis1";
     const notes = ["h1", "a1", "g1", "c2", "d2", "e1", "d1", "fis1"];
@@ -265,15 +281,17 @@ describe("Vertippt", () => {
       st = s.next()!;
     }
     const f = st.folge.notes;
-    const wrong = f[1];
-    const res = f.map((n) => n !== wrong);
+    const res = f.map((_, i) => i !== f.length - 1);
     const before = structuredClone(d.history.lesen);
+    const graded = s.graded;
     s.answerFolge(res, true);
     expect(s.canUndo).toBe(true);
     s.undoLast();
-    expect(d.history.lesen[wrong]).toEqual(before[wrong]);
-    for (const n of new Set(f.filter((n) => n !== wrong))) expect(d.history.lesen[n]).toHaveLength((before[n]?.length ?? 0) + 1);
-    expect(s.result().difficult).not.toContain(wrong);
+    expect(d.history.lesen).toEqual(before);
+    expect(s.graded).toBe(graded);
+    expect(s.result().difficult).toEqual([]);
+    s.answerFolge(f.map(() => true), true);
+    for (const n of new Set(f)) expect(d.history.lesen[n]).toHaveLength((before[n]?.length ?? 0) + 1);
     expect(s.correct).toBe(s.graded);
   });
 });

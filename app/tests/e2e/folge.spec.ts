@@ -110,6 +110,43 @@ test.describe("Lesen", () => {
     throw new Error("keine Wiederholung");
   });
 
+  test("„Vertippt“ nimmt den letzten Tipp zurück – mitten in der Folge und nach dem Ende", async ({ page }) => {
+    await seed(page, extrasOnly());
+    await page.addInitScript(() => ((window as never as { __folgen: string[][] }).__folgen = [["g1", "a1", "h1"]]));
+    await page.goto("./");
+    await page.getByRole("button", { name: /Weiter üben/ }).click();
+    const s = await toFolge(page);
+    const m = folge(page);
+    const typo = m.locator('.idkrow [data-act="typo"]');
+    // vor dem ersten Tipp unsichtbar
+    await expect(typo).toBeHidden();
+    await tap(page, "g1");
+    await expect(typo).toBeVisible();
+    // vertippt: a1 erwartet, h1 getippt
+    await tap(page, "h1");
+    await expect(m.locator('.sn[data-i="1"]')).toHaveClass(/miss/);
+    await typo.click();
+    await expect(m.locator('.sn[data-i="1"]')).not.toHaveClass(/miss/);
+    await expect(m.locator('.sn[data-i="1"] .sl')).toHaveText("");
+    await expect(m.locator(".sn.cur")).toHaveAttribute("data-i", "1");
+    await tap(page, "a1");
+    // letzte Note vertippt: Ergebnis erscheint, „Vertippt“ macht die Folge wieder auf
+    const before = (await stored(page)).history.lesen.h1.length;
+    await tap(page, "c2");
+    await expect(page.getByTestId("panel")).toContainText("Nicht ganz");
+    expect((await stored(page)).history.lesen.h1.length).toBe(Math.min(20, before + 1));
+    await m.locator('.slot [data-act="typo"]').click();
+    await expect(page.getByTestId("panel")).toHaveCount(0);
+    expect((await stored(page)).history.lesen.h1).toHaveLength(before);
+    await expect(m.locator(".sn.cur")).toHaveAttribute("data-i", "2");
+    expect(await m.getAttribute("data-seq")).toBe(s.seq); // dieselbe Folge
+    await tap(page, "h1");
+    await expect(page.getByTestId("panel")).toContainText("Richtig");
+    const d = await stored(page);
+    expect(d.history.lesen.h1.at(-1)[0]).toBe(1);
+    expect(d.history.lesen.g1.at(-1)[0]).toBe(1);
+  });
+
   test("„Weiß nicht“ löst die restlichen Noten auf", async ({ page }) => {
     await seed(page, extrasOnly());
     await page.addInitScript(() => ((window as never as { __folgen: string[][] }).__folgen = [["a1", "h1", "c2"]]));
