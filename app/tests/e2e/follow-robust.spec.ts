@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { soundingFreq } from "../../src/music/notes";
 import { FAKE_AUDIO } from "./fake-audio";
 import { sampleData } from "./seed";
-import { FAKE_MIC, menuTo, seed, stored } from "./util";
+import { FAKE_MIC, menuTo, seed, stored, beatStarted } from "./util";
 
 const ABC = "X:1\nT:Kurz\nM:4/4\nL:1/4\nQ:1/4=120\nK:G\nG A B B | c A G2 |]\n";
 const SONG = "abc-kurz";
@@ -77,7 +77,7 @@ async function playWait(page: Page, cents: number[]) {
 
 /** Takt-Modus: Noten ab dem gemeldeten Beginn, je 60 ms Lücke, um cents[i] verstimmt */
 async function playBeat(page: Page, cents: number[]) {
-  await page.waitForFunction(() => (window as unknown as { __lied: { follow(): Dbg } }).__lied.follow().startMs !== null);
+  await beatStarted(page);
   const d = await dbg(page);
   const list: [number, number | null][] = [];
   d.timeline!.tones.forEach((n, i) => {
@@ -105,8 +105,12 @@ test("Verzögerung abgleichen: Töne 140 ms nach den Klicks → etwa 140 ms, ges
   await expect(page.getByTestId("fcal-for")).toHaveText("ohne Kopfhörer");
   await expect(page.getByTestId("fcal-val")).toHaveText("120 ms");
   await page.getByRole("button", { name: "Abgleich starten" }).click();
-  await page.waitForFunction(() => !!(window as unknown as { __lied: { follow(): Dbg } }).__lied.follow().cal?.clicks);
   await page.waitForFunction(() => (window as unknown as { __osc: unknown }).__osc !== null);
+  // erst nach einem Bereit-Ton wird eingezählt
+  await expect(page.getByTestId("fcal-text")).toHaveText("Bereit? Spiel einen Ton, dann zähle ich ein.");
+  const now = await page.evaluate(() => performance.now());
+  await schedule(page, [[now + 100, hz(69)], [now + 500, null]]);
+  await page.waitForFunction(() => !!(window as unknown as { __lied: { follow(): Dbg } }).__lied.follow().cal?.clicks);
   // Umschalter ist gesperrt, solange gemessen wird
   await expect(page.getByRole("tab", { name: "Anhören" })).toBeDisabled();
   const clicks = (await dbg(page)).cal!.clicks!;

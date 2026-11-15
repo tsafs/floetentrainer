@@ -179,3 +179,12 @@ export async function menuTo(page: Page, entry: string) {
   await menu.getByRole("link", { name: entry, exact: true }).click();
   await expect(menu).toBeHidden();
 }
+
+/**
+ * Takt-Modus beim Mitspielen: Die App zählt erst nach einem Bereit-Ton ein (docs/app-uebungen.md); im Test
+ * „Los“ tippen und warten, bis der Zeitplan läuft.
+ */
+export async function beatStarted(page: Page) {
+  await page.getByTestId("follow-ready").click();
+  await page.waitForFunction(() => (window as unknown as { __lied: { follow(): { startMs: number | null } } }).__lied.follow().startMs !== null);
+}

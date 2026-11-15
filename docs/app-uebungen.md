@@ -167,7 +167,8 @@ Ab welcher Stufe die Heft-Lieder spielbar sind (Stand 15.11.2026):
   einen Ton, dann zähle ich ein.“ Die App wartet auf einen beliebigen Ton (mindestens 0,3 s) und die
   Pause danach; dann beginnt das Einzählen. Tippen auf „Los“ startet ohne Ton.
 - **Zwei Takte einzählen** im Takt-Modus (bisher einer).
-- **Verzögerung nebenbei:** Nach jedem Durchgang im Takt mit mindestens 8 sauberen Einsätzen errechnet die
+- **Verzögerung nebenbei:** Nach jedem Durchgang im Takt mit mindestens 6 sauberen Einsätzen (umgesetzt mit
+  6 statt 8, damit auch kurze Lieder und Abschnitte zählen) errechnet die
   App den mittleren Versatz der Einsätze (Median, Ausreißer weg) und stellt die Verzögerung für den
   aktuellen Kopfhörer-Zustand um die Hälfte der Abweichung nach (nur ab 15 ms Abweichung, innerhalb der
   erlaubten Grenzen). Dezent: „Verzögerung nachgestellt: 150 ms“. Der Knopf „abgleichen“ bleibt.

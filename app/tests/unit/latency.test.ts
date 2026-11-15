@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { CLICK_ACCENT_FREQ } from "../../src/audio/flute-synth";
 import type { Frame } from "../../src/audio/judge";
-import { CAL_CLICKS, CAL_SPQ, latencyFromOnsets, OnsetDetector } from "../../src/audio/latency";
+import { autoLatency, CAL_CLICKS, CAL_SPQ, latencyFromOnsets, OnsetDetector, ReadyGate } from "../../src/audio/latency";
 import { soundingFreq } from "../../src/music/notes";
 import { seeded } from "./helpers";
 
@@ -77,5 +77,43 @@ describe("Abgleich: Einsätze aus den Messungen", () => {
     };
     expect(run()).toMatchObject({ ok: true, ms: 100 });
     expect(run([])).toMatchObject({ ok: true, ms: 50 });
+  });
+});
+
+describe("Verzögerung nebenbei nachstellen", () => {
+  it("zu wenige Einsätze oder kleine Abweichung: nichts", () => {
+    expect(autoLatency(120, [40, 40, 40, 40, 40])).toBeNull();
+    expect(autoLatency(120, [10, -5, 8, 12, 3, 9, 0, 11])).toBeNull();
+    expect(autoLatency(120, [null, null, null, null, null, null, 50])).toBeNull();
+  });
+  it("um die Hälfte des Medians, auf 5 ms gerundet, Ausreißer zählen nicht, innerhalb der Grenzen", () => {
+    expect(autoLatency(120, [60, 62, 58, 61, 59, 60, 400])).toBe(150);
+    expect(autoLatency(200, [-40, -42, -38, -41, -39, -40])).toBe(180);
+    expect(autoLatency(390, [60, 60, 60, 60, 60, 60])).toBe(400);
+    expect(autoLatency(400, [60, 60, 60, 60, 60, 60])).toBeNull();
+  });
+});
+
+describe("Start durch Spielen (ReadyGate)", () => {
+  const tone = (t: number) => ({ t, freq: 880, clarity: 0.97, rms: 0.2 }) as Frame; // a¹ klingt eine Oktave höher
+  const quiet = (t: number) => ({ t, freq: null, clarity: 0, rms: 0 }) as Frame;
+  const feed = (g: ReadyGate, frames: Frame[]) => frames.findIndex((f) => g.push(f));
+  it("Ton von 300 ms, dann 250 ms Stille: bereit", () => {
+    const fr = [...Array.from({ length: 14 }, (_, i) => tone(i * 25)), ...Array.from({ length: 12 }, (_, i) => quiet(350 + i * 25))];
+    const g = new ReadyGate();
+    const k = feed(g, fr);
+    expect(k).toBeGreaterThan(0);
+    expect(fr[k].t - 325).toBeGreaterThanOrEqual(250);
+    expect(g.push(quiet(2000))).toBe(false); // nur einmal
+  });
+  it("zu kurzer Ton oder Ton ohne Pause danach: nicht bereit", () => {
+    expect(feed(new ReadyGate(), [...Array.from({ length: 6 }, (_, i) => tone(i * 25)), ...Array.from({ length: 20 }, (_, i) => quiet(200 + i * 25))])).toBe(-1);
+    expect(feed(new ReadyGate(), Array.from({ length: 60 }, (_, i) => tone(i * 25)))).toBe(-1);
+  });
+  it("kurze Aussetzer im Ton zählen nicht als Ende", () => {
+    const fr: Frame[] = [];
+    for (let i = 0; i < 16; i++) fr.push(i === 6 ? quiet(i * 25) : tone(i * 25));
+    for (let i = 0; i < 12; i++) fr.push(quiet(400 + i * 25));
+    expect(feed(new ReadyGate(), fr)).toBeGreaterThan(16);
   });
 });

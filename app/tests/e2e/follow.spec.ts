@@ -16,7 +16,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { soundingFreq } from "../../src/music/notes";
 import { audioLog, FAKE_AUDIO } from "./fake-audio";
 import { sampleData } from "./seed";
-import { FAKE_MIC, seed, stored } from "./util";
+import { FAKE_MIC, seed, stored, beatStarted } from "./util";
 
 const ABC = "X:1\nT:Kurz\nM:4/4\nL:1/4\nQ:1/4=120\nK:G\nG A B B | c A G2 |]\n";
 const SONG = "abc-kurz";
@@ -96,7 +96,7 @@ const waitPieces = (wrong: Record<number, number> = {}): [number | null, number]
 
 /** Takt-Modus: Töne relativ zum Beginn des Zeitplans, um delay ms verspätet, je 60 ms Lücke vor dem nächsten */
 async function playBeat(page: Page, opts: { delay?: number; midis?: number[] } = {}) {
-  await page.waitForFunction(() => (window as unknown as { __lied: { follow(): FollowDebug } }).__lied.follow().startMs !== null);
+  await beatStarted(page);
   const d = await dbg(page);
   const tones = d.timeline!.tones;
   const midis = opts.midis ?? MELODY;
@@ -263,7 +263,7 @@ test("Balken: im Warte-Modus an der Note, auf die gewartet wird; im Takt-Modus l
   // Takt-Modus: nach dem Einzählen (2 s) stetig nach rechts
   await page.getByRole("button", { name: "Im Takt" }).click();
   await go(page).click();
-  await page.waitForFunction(() => (window as unknown as { __lied: { follow(): FollowDebug } }).__lied.follow().startMs !== null);
+  await beatStarted(page);
   const startMs = (await dbg(page)).startMs!;
   await page.waitForFunction((t) => performance.now() > t + 300, startMs);
   const a = (await barAndHead(page, 0)).x!;
@@ -284,10 +284,39 @@ test("Takt-Modus richtig gespielt: Einzählen und leise Klicks ohne Melodie, all
   expect(await colors(page)).toEqual(Array(7).fill("hit"));
   await noScore(page);
   expect(await learning(page)).toBe(before);
-  // Klicks: 4 Einzählen + 8 Metronom, Melodie aus (ohne Kopfhörer)
-  expect((await audioLog(page, "click")).length).toBe(12);
+  // Klicks: 8 Einzählen (zwei Takte) + 8 Metronom, Melodie aus (ohne Kopfhörer)
+  expect((await audioLog(page, "click")).length).toBe(16);
   expect(await audioLog(page, "tone")).toEqual([]);
   expect(await page.evaluate(() => (window as unknown as { __micStopped: boolean }).__micStopped)).toBe(true);
+});
+
+test("Takt-Modus: zählt erst nach einem Bereit-Ton ein (Ton, dann Pause)", async ({ page }) => {
+  await open(page);
+  await start(page, "Im Takt");
+  await expect(page.getByTestId("follow-status")).toHaveText("Bereit? Spiel einen Ton, dann zähle ich ein.");
+  await expect(page.getByTestId("follow-ready")).toBeVisible();
+  await page.waitForTimeout(800);
+  expect((await dbg(page)).startMs).toBeNull();
+  expect((await audioLog(page, "click")).length).toBe(0);
+  // ein beliebiger Ton, 400 ms, dann Stille: jetzt wird eingezählt
+  await playSeq(page, [[67, 400]]);
+  await page.waitForFunction(() => (window as unknown as { __lied: { follow(): FollowDebug } }).__lied.follow().startMs !== null, null, { timeout: 3000 });
+  await expect(page.getByTestId("follow-ready")).toBeHidden();
+  await page.getByRole("button", { name: "Stopp" }).click();
+});
+
+test("Takt-Modus: nach einem Durchgang wird die Verzögerung nebenbei nachgestellt", async ({ page }) => {
+  await open(page);
+  await start(page, "Im Takt");
+  // alles 160 ms später: Die Attrappe hat selbst keine Verzögerung, mit dem Standard (120 ms) und ihrem kleinen
+  // Messweg bleiben etwa 70 ms Versatz; die Hälfte davon wird nachgestellt
+  await playBeat(page, { delay: 160 });
+  await finished(page);
+  await expect(page.getByTestId("latency-nudged")).toBeVisible();
+  const ms = Number((await page.getByTestId("latency-nudged").textContent())!.match(/(\d+) ms/)![1]);
+  expect(ms).toBeGreaterThanOrEqual(135);
+  expect(ms).toBeLessThanOrEqual(175);
+  expect((await stored(page)).settings.inputLatencyMs).toEqual({ speaker: ms, headphones: null });
 });
 
 test("Takt-Modus mit falschen Tönen: diese Noten rot, sonst nichts", async ({ page }) => {
@@ -333,7 +362,7 @@ test("Kopfhörer: Schalter im Mitspielen und in den Einstellungen ist dieselbe E
   await page.getByRole("button", { name: "Im Takt" }).click();
   await expect(page.getByTestId("phones-hint")).toHaveText("Die Melodie spielt leise mit.");
   await go(page).click();
-  await page.waitForFunction(() => (window as unknown as { __lied: { follow(): FollowDebug } }).__lied.follow().startMs !== null);
+  await beatStarted(page);
   await expect.poll(async () => (await audioLog(page, "tone")).length, { timeout: 6000 }).toBeGreaterThanOrEqual(3);
   const tones = await audioLog(page, "tone");
   expect(tones[0].freq).toBeCloseTo(hz(67), 0);
@@ -375,18 +404,18 @@ test("Mitspielen-Zustand: Anhören aus, Auswahl gilt einmal (keine Schleife), Ve
   await expect(go(page)).toHaveText("Takt 2 mitspielen");
   await page.getByRole("button", { name: "Im Takt" }).click();
   await go(page).click();
-  await page.waitForFunction(() => (window as unknown as { __lied: { follow(): FollowDebug } }).__lied.follow().startMs !== null);
+  await beatStarted(page);
   const d = await dbg(page);
   expect(d.timeline!.tones.map((t) => t.midi)).toEqual([72, 69, 67]);
   await expect(page.getByTestId("follow-status")).toContainText("Takt 2", { timeout: 5000 });
-  // ein Durchgang, dann ist Schluss (Einzählen 2 s + Takt 2 s): Mikrofon wieder aus, Auswahl bleibt
-  await finished(page, 7000);
+  // ein Durchgang, dann ist Schluss (Einzählen zwei Takte 4 s + Takt 2 s): Mikrofon wieder aus, Auswahl bleibt
+  await finished(page, 9000);
   expect(await page.evaluate(() => (window as unknown as { __micStopped: boolean }).__micStopped)).toBe(true);
-  expect((await audioLog(page, "click")).length).toBe(4 + 4);
+  expect((await audioLog(page, "click")).length).toBe(8 + 4);
   await expect(go(page)).toHaveText("Takt 2 mitspielen");
   // nochmal starten, dann die Seite verlassen: Mikrofon frei, Abspieler still
   await go(page).click();
-  await page.waitForFunction(() => (window as unknown as { __lied: { follow(): FollowDebug } }).__lied.follow().startMs !== null);
+  await beatStarted(page);
   await page.getByRole("link", { name: "Zurück" }).click();
   await expect(page.getByRole("heading", { name: "Lieder", exact: true })).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as { __micStopped: boolean }).__micStopped)).toBe(true);
@@ -425,7 +454,7 @@ test("Takt-Modus: gemeldete Ausgabe-Verzögerung (z. B. Bluetooth) gilt für Mar
   await open(page);
   expect(await page.evaluate(() => new AudioContext().outputLatency)).toBe(0.3);
   await start(page, "Im Takt");
-  await page.waitForFunction(() => (window as unknown as { __lied: { follow(): FollowDebug } }).__lied.follow().startMs !== null);
+  await beatStarted(page);
   // Hörbeginn unabhängig von der Seite berechnet: eingeplanter Beginn + 0,3 s
   const heard = await page.evaluate(() => {
     const p = (window as unknown as { __lied: { player: { context: AudioContext; timelineStart: number } } }).__lied.player;

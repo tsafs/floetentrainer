@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SONGS, songById } from "../../src/songs/library";
-import { buildTimeline, fromBarTimeline, playOrder, sectionTimeline } from "../../src/songs/timeline";
+import { buildTimeline, fromBarTimeline, playOrder, sectionTimeline, withExtraCountInBar } from "../../src/songs/timeline";
 import { song } from "./songs-helpers";
 
 const tones = (music: string, extra = {}) => buildTimeline(song(music, extra)).tones.map((t) => [t.start, t.dur, t.midi]);
@@ -339,5 +339,20 @@ describe("Bindebögen im Zeitplan (slurToNext)", () => {
     ]);
     // gebundene Töne schließen lückenlos an
     for (const i of bound) expect(tl.tones[i + 1].start).toBeCloseTo(tl.tones[i].start + tl.tones[i].dur, 9);
+  });
+});
+
+describe("Zwei Takte einzählen", () => {
+  it("ein Takt mehr vorn, Zählzeiten im gleichen Abstand, Zeitplan sonst gleich", () => {
+    for (const s of SONGS) {
+      const tl = buildTimeline(s);
+      const t2 = withExtraCountInBar(tl);
+      const step = tl.countInBeats > 1 ? tl.countIn[1] - tl.countIn[0] : tl.countInDur;
+      const bar = step * tl.countInBeats;
+      expect(t2.countIn.length).toBe(tl.countIn.length + tl.countInBeats);
+      expect(t2.countInDur).toBeCloseTo(tl.countInDur + bar, 6);
+      expect(t2.countIn.slice(tl.countInBeats)).toEqual(tl.countIn.map((b) => b + bar));
+      expect(t2.tones).toBe(tl.tones);
+    }
   });
 });

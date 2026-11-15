@@ -106,3 +106,80 @@ export function latencyFromOnsets(clicks: number[], onsets: number[], cfg: Laten
   if (ms < LATENCY_MIN - 30 || ms > LATENCY_MAX) return { ok: false, reason: "unplausibel", offsets };
   return { ok: true, ms: Math.round(Math.max(LATENCY_MIN, ms)), offsets, used: good.length };
 }
+
+// ── Verzögerung nebenbei nachstellen (docs/app-uebungen.md, Abschnitt 5) ──────────────────────────────
+
+/** So viele saubere Einsätze braucht ein Durchgang im Takt, damit er die Verzögerung nachstellt */
+export const AUTO_MIN_ONSETS = 6;
+/** Erst ab dieser mittleren Abweichung (ms) wird nachgestellt */
+export const AUTO_MIN_DIFF = 15;
+/** Anteil der Abweichung, um den nachgestellt wird (behutsam) */
+export const AUTO_GAIN = 0.5;
+
+/**
+ * Neue Verzögerung nach einem vollständigen Durchgang im Takt. onsets: je getroffener Note der Einsatz
+ * relativ zum Notenbeginn, wie die Wertung ihn sieht (ms, nach dem Ausgleich mit currentMs; positiv = später
+ * erkannt als erwartet). Median, Werte mehr als outlierMs davon weg fallen heraus; mindestens
+ * AUTO_MIN_ONSETS müssen bleiben. Bei weniger als AUTO_MIN_DIFF Abweichung bleibt alles (null), sonst
+ * wird um AUTO_GAIN der Abweichung nachgestellt, auf 5 ms gerundet, innerhalb LATENCY_MIN–LATENCY_MAX.
+ */
+export function autoLatency(currentMs: number, onsets: (number | null)[], cfg: LatencyConfig = DEFAULT_LATENCY): number | null {
+  const vals = onsets.filter((x): x is number => x !== null && Number.isFinite(x));
+  if (vals.length < AUTO_MIN_ONSETS) return null;
+  const m0 = median(vals)!;
+  const good = vals.filter((v) => Math.abs(v - m0) <= cfg.outlierMs);
+  if (good.length < AUTO_MIN_ONSETS) return null;
+  const m = median(good)!;
+  if (Math.abs(m) < AUTO_MIN_DIFF) return null;
+  const next = Math.round((currentMs + AUTO_GAIN * m) / 5) * 5;
+  const clamped = Math.max(LATENCY_MIN, Math.min(LATENCY_MAX, next));
+  return clamped === currentMs ? null : clamped;
+}
+
+// ── Start durch Spielen ──────────────────────────────────────────────────────────────────────────────
+
+export interface ReadyConfig {
+  /** so lange muss der Ton klingen (ms) */
+  toneMs: number;
+  /** so lange danach Stille (ms) */
+  quietMs: number;
+  /** kürzere Aussetzer im Ton zählen nicht als Ende (ms) */
+  gapMs: number;
+}
+
+export const DEFAULT_READY: ReadyConfig = { toneMs: 300, quietMs: 250, gapMs: 80 };
+
+/**
+ * „Bereit? Spiel einen Ton, dann zähle ich ein.“ (Takt-Modus und Abgleich): push liefert true, sobald ein
+ * beliebiger Ton mindestens toneMs lang klang und danach quietMs Stille war – dann hat sie die Flöte am
+ * Mund und die Finger liegen. Rohe Frames vom Mikrofon.
+ */
+export class ReadyGate {
+  private toneStart: number | null = null;
+  private lastPitched: number | null = null;
+  private heard = false;
+  private done = false;
+
+  constructor(
+    private rcfg: ReadyConfig = DEFAULT_READY,
+    private cfg: Pick<FollowConfig, "minClarity" | "minFreq" | "maxFreq"> = DEFAULT_FOLLOW,
+  ) {}
+
+  push(f: Frame): boolean {
+    if (this.done) return false;
+    if (pitched(this.cfg, f)) {
+      if (this.toneStart === null || (this.lastPitched !== null && f.t - this.lastPitched > this.rcfg.gapMs)) {
+        if (!this.heard) this.toneStart = f.t;
+      }
+      this.toneStart ??= f.t;
+      this.lastPitched = f.t;
+      if (f.t - this.toneStart >= this.rcfg.toneMs) this.heard = true;
+      return false;
+    }
+    if (this.heard && this.lastPitched !== null && f.t - this.lastPitched >= this.rcfg.quietMs) {
+      this.done = true;
+      return true;
+    }
+    return false;
+  }
+}

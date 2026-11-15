@@ -349,3 +349,23 @@ bleiben bei ihren Regeln, außer dem Flötenprofil in der Übung):
   unbekannt), `follow.test.ts`/`data.test.ts` (`followConfig(s, tuningHz)`, Flöten mit `tuning`, Grenze der
   Werte ±120), `follow-robust.spec.ts` (Werte nach dem Einstellen relativ zum ermittelten Stimmton, z. B.
   g¹ +2 bei etwa 429,5 Hz statt −40; Neuanlegen mit Stimmton-Frage; Stimmgerät-Bezug).
+
+### Im Takt: Start durch Spielen, zwei Takte Einzählen, Verzögerung nebenbei (15.11.2026)
+
+Rückmeldung: „Im Takt mitspielen finde ich recht schwierig, weil die App zu schnell anfängt zu spielen. Bis
+dahin habe ich meine Blockflöte gar nicht im Mund.“ Und: Der Abgleich ist ein eigener Schritt, „das mache ich
+so selten“. Plan in `docs/app-uebungen.md`, Abschnitt 5.
+
+- **Start durch Spielen:** Nach „Mitspielen“ im Takt-Modus steht „Bereit? Spiel einen Ton, dann zähle ich
+  ein.“ und daneben „Los“. Eingezählt wird, sobald ein beliebiger Ton mindestens 0,3 s klang und danach
+  0,25 s Stille war (kurze Aussetzer im Ton bis 80 ms zählen nicht), oder nach „Los“. Ebenso beim Abgleich
+  (dort ohne „Los“). Logik `ReadyGate` in `app/src/audio/latency.ts`.
+- **Zwei Takte Einzählen** im Takt-Modus (`withExtraCountInBar` in `app/src/songs/timeline.ts`); beim
+  Anhören bleibt es bei einem.
+- **Verzögerung nebenbei:** Nach jedem vollständigen Durchgang im Takt nimmt die App die Einsätze der
+  getroffenen Noten (wie die Wertung sie sieht, nach dem Ausgleich), bildet den Median (Ausreißer über 80 ms
+  weg, mindestens 6 Einsätze) und stellt die Verzögerung des aktuellen Kopfhörer-Zustands um die Hälfte davon
+  nach, ab 15 ms Abweichung, auf 5 ms gerundet, 0–400 ms (`autoLatency`). Danach steht in der Zeile darunter
+  „Verzögerung nachgestellt: 150 ms · ändern“. Weil die Wertung Einsätze nur bis 120 ms neben dem Notenbeginn
+  zuordnet, stellt das nur fein nach; bei großen Abweichungen (z. B. neue Bluetooth-Kopfhörer) bleibt
+  „abgleichen“ der schnellere Weg. Der eigene Versatz beim Spielen geht mit ein – wie beim Abgleich auch.

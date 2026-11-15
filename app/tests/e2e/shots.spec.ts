@@ -1,7 +1,7 @@
 // Bildschirmfotos für die Durchsicht (nur mit SHOTS=1): npx playwright test shots
 import { expect, test, type Page } from "@playwright/test";
 import { sampleData } from "./seed";
-import { answer, FAKE_MIC, info, next, menuTo, skipIntros } from "./util";
+import { answer, FAKE_MIC, info, next, menuTo, skipIntros, beatStarted } from "./util";
 import { FAKE_AUDIO } from "./fake-audio";
 import { note, soundingFreq } from "../../src/music/notes";
 import { dayKey } from "../../src/store/dates";
@@ -379,7 +379,7 @@ for (const s of SIZES) {
       await page.waitForTimeout(200);
       await page.screenshot({ path: p("f1b-mitspielen-auswahl") });
       await page.getByRole("button", { name: "Takt 5–8 mitspielen" }).click();
-      await page.waitForFunction(() => (window as unknown as { __lied: { follow(): Dbg } }).__lied.follow().startMs !== null);
+      await beatStarted(page);
       const d = await dbg();
       const spq = await page.evaluate(() => (window as unknown as { __lied: { player: { secPerQuarter: number } } }).__lied.player.secPerQuarter);
       const beat: [number, number | null][] = [];

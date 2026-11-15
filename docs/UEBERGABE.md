@@ -154,3 +154,7 @@ Silben, Atemzeichen, Seitenumbrüche.
      (`songSnippets`), in der Sitzung `PlanItem.snippet`/`Folge.song`; Fortschrittsseite und Ergebnis in
      `app/src/ui/pages.ts`. Tests `chapters.test.ts`, `session.test.ts`, `play.spec.ts` („Stufe geschafft“).
      Offen: Abschnitte mit echtem Rhythmus; Lied für Stufe 1 und 8.
+   - **Abschnitt 5 umgesetzt (Im Takt):** Start durch Spielen (`ReadyGate`, Knopf „Los“
+     `data-testid="follow-ready"`), zwei Takte Einzählen (`withExtraCountInBar`), Verzögerung nebenbei
+     (`autoLatency`, `nudgeLatency` in `song-follow.ts`). Regeln am Ende von `docs/app-lieder.md`.
+     Browser-Tests im Takt-Modus tippen „Los“: `beatStarted(page)` in `tests/e2e/util.ts`.

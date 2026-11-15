@@ -254,3 +254,16 @@ export function toneTimeline(midis: number[]): Timeline {
     countInBeats: 0,
   };
 }
+
+/**
+ * Derselbe Zeitplan mit einem zusätzlichen Takt Einzählen vorn (Takt-Modus beim Mitspielen: zwei Takte,
+ * docs/app-uebungen.md). Die Klicks des ersten Takts liegen im Abstand der Zählzeiten davor.
+ */
+export function withExtraCountInBar(tl: Timeline): Timeline {
+  const per = tl.countInBeats || tl.countIn.length;
+  if (!per || !tl.countIn.length) return tl;
+  const step = per > 1 ? tl.countIn[1] - tl.countIn[0] : tl.countInDur;
+  const barDur = step * per;
+  const first = Array.from({ length: per }, (_, k) => k * step);
+  return { ...tl, countIn: [...first, ...tl.countIn.map((b) => b + barDur)], countInDur: tl.countInDur + barDur };
+}
