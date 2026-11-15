@@ -4,7 +4,7 @@ import { mic } from "../audio/mic";
 import { maxLevel, unlockedNotes, type Track } from "../music/levels";
 import { nameHtml } from "../music/names";
 import { dueCount } from "../srs/leitner";
-import { isWeak, level, noteAccuracy, streak, weekDots } from "../srs/progress";
+import { isWeak, level, noteAccuracy, noteMastered, streak, weekDots } from "../srs/progress";
 import { hasWork, Session } from "../srs/session";
 import { menuSlot, plural, type Ctx, type View } from "./common";
 
@@ -77,7 +77,7 @@ export const homeView: View = (root, ctx) => {
     .map((n) => {
       const acc = noteAccuracy(d, "lesen", n);
       const w = acc.n ? Math.round(acc.ratio * 100) : 0;
-      return `<span class="chip${isWeak(acc) ? " weak" : ""}" title="${acc.n ? `${acc.correct} von ${acc.n} richtig` : "noch keine Antworten"}">${nameHtml(n)}<i><b style="width:${w}%"></b></i></span>`;
+      return `<span class="chip${isWeak(acc) && !noteMastered(d, "lesen", n) ? " weak" : ""}" title="${acc.n ? `${acc.correct} von ${acc.n} richtig` : "noch keine Antworten"}">${nameHtml(n)}<i><b style="width:${w}%"></b></i></span>`;
     })
     .join("");
   const lese = buttonText(ctx, "lesen");

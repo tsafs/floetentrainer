@@ -17,7 +17,7 @@ wie f¹ – fis¹ – g¹.
 1. **Eingemischt in die normalen Sitzungen** (kein eigener Knopf): Ein Teil der Zusatzkarten wird zu
    Tonfolgen.
 2. **Ab 5 Tönen**, also ab Stufe 2 der jeweiligen Spur (Lesen-Stufe für Üben, Spielen-Stufe für Spielen).
-3. **Fortschritt:** Jeder Ton einer Folge zählt für seine Trefferquote (also fürs Freischalten), aber
+3. **Fortschritt:** Jeder Ton einer Folge zählt für seine Trefferquote und Sicherheit (also fürs Freischalten), aber
    **jeder Ton höchstens einmal pro Folge**. Kommt ein Ton mehrfach vor, ist er richtig, wenn er an allen
    Stellen richtig war. Die Fächer und Termine (Leitner) bleiben unberührt – wie bei Zusatzkarten heute.
 4. **Lesen und Spielen**, beides.

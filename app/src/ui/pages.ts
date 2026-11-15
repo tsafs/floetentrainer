@@ -7,11 +7,12 @@ import { joinNames, nameHtml, nameText } from "../music/names";
 import { CHART, NOTES } from "../music/notes";
 import { staffRange, staffSvg } from "../music/staff";
 import {
-  blockingNotes,
+  countedNotes,
   isWeak,
   level,
   levelCap,
   noteAccuracy,
+  noteMastered,
   notePoints,
   POINTS_MAX,
   POINTS_RIGHT,
@@ -84,7 +85,9 @@ export const progressView: View = (root, ctx) => {
         );
       })
       .join("");
-    const missing = blockingNotes(ctx.data, track).map((n) => {
+    // Töne unter 8 Punkten – auch wenn Spielen gerade an der Lesen-Stufe ansteht (dort hält blockingNotes
+    // nichts auf, aber diese Töne entscheiden, ob Spielen mit Lesen mitzieht)
+    const missing = countedNotes(ctx.data, track).filter((n) => !noteMastered(ctx.data, track, n)).map((n) => {
       const k = pointsMissing(ctx.data, track, n);
       return `${nameHtml(n)} (${k} richtige)`;
     });
@@ -103,7 +106,7 @@ export const progressView: View = (root, ctx) => {
             (missing.length
               ? ` <span data-testid="missing-${track}">Es fehlen noch: ${missing.join(", ")}.</span>`
               : lv < levelCap(ctx.data, track)
-                ? ` <span data-testid="missing-${track}">Alle sitzen – die nächste Stufe kommt mit deiner nächsten Antwort.</span>`
+                ? ` <span data-testid="missing-${track}">Alle sitzen – die nächste Stufe kommt mit deiner nächsten richtigen Antwort.</span>`
                 : "")
           : "Alle Stufen sind freigeschaltet."
       }${track === "spielen" && next ? " Spielen kann Lesen nicht überholen." : ""}</p>

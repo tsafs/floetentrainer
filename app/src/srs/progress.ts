@@ -68,7 +68,7 @@ export function resetCount(data: AppData, track: Track, now: number): void {
 export function recordAnswer(data: AppData, track: Track, note: string, ok: boolean, now: number, today: string): void {
   const before = notePoints(data, track, note);
   data.points ??= { lesen: {}, spielen: {} };
-  data.points[track][note] = stepPoints(before, ok);
+  (data.points[track] ??= {})[note] = stepPoints(before, ok);
   const list = (data.history[track][note] ??= []);
   list.push([ok ? 1 : 0, today, now]);
   if (list.length > HISTORY_LEN) list.splice(0, list.length - HISTORY_LEN);
@@ -81,7 +81,7 @@ export function recordAnswer(data: AppData, track: Track, note: string, ok: bool
 /**
  * Sitzt ein Ton fürs Freischalten? Mindestens POINTS_UNLOCK Punkte Sicherheit. Bis 15.11.2026 galten
  * „mindestens 10 der letzten 20 Antworten, davon 90 % richtig“ – dort kostete ein Fehler je nach seiner
- * Lage in den letzten 20 nichts oder bis zu 18 weitere richtige Antworten. Jetzt kostet er immer zwei.
+ * Lage in den letzten 20 nichts oder bis zu 18 weitere richtige Antworten. Jetzt höchstens zwei.
  * Keine Bedingung an die Zahl der Tage: Wer an einem Tag viel übt, soll weiterkommen.
  * Dass die Töne auch am nächsten Tag sitzen, prüfen die fälligen Karten (Leitner).
  */

@@ -21,7 +21,7 @@ In den Einstellungen lässt sich die Stufe mit + erhöhen. Springt man so auf St
   kommt seine Vorstellung. Das sind 9 Sitzungen nur mit neuen Karten, ehe alle durch sind, und
   17 Vorstellungen von Tönen, die man angeblich schon kann.
 - Für Stufe 9 braucht **jeder** der 17 Töne 10 Antworten mit 90 % (seit 15.11.2026: 8 Punkte Sicherheit). Zusatzkarten verteilen sich gleich auf
-  alle Töne; das sind rund 170 gewertete Antworten, bevor es weitergeht.
+  alle Töne; das sind rund 170 gewertete Antworten (mit 8 Punkten je Ton seit 15.11.2026 rund 136), bevor es weitergeht.
 
 ## Entscheidungen
 

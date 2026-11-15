@@ -14,6 +14,10 @@ test("Punkte je Ton, Kerbe bei 8, „Es fehlen noch“ nennt den aufhaltenden To
   const lesen = page.getByRole("region", { name: "Lesen" });
   await expect(lesen.locator('.prow[data-note="d2"] .cnt')).toHaveText("4 von 10");
   await expect(lesen.locator('.prow[data-note="h1"] .cnt')).toHaveText("10 von 10");
+  // Kerbe bei 8 von 10
+  const mark = await lesen.locator('.prow[data-note="d2"] .pb').evaluate((el) => getComputedStyle(el, "::after").left);
+  const width = await lesen.locator('.prow[data-note="d2"] .pb').evaluate((el) => el.clientWidth);
+  expect(parseFloat(mark) / width).toBeCloseTo(0.8, 2);
   await expect(page.getByTestId("missing-lesen")).toHaveText("Es fehlen noch: d2 (4 richtige)."); // d mit hochgestellter 2
   await page.screenshot({ path: test.info().outputPath("fortschritt.png") });
 });
@@ -24,5 +28,5 @@ test("alle Töne sitzen schon: Hinweis, dass die nächste Stufe mit der nächste
   for (const n of ["h1", "a1", "g1", "c2", "d2", "e1", "d1", "fis1"]) data.history.lesen[n] = ok(9, 1000);
   await seed(page, data);
   await page.goto("./#/fortschritt");
-  await expect(page.getByTestId("missing-lesen")).toHaveText("Alle sitzen – die nächste Stufe kommt mit deiner nächsten Antwort.");
+  await expect(page.getByTestId("missing-lesen")).toHaveText("Alle sitzen – die nächste Stufe kommt mit deiner nächsten richtigen Antwort.");
 });

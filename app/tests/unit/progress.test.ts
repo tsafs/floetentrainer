@@ -172,9 +172,11 @@ describe("Stufe von Hand", () => {
     const d = defaultData();
     setLevel(d, "lesen", 8, 100);
     setLevel(d, "spielen", 8, 100);
+    d.points = { lesen: { h1: 9 }, spielen: { h1: 9 } };
     setLevel(d, "lesen", 3, 5000);
     expect(level(d, "spielen")).toBe(3);
     expect(d.countFrom).toEqual({ lesen: 5000, spielen: 5000 });
+    expect(d.points).toEqual({ lesen: {}, spielen: {} }); // Sicherheit beider Spuren zurückgesetzt
   });
   it("nach dem Senken zählen nur neue Antworten", () => {
     const d = defaultData();

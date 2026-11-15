@@ -126,7 +126,7 @@ describe("Zusammensetzung", () => {
   it("ein schwacher Ton bleibt vorn, auch wenn alle Töne aufhalten", () => {
     const d = defaultData();
     for (const n of ["h1", "a1", "g1"]) for (const k of ["name", "griff", "note"]) d.cards[`${n}|${k}`] = { box: 4, day: TODAY, session: 1 };
-    // alle unter 10 Antworten (halten auf), g1 dazu schwach
+    // alle unter 8 Punkten (halten auf), g1 dazu schwach
     d.history.lesen.h1 = answers(6, 0, [TODAY]);
     d.history.lesen.a1 = answers(6, 0, [TODAY]);
     d.history.lesen.g1 = answers(6, 3, [TODAY]);
@@ -243,6 +243,19 @@ describe("Vertippt", () => {
     expect(d.stages.lesen).toBe("c2-d2");
     expect(s.result().unlocks.map((u) => u.level)).toEqual([2]);
   });
+  it("Stufe, die eine falsche Antwort freigeschaltet hat (alle sitzen schon), gilt danach nicht mehr", () => {
+    // nach dem Umstieg: alle Töne nachgerechnet ≥ 8, die nächste gewertete Antwort schaltet frei – auch eine falsche
+    const d = extrasOnly();
+    for (const n of ["h1", "a1", "g1"]) d.history.lesen[n] = answers(10, 0, [TODAY]);
+    const s = mkSession(d);
+    const st = s.next()!;
+    expect(st.type).toBe("card");
+    s.answer(false, true); // 10 → 8: sitzt noch, Stufe 2 frei
+    expect(d.stages.lesen).toBe("c2-d2");
+    s.undoLast();
+    expect(d.stages.lesen).toBe("erste-toene");
+    expect(s.result().unlocks).toEqual([]);
+  });
   it("die Sicherheit kommt zurück, auch wenn sie vorher nicht gespeichert war", () => {
     const d = extrasOnly();
     master(d, "lesen", ["h1", "a1"]);
@@ -293,11 +306,13 @@ describe("Vertippt", () => {
     const f = st.folge.notes;
     const res = f.map((_, i) => i !== f.length - 1);
     const before = structuredClone(d.history.lesen);
+    const pointsBefore = structuredClone(d.points);
     const graded = s.graded;
     s.answerFolge(res, true);
     expect(s.canUndo).toBe(true);
     s.undoLast();
     expect(d.history.lesen).toEqual(before);
+    expect(d.points).toEqual(pointsBefore); // gespeicherte Sicherheit aller Töne der Folge zurück
     expect(s.graded).toBe(graded);
     expect(s.result().difficult).toEqual([]);
     s.answerFolge(f.map(() => true), true);

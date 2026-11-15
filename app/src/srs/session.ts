@@ -519,7 +519,7 @@ export class Session {
   /**
    * „Vertippt“: die letzte getippte Antwort zurücknehmen, als wäre sie nie gegeben. Die Karte bzw. Folge
    * bleibt die aktuelle; die neue Antwort darauf wird ganz normal gewertet (answer bzw. answerFolge).
-   * Zurück kommen Verlauf, Fach, Übungstage, Stufen und Meldungen (auch eine Stufe, die erst diese Antwort
+   * Zurück kommen Verlauf, Sicherheit, Fach, Übungstage, Stufen und Meldungen (auch eine Stufe, die erst diese Antwort
    * freigeschaltet hat), Wiederholung, „Schwierig waren“ und die Zähler.
    */
   undoLast(): void {

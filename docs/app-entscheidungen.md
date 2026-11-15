@@ -26,7 +26,7 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
      Ton nur in jeder achten Zusatzkarte, und bis ein alter Fehler aus den letzten 20 fiel, vergingen viele
      Sitzungen). Gewicht je Ton: 1, schwach +2, aufhaltend +2 – also dreifach, wenn eins davon zutrifft,
      fünffach bei beidem. So bleibt ein schwacher Ton vorn, auch wenn alle Töne aufhalten (Stufe 1, nach
-     dem Senken einer Stufe). Zusatzkarten zählen für die Trefferquote (Abschnitt 3),
+     dem Senken einer Stufe). Zusatzkarten zählen für Trefferquote und Sicherheit (Abschnitt 3),
      **verändern aber keine Fächer und Termine.**
      **Etwa jede zweite Zusatzkarte ist eine Tonfolge** (seit 14.11.2026, `docs/app-tonfolgen.md`;
      abwechselnd, nicht gehäuft), **beim Spielen drei von vier** (seit 15.11.2026, `docs/app-uebungen.md`;
@@ -61,15 +61,16 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   die App nach „Vertippt“ zur nächsten Aufgabe; Rückmeldung: „kann nicht korrigieren“). Nur beim Lesen
   und nur für getippte Antworten (nicht nach „Weiß nicht“, nicht beim Spielen).
   - **Karte:** Nach einer falschen Antwort steht „Vertippt“ neben „Weiter“. Die Antwort wird ganz
-    zurückgenommen (Verlauf samt der dadurch verdrängten ältesten Antwort, Fach, Übungstag, Stufe und
+    zurückgenommen (Verlauf samt der dadurch verdrängten ältesten Antwort, Sicherheit, Fach, Übungstag, Stufe und
     Meldung, Wiederholung, „Schwierig waren“, Zähler), die Karte ist wieder offen. Die neue Antwort wird
     ganz normal gewertet, auch falsch.
-  - **Tonfolge:** „Vertippt“ steht neben „Weiß nicht“, sobald eine Note getippt ist (vorher unsichtbar,
+  - **Tonfolge:** „Vertippt“ steht links in der Zeile von „Weiß nicht“, sobald eine Note getippt ist (vorher unsichtbar,
     damit nichts verrutscht), und nimmt den letzten Tipp zurück – mehrmals hintereinander bis zur ersten
     Note. Gewertet wird erst am Ende der Folge; das Ergebnis erscheint mit dem letzten Tipp. Hat die Folge
     einen Fehler, steht „Vertippt“ auch dort: Es nimmt die Wertung der ganzen Folge zurück und macht sie ab
     der ersten falschen Note wieder auf (die Tipps danach sind mit weg, sie tippt von dort weiter).
-    „Weiß nicht“ steht dabei mittig wie auf den Karten, „Vertippt“ rechts daneben.
+    „Weiß nicht“ steht dabei mittig wie auf den Karten, „Vertippt“ ganz links (seit 15.11.2026, wie im
+    Fehlerfeld; vorher rechts daneben – Rückmeldung: „Das sollte einheitlich sein.“).
   - Nur solange die Karte bzw. Folge da ist; danach nicht mehr. Die App vertraut ihr hier: Wer es
     ausnutzt, betrügt nur sich selbst.
 - **Abbrechen mit ×:** Bereits beantwortete Karten bleiben gewertet, alles andere bleibt unverändert.
@@ -78,7 +79,7 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   Antworten zählen trotzdem, und Spielen schaltet frei, sobald Lesen steigt). Auf der letzten Stufe:
   „Fälliges erledigt · alle Stufen erreicht“. Die Sitzung besteht dann nur aus Zusatzkarten. Bis 14.11.2026 hieß er „Trotzdem üben“ mit
   „Für heute alles erledigt“; das klang, als brächte Weiterüben nichts, obwohl Zusatzkarten für die
-  Trefferquote und damit fürs Freischalten zählen.
+  Trefferquote und Sicherheit und damit fürs Freischalten zählen.
 
 ## 2. Karten und Wiederholung (Leitner)
 
@@ -118,10 +119,11 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
     fürs Freischalten wie nach jeder Karte.
 - **Sicherheit eines Tons** in einer Spur (seit 15.11.2026): Punkte von 0 bis 10. Jede gewertete Antwort
   (dieselben wie bei der Trefferquote) gibt **richtig +1, falsch −2**. Gespeichert je Spur und Ton; wo
-  der Wert fehlt (ältere Daten), wird er einmal aus den gespeicherten Antworten nachgerechnet (ab 0).
+  der Wert fehlt (ältere Daten), wird er aus den gespeicherten Antworten nachgerechnet (ab 0), bis die
+  nächste gewertete Antwort des Tons ihn speichert.
 - **Freischalten:** Die nächste Stufe einer Spur kommt automatisch, sobald *jeder* freigeschaltete Ton
   dieser Spur **mindestens 8 Punkte** hat. Ein neuer Ton braucht also 8 richtige Antworten; ein Fehler
-  kostet immer genau 2 weitere richtige. Ein voller Ton (10) übersteht einen Ausrutscher (8).
+  kostet höchstens 2 weitere richtige (nahe 0 weniger). Ein voller Ton (10) übersteht einen Ausrutscher (8).
 
   Bis 15.11.2026 galt: mindestens 10 der letzten 20 Antworten, davon **90 %** richtig. Geändert auf
   Rückmeldung: „Wenn ich 19 mal d² richtig mache und dann aus Versehen falsch, muss ich noch 19 weitere
@@ -438,7 +440,7 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   - „Tage in Folge“ mit den Wochenpunkten Mo–So.
   - Die beiden Spuren als Stufenleisten (12 bzw. 11 Abschnitte).
   - „Deine Töne beim Lesen“: Namen mit Trefferquote-Balken. Rot ist ein Ton mit mindestens 5 Antworten
-    und unter 80 %.
+    und unter 80 %, der noch nicht sitzt (unter 8 Punkten Sicherheit, seit 15.11.2026 wie im Fortschritt).
   - Unten die großen Knöpfe Üben und Spielen. Die frühere Zeile „Lieder · Stimmgerät · Grifftabelle ·
     Einstellungen“ ist seit 14.11.2026 durch das Menü ersetzt (wurde auf schmalen Handys zweizeilig);
     der Platz kommt der Tonübersicht zugute.
@@ -477,8 +479,9 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   Danach zurück zur Startseite.
 - **Fortschritt:** Sicherheit je Ton („8 von 10“, Balken mit Kerbe bei 8; seit 15.11.2026, vorher
   Trefferquote der letzten 20), getrennt nach Lesen und Spielen. Darunter „Als Nächstes: … Es fehlen
-  noch: d² (2 richtige).“ bzw. „Alle sitzen – die nächste Stufe kommt mit deiner nächsten Antwort.“
-  Rot ist ein schwacher Ton nur, solange er noch nicht sitzt. Erreichbar durch Tippen auf
+  noch: d² (2 richtige).“ (auch wenn Spielen gerade an der Lesen-Stufe ansteht) bzw. „Alle sitzen – die
+  nächste Stufe kommt mit deiner nächsten richtigen Antwort.“ Rot ist ein schwacher Ton (hier wie auf der
+  Startseite) nur, solange er noch nicht sitzt. Erreichbar durch Tippen auf
   die Spuren. Unten „Zu leicht oder zu schwer? …“ mit dem Knopf „Startpunkt ändern“. Mit einem
   Startpunkt über Stufe 1 heißt es „Dafür braucht jeder Ton ab deinem Startpunkt (Stufe n) …“.
 - **Stimmgerät:** freies Spielen mit laufender Anzeige der gehörten Note (auf den Linien, als Name und

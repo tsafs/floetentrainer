@@ -134,7 +134,7 @@ Silben, Atemzeichen, Seitenumbrüche.
    Startpunkt an, sonst käme in jedem Test ohne eigene Daten die Willkommensseite; `seed(page, null)`
    entfernt sie (dann wie beim allerersten Start). Nicht angefasst: `session.ts`, `practice.ts`, Startseite.
    Bekannte Grenze: Zusatzkarten verteilen sich auf alle Töne, auf hohen Stufen kommen die neuen darum
-   langsam auf 10 Antworten; Abhilfe (aktuelle Stufe stärker gewichten) erst nach den Tonfolgen.
+   langsam auf 8 Punkte Sicherheit (bis 15.11.2026: 10 Antworten); Abhilfe (aktuelle Stufe stärker gewichten) erst nach den Tonfolgen.
 6. **Abwechslung beim Üben und Spielen** (`docs/app-uebungen.md`, abgestimmt 15.11.2026, Umsetzung in
    Abschnitten 1–5):
    - **Abschnitt 1 umgesetzt (Üben):** Alle Antwortknöpfe in einer Zeile, höchstens 5 (`choiceCount` in
