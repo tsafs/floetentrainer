@@ -157,7 +157,7 @@ export class Session {
   /** Länge der Tonfolgen (erst bei der ersten Folge angelegt) */
   private folgeLen: FolgeLength | null = null;
   private usedFolgen = new Set<string>();
-  /** letzte gewertete falsche Antwort, solange sie noch zurückgenommen werden kann */
+  /** Stand vor der letzten getippten falschen Antwort, solange sie noch zurückgenommen werden kann */
   private undo: Undo | null = null;
   current: Step | null = null;
   graded = 0;
@@ -327,8 +327,8 @@ export class Session {
     if (!step || step.type !== "card") return;
     const { item, retry } = step;
     this.undo = null;
-    if (typed && this.track === "lesen") {
-      this.undo = this.snapshot(item.uid, [item.note], !retry && item.type !== "extra" ? cardKey(item.note, item.kind) : undefined);
+    if (typed && !ok && this.track === "lesen") {
+      this.undo = this.snapshot(item.uid, [item.note], { key: !retry && item.type !== "extra" ? cardKey(item.note, item.kind) : undefined });
     }
     if (!retry) {
       this.graded += 1;
@@ -367,7 +367,7 @@ export class Session {
     folge.notes.forEach((n, i) => per.set(n, (per.get(n) ?? true) && !!ok[i]));
     const all = [...per.values()].every(Boolean);
     this.undo = null;
-    if (typed && this.track === "lesen") this.undo = this.snapshot(folge.uid, [...per.keys()]);
+    if (typed && !all && this.track === "lesen") this.undo = this.snapshot(folge.uid, [...per.keys()], { folgeLen: true });
     if (!retry) {
       this.graded += 1;
       if (all) this.correct += 1;
@@ -390,8 +390,12 @@ export class Session {
     }
   }
 
-  /** Stand vor einer getippten Antwort. notes: die Töne, deren Verlauf sie ändert. */
-  private snapshot(uid: number, notes: string[], key?: string): Undo {
+  /**
+   * Stand vor einer getippten falschen Antwort. notes: die Töne, deren Verlauf sie ändert; key: Karte, deren
+   * Fach sie ändert; folgeLen: auch die Länge der Tonfolgen merken.
+   */
+  private snapshot(uid: number, notes: string[], opt: { key?: string; folgeLen?: boolean }): Undo {
+    const key = opt.key;
     const h = this.data.history[this.track];
     return {
       uid,
@@ -405,11 +409,11 @@ export class Session {
       retryCount: this.retryCount.get(uid),
       graded: this.graded,
       correct: this.correct,
-      folgeLen: this.current?.type === "folge" ? this.folgeLen?.snapshot() : undefined,
+      folgeLen: opt.folgeLen ? this.folgeLen?.snapshot() : undefined,
     };
   }
 
-  /** Lässt sich die letzte Antwort als „Vertippt“ zurücknehmen? (getippt, Lesen, noch auf derselben Karte) */
+  /** Lässt sich die letzte Antwort als „Vertippt“ zurücknehmen? (getippt, falsch, Lesen, noch auf derselben Karte) */
   get canUndo(): boolean {
     return this.undo !== null;
   }

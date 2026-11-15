@@ -770,9 +770,22 @@ svg.acc {
 .idkrow {
   display: flex;
   justify-content: center;
-  gap: 8px;
   margin: -6px 0 -10px;
   min-height: 48px;
+}
+/* Tonfolge beim Lesen: „Weiß nicht“ mittig wie auf den Karten, „Vertippt“ rechts daneben */
+.idkrow.three {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  column-gap: 8px;
+}
+.idkrow.three .typo {
+  justify-self: start;
+}
+/* „Richtig“ steht anstelle von „Weiß nicht“ (auch über alle drei Spalten) */
+.idkrow.three .okline {
+  grid-column: 1 / -1;
+  justify-self: center;
 }
 /* „Richtig“ steht anstelle von „Weiß nicht“ */
 .okline {

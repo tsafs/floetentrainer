@@ -55,9 +55,10 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
     ganz normal gewertet, auch falsch.
   - **Tonfolge:** „Vertippt“ steht neben „Weiß nicht“, sobald eine Note getippt ist (vorher unsichtbar,
     damit nichts verrutscht), und nimmt den letzten Tipp zurück – mehrmals hintereinander bis zur ersten
-    Note. Gewertet wird erst am Ende der Folge. Ist der letzte Tipp falsch, erscheint das Ergebnis sofort;
-    „Vertippt“ dort nimmt die Wertung der ganzen Folge zurück und löscht den letzten Tipp, die Folge ist
-    wieder offen.
+    Note. Gewertet wird erst am Ende der Folge; das Ergebnis erscheint mit dem letzten Tipp. Hat die Folge
+    einen Fehler, steht „Vertippt“ auch dort: Es nimmt die Wertung der ganzen Folge zurück und macht sie ab
+    der ersten falschen Note wieder auf (die Tipps danach sind mit weg, sie tippt von dort weiter).
+    „Weiß nicht“ steht dabei mittig wie auf den Karten, „Vertippt“ rechts daneben.
   - Nur solange die Karte bzw. Folge da ist; danach nicht mehr. Die App vertraut ihr hier: Wer es
     ausnutzt, betrügt nur sich selbst.
 - **Abbrechen mit ×:** Bereits beantwortete Karten bleiben gewertet, alles andere bleibt unverändert.

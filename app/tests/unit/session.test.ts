@@ -211,6 +211,13 @@ describe("Vertippt", () => {
     s.answer(true, true);
     expect(d.cards["h1|name"].box).toBe(4);
   });
+  it("nicht nach einer richtigen Antwort", () => {
+    const d = extrasOnly();
+    const s = mkSession(d);
+    s.next();
+    s.answer(true, true);
+    expect(s.canUndo).toBe(false);
+  });
   it("nur auf der aktuellen Karte", () => {
     const d = extrasOnly();
     const s = mkSession(d);
