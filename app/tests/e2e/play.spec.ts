@@ -280,7 +280,7 @@ test("Stufe geschafft: Hinweis auf das Stufenlied; Fortschritt zeigt Kapitel und
   await expect(page.getByTestId("panel")).toContainText("Richtig");
   await silence(page);
   await page.getByRole("button", { name: "Sitzung beenden" }).click();
-  await expect(page.getByTestId("unlock")).toContainText("Spielen · Stufe 3");
+  await expect(page.getByTestId("unlock")).toContainText("Spielen · Stufe 3 erreicht");
   await expect(page.getByTestId("unlock-song")).toHaveText("Jetzt kannst du Hänschen klein ganz spielen.");
   await expect(page.getByTestId("unlock-song").locator("a")).toHaveAttribute("href", "#/lied/haenschen-klein");
   await page.goto("./#/fortschritt");

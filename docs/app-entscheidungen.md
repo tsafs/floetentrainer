@@ -142,8 +142,10 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   20 und blockierte sich so selbst. Ob die Töne auch am nächsten Tag sitzen, prüfen die fälligen Karten
   (Abschnitt 2): Jede richtig beantwortete Karte kommt nach 1, 3, 7 … Tagen wieder.
 
-  Die Prüfung läuft nach jeder Antwort. Die Meldung („Neu: c² und d²“) erscheint am Sitzungsende,
-  und die neuen Töne kommen ab der nächsten Sitzung.
+  Die Prüfung läuft nach jeder Antwort. Die Meldung („Lesen · Stufe 2 erreicht · Neu: c² und d²“)
+  erscheint am Sitzungsende, und die neuen Töne kommen ab der nächsten Sitzung. Bis 15.11.2026 stand
+  dort nur „Stufe 2“; auf Rückmeldung geändert, weil sich das wie „Stufe 2 geschafft“ las und die neuen
+  Töne dann wie Töne erst der Stufe danach (fis¹ gehört zu Stufe 4, nicht 5).
 - **Spielen kann Lesen nie überholen:** Die Spielen-Stufe ist höchstens so hoch wie die Lesen-Stufe.
 - **Von Hand:** In den Einstellungen lässt sich jede Spur verstellen.
   - Spielen bleibt dabei auf die Lesen-Stufe begrenzt. Wird Lesen unter Spielen gesenkt, sinkt Spielen
@@ -475,7 +477,7 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   Zurückgehen übersprungen.
 - **Übung** (Entwurf `?s=ok`, `?s=err`): oben ein ×-Knopf, ein feiner Fortschrittsstrich und
   „7 von 20“, darunter Notenzeile, Frage, Antworten und Rückmeldung.
-- **Sitzungsende:** wie viele richtig, welche Töne schwierig waren und gegebenenfalls „Neu: …“.
+- **Sitzungsende:** wie viele richtig, welche Töne schwierig waren und gegebenenfalls die erreichte Stufe mit „Neu: …“.
   Danach zurück zur Startseite.
 - **Fortschritt:** Sicherheit je Ton („8 von 10“, Balken mit Kerbe bei 8; seit 15.11.2026, vorher
   Trefferquote der letzten 20), getrennt nach Lesen und Spielen. Darunter „Als Nächstes: … Es fehlen

@@ -34,12 +34,14 @@ export const summaryView: View = (root, ctx) => {
   const allRight = r.graded > 0 && r.correct === r.graded;
   const unlocks = r.unlocks
     .map((u) => {
+      // Überschrift nennt die erreichte Stufe als solche: „Stufe 4“ allein las sich wie „Stufe 4 geschafft“,
+      // „Neu: fis¹“ dann wie ein Ton erst der Stufe danach (docs/app-entscheidungen.md, Abschnitt 3).
       // Spielen: Das Stufenlied der eben geschafften Stufe kann sie jetzt ganz spielen (docs/app-uebungen.md)
       const song = u.track === "spielen" ? stageSong("spielen", u.level - 1) : undefined;
       const songLine = song
         ? `<span data-testid="unlock-song">Jetzt kannst du <a href="#/lied/${encodeURIComponent(song.id)}">${esc(song.title)}</a> ganz spielen.</span>`
         : "";
-      return `<div class="new" data-testid="unlock"><span class="soft">${TRACK_LABEL[u.track]} · Stufe ${u.level}</span><span class="v">Neu: ${joinNames(u.notes)}</span>${songLine}<span class="soft">Die neuen Töne kommen ab der nächsten Sitzung.</span></div>`;
+      return `<div class="new" data-testid="unlock"><span class="soft">${TRACK_LABEL[u.track]} · Stufe ${u.level} erreicht</span><span class="v">Neu: ${joinNames(u.notes)}</span>${songLine}<span class="soft">Die neuen Töne kommen ab der nächsten Sitzung.</span></div>`;
     })
     .join("");
   root.innerHTML = `
