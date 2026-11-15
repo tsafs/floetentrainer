@@ -96,6 +96,7 @@ export const homeView: View = (root, ctx) => {
   <section class="actions">
     <button class="main" data-act="ueben">${lese.label}<small>${lese.sub}</small></button>
     <button class="alt" data-act="spielen">${spiel.label}<small>${spiel.sub}</small></button>
+    <a class="textbtn hearlink" href="#/hoeren" data-testid="to-echo">Hören: vorgespielte Töne erkennen</a>
   </section>
 </main>`;
   const main = root.querySelector("main")!;

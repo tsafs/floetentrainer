@@ -1,11 +1,24 @@
 // Ablauf einer Sitzung: Zusammensetzung, Reihenfolge, Wiederholungen nach Fehlern, Wertung.
 
 import { levelOf, type Kind, type Track } from "../music/levels";
-import { cardKey, type Answer, type AppData, type CardState } from "../store/data";
+import { cardKey, PAIR_LEN, type Answer, type AppData, type CardState } from "../store/data";
 import { applyAnswer, dueCards, newCards, trackCards, type CardRef } from "./leitner";
 import { checkUnlocks, noteWeight, recordAnswer, type Unlock } from "./progress";
+import { snippetSong } from "./chapters";
+import { songSnippets } from "../songs/snippets";
 import type { Rng } from "./choices";
-import { FolgeLength, folgeKey, folgeMaxLen, folgePool, makeFolge } from "./sequences";
+import {
+  drillNotes,
+  drillPair,
+  FOLGE_MAX_DISTINCT,
+  FOLGE_MAX_GRIPS,
+  FolgeLength,
+  folgeKey,
+  folgeMaxLen,
+  folgePool,
+  makeFolge,
+  pairKey,
+} from "./sequences";
 
 export const MAX_NEW = 6;
 export const MAX_RETRIES = 2;
@@ -23,12 +36,30 @@ export interface PlanItem extends CardRef {
    * sonst bleibt sie die Karte (note, kind).
    */
   folge?: boolean;
+  /** Spielen: Dieser Folge-Platz wird ein Wechsel-Drill (höchstens einer je Sitzung) */
+  drill?: boolean;
+  /** Spielen: Dieser Folge-Platz wird ein Abschnitt des Stufenlieds (etwa jede vierte Folge) */
+  snippet?: boolean;
 }
 
 /** Eine Tonfolge in der Sitzung (keine Leitner-Karte) */
 export interface Folge {
   /** Töne der Reihe nach (Kennungen, mit Wiederholungen) */
   notes: string[];
+  /**
+   * Übungsart, geerbt von der Karte auf dem Platz (docs/app-uebungen.md): "name" Noten → Namen, "griff"
+   * Noten → Griffe, "note" Griffbilder → Namen, "spiel" spielen.
+   */
+  kind: Kind;
+  /** Ton der fälligen Karte, die diese Folge trägt (Spielen): nach der Folge wird die Karte gewertet */
+  carry?: string;
+  /** Wechsel-Drill: zwei Töne im Wechsel */
+  drill?: boolean;
+  /** Abschnitt aus diesem Lied (Titel) … */
+  song?: string;
+  /** … mit dieser Kennung, Takte von–bis (Notenbild-Reihenfolge) */
+  songId?: string;
+  bars?: [number, number];
   /** fortlaufende Nummer in der Sitzung (Wiederholung: dieselbe) */
   uid: number;
 }
@@ -99,9 +130,11 @@ export function weightedPick<T>(items: T[], weight: (t: T) => number, rng: Rng):
 export function buildPlan(data: AppData, track: Track, today: string, sessionNo: number, limit: number, rng: Rng): PlanItem[] {
   let uid = 0;
   const plan: PlanItem[] = [];
+  // Spielen (docs/app-uebungen.md): fällige Karten werden Folgen, die ihren Ton enthalten
+  const spielen = track === "spielen";
   for (const c of dueCards(data, track, today, sessionNo)) {
     if (plan.length >= limit) break;
-    plan.push({ ...c, type: "due", uid: uid++ });
+    plan.push({ ...c, type: "due", uid: uid++, ...(spielen ? { folge: true } : {}) });
   }
   if (plan.length < limit) {
     for (const c of pickNew(newCards(data, track), Math.min(MAX_NEW, limit - plan.length))) {
@@ -120,12 +153,35 @@ export function buildPlan(data: AppData, track: Track, today: string, sessionNo:
       const c = weightedPick(from, (x) => weight(x.note), rng);
       plan.push({ note: c.note, kind: c.kind, type: "extra", uid: uid++ });
     }
-    // Etwa jede zweite Zusatzkarte wird eine Tonfolge (abwechselnd: die 2., 4., …)
+    // Lesen: etwa jede zweite Zusatzkarte wird eine Tonfolge (abwechselnd: die 2., 4., …);
+    // Spielen: drei von vier (alle außer der 1., 5., …)
     plan.filter((p) => p.type === "extra").forEach((p, i) => {
-      if (i % 2 === 1) p.folge = true;
+      if (spielen ? i % 4 !== 0 : i % 2 === 1) p.folge = true;
+    });
+  }
+  if (spielen) {
+    // ein Wechsel-Drill je Sitzung: der mittlere Folge-Platz unter den Zusatzkarten
+    const slots = plan.filter((p) => p.type === "extra" && p.folge);
+    if (slots.length) slots[Math.floor(slots.length / 2)].drill = true;
+    // etwa jede vierte übrige Folge ein Abschnitt des Stufenlieds (die 2., 6., …)
+    slots.filter((p) => !p.drill).forEach((p, i) => {
+      if (i % 4 === 1) p.snippet = true;
     });
   }
   return plan;
+}
+
+/**
+ * Griffwechsel einer gespielten Folge merken: je Übergang von einem richtig gespielten Ton zum nächsten
+ * (anderen) Ton, ob der gelang (richtig beim ersten Versuch). Für die Wechsel-Drills.
+ */
+export function recordPairs(data: AppData, notes: string[], ok: boolean[]): void {
+  for (let i = 1; i < notes.length; i++) {
+    if (!ok[i - 1] || notes[i] === notes[i - 1]) continue;
+    const key = pairKey(notes[i - 1], notes[i]);
+    data.pairs ??= {};
+    data.pairs[key] = [...(data.pairs[key] ?? []), ok[i] ? 1 : 0].slice(-PAIR_LEN) as (0 | 1)[];
+  }
 }
 
 export interface SessionOptions {
@@ -138,8 +194,11 @@ export interface SessionOptions {
   limitMs: number;
 }
 
-/** Wird dieser Platz im Plan jetzt eine Tonfolge? (leerer Vorrat: zu wenige vorgestellte Töne) */
-const isFolgeSlot = (p: PlanItem, pool: string[]) => !!p.folge && pool.length > 0;
+/**
+ * Wird dieser Platz im Plan jetzt eine Tonfolge? (leerer Vorrat: zu wenige vorgestellte Töne; eine fällige
+ * Karte nur, wenn ihr Ton im Vorrat ist – nach dem Senken einer Stufe kann er gesperrt sein)
+ */
+const isFolgeSlot = (p: PlanItem, pool: string[]) => !!p.folge && pool.length > 0 && (p.type !== "due" || pool.includes(p.note));
 
 export class Session {
   readonly track: Track;
@@ -235,11 +294,39 @@ export class Session {
   /** Neue Tonfolge für einen Platz im Plan erzeugen. */
   private makeFolge(p: PlanItem, pool: string[], avoidLast: string[]): Folge {
     const rng = this.opt.rng;
+    if (p.drill) {
+      const pair = drillPair(pool, this.data.pairs, rng);
+      if (pair) return { notes: drillNotes(pair, rng, this.lastNote), uid: p.uid, kind: p.kind, drill: true };
+    }
+    if (p.snippet) {
+      const song = snippetSong(this.track, levelOf(this.track, this.data.stages[this.track]));
+      const options = song
+        ? songSnippets(song).filter(
+            (sn) => sn.notes.every((n) => pool.includes(n)) && sn.notes[0] !== this.lastNote && !this.usedFolgen.has(folgeKey(sn.notes)),
+          )
+        : [];
+      if (song && options.length) {
+        const sn = options[Math.floor(rng() * options.length)];
+        this.usedFolgen.add(folgeKey(sn.notes));
+        return { notes: sn.notes, uid: p.uid, kind: p.kind, song: song.title, songId: song.id, bars: [sn.from, sn.to] };
+      }
+    }
+    const carry = p.type === "due" ? p.note : undefined;
     this.folgeLen ??= new FolgeLength(pool.length, folgeMaxLen(levelOf(this.track, this.data.stages[this.track])), rng);
     const weight = noteWeight(this.data, this.track);
-    const notes = makeFolge(pool, this.folgeLen.len, rng, { weight, avoidFirst: this.lastNote, used: this.usedFolgen, avoidLast });
+    const reading = this.track === "lesen";
+    // Griffbilder → Namen: nicht mehr Griffbilder, als bequem in eine Zeile passen
+    const len = p.kind === "note" ? Math.min(this.folgeLen.len, FOLGE_MAX_GRIPS) : this.folgeLen.len;
+    const notes = makeFolge(pool, len, rng, {
+      weight,
+      avoidFirst: this.lastNote,
+      used: this.usedFolgen,
+      avoidLast,
+      maxDistinct: reading ? FOLGE_MAX_DISTINCT : undefined,
+      must: carry,
+    });
     this.usedFolgen.add(folgeKey(notes));
-    return { notes, uid: p.uid };
+    return { notes, uid: p.uid, kind: p.kind, ...(carry ? { carry } : {}) };
   }
 
   private pick(): Step | null {
@@ -273,12 +360,14 @@ export class Session {
     // Tonfolgen und Zusatzkarten abwechselnd: nach einer Folge möglichst eine Karte, nach einer Karte
     // (im Bereich der Zusatzkarten) möglichst eine Folge – sonst schöbe eine Karte, die gerade nicht
     // passt, die Folgen nach hinten und sie häuften sich am Ende.
+    // Nur beim Lesen (halb Folgen, halb Karten); beim Spielen sind die meisten Plätze Folgen, dort in Reihe.
     const afterFolge = this.current?.type === "folge";
     const fits = (p: PlanItem) => noteOf(p) !== last && !soon.includes(noteOf(p));
     const inExtras = this.remaining[0]?.type === "extra";
+    const alternate = this.track === "lesen";
     let i = -1;
-    if (afterFolge) i = this.remaining.findIndex((p) => fits(p) && !isFolgeSlot(p, pool));
-    else if (inExtras && this.current?.type === "card") i = this.remaining.findIndex((p) => fits(p) && isFolgeSlot(p, pool));
+    if (alternate && afterFolge) i = this.remaining.findIndex((p) => fits(p) && !isFolgeSlot(p, pool));
+    else if (alternate && inExtras && this.current?.type === "card") i = this.remaining.findIndex((p) => fits(p) && isFolgeSlot(p, pool));
     if (i < 0) i = this.remaining.findIndex(fits);
     if (i < 0) i = this.remaining.findIndex((p) => noteOf(p) !== last);
     if (i >= 0) {
@@ -358,22 +447,28 @@ export class Session {
    * gewertet (richtig nur, wenn er an allen Stellen richtig war); keine Fächer und Termine. Im Ergebnis
    * zählt die Folge als eine Position, richtig nur ganz fehlerfrei. Bei einem Fehler kommt sie einmal
    * wieder (ungewertet). typed wie bei answer: alle Antworten getippt (nicht „Weiß nicht“, nicht gespielt).
+   * judged: so viele Töne von vorn wurden wirklich versucht (für die Griffwechsel).
    */
-  answerFolge(ok: boolean[], typed = false): void {
+  answerFolge(ok: boolean[], typed = false, judged = ok.length): void {
     const step = this.current;
     if (!step || step.type !== "folge") return;
     const { folge, retry } = step;
     const per = new Map<string, boolean>();
     folge.notes.forEach((n, i) => per.set(n, (per.get(n) ?? true) && !!ok[i]));
     const all = [...per.values()].every(Boolean);
+    const cardKeyOf = folge.carry && !retry ? cardKey(folge.carry, folge.kind) : undefined;
     this.undo = null;
-    if (typed && !all && this.track === "lesen") this.undo = this.snapshot(folge.uid, [...per.keys()], { folgeLen: true });
+    if (typed && !all && this.track === "lesen") this.undo = this.snapshot(folge.uid, [...per.keys()], { folgeLen: true, key: cardKeyOf });
     if (!retry) {
       this.graded += 1;
       if (all) this.correct += 1;
       const now = this.opt.now();
       for (const [n, good] of per) recordAnswer(this.data, this.track, n, good, now, this.opt.today);
-      this.folgeLen?.update(all);
+      // Fällige Karte, die die Folge trägt: richtig nur, wenn ihr Ton an allen Stellen richtig war
+      if (cardKeyOf) this.data.cards[cardKeyOf] = applyAnswer(this.data.cards[cardKeyOf], per.get(folge.carry!)!, this.opt.today, this.sessionNo);
+      // Griffwechsel nur, soweit wirklich gespielt (nach „Weiß nicht“ sind die übrigen nie versucht worden)
+      if (this.track === "spielen") recordPairs(this.data, folge.notes.slice(0, judged), ok.slice(0, judged));
+      if (!folge.drill && !folge.song) this.folgeLen?.update(all);
       this.unlocks.push(...checkUnlocks(this.data));
       this.onChange();
     }

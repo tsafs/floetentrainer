@@ -57,6 +57,14 @@ describe("Speichern", () => {
 });
 
 describe("Umwandlung und Prüfung", () => {
+  it("Griffwechsel (pairs): optional, Fehlerhaftes still weg, höchstens 10 je Paar", () => {
+    expect(normalizeData({ version: 2 }).pairs).toBeUndefined();
+    const d = normalizeData({
+      version: 2,
+      pairs: { "h1-c2": [1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0], "x1-c2": [1], "g1-a1": "kaputt", "e1-fis1": [1, 2, 0] },
+    });
+    expect(d.pairs).toEqual({ "h1-c2": [1, 1, 1, 1, 1, 1, 1, 1, 0, 0], "e1-fis1": [1, 0] });
+  });
   it("Version 0 (ohne Versionsnummer, Stufen als Zahlen) wird umgewandelt", () => {
     const d = normalizeData({ level: { lesen: 3, spielen: 5 }, cards: { "h1|name": { box: 2, day: TODAY } } });
     expect(d.version).toBe(DATA_VERSION);

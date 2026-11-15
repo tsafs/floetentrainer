@@ -135,3 +135,33 @@ Silben, Atemzeichen, Seitenumbrüche.
    entfernt sie (dann wie beim allerersten Start). Nicht angefasst: `session.ts`, `practice.ts`, Startseite.
    Bekannte Grenze: Zusatzkarten verteilen sich auf alle Töne, auf hohen Stufen kommen die neuen darum
    langsam auf 10 Antworten; Abhilfe (aktuelle Stufe stärker gewichten) erst nach den Tonfolgen.
+6. **Abwechslung beim Üben und Spielen** (`docs/app-uebungen.md`, abgestimmt 15.11.2026, Umsetzung in
+   Abschnitten 1–5):
+   - **Abschnitt 1 umgesetzt (Üben):** Alle Antwortknöpfe in einer Zeile, höchstens 5 (`choiceCount` in
+     `app/src/srs/choices.ts`, `FOLGE_CHOICES`/`FOLGE_MAX_DISTINCT` in `sequences.ts`, CSS `.btns` mit
+     `grid-auto-flow: column`). Die Folge erbt die Übungsart des Platzes (`Folge.kind` in `session.ts`):
+     Noten → Namen, Noten → Griffe, Griffbilder → Namen (`gripSeq` und `renderFolge` in
+     `app/src/ui/practice.ts`). Browser-Tests können die Art vorgeben:
+     `window.__folgen = [{ kind: "griff", notes: [...] }]`. Bildschirmfotos `*-t8…t11-*.png`.
+   - **Abschnitt 2 umgesetzt (Spielen):** Fällige Spielen-Karten werden Folgen mit ihrem Ton
+     (`PlanItem.folge` bei `type: "due"`, `Folge.carry`, Wertung in `answerFolge`), drei von vier
+     Zusatzkarten Folgen, ein Wechsel-Drill je Sitzung (`PlanItem.drill`, `Folge.drill`; Paarwahl
+     `drillPair`/`counterMotion` in `sequences.ts`; Versuche je Tonpaar in `data.pairs`, optional, über
+     `recordPairs` in `session.ts`). Browser-Tests für Einzelkarten beim Spielen brauchen weniger als 5
+     vorgestellte Töne (`singleCards()` in `play.spec.ts`).
+   - **Abschnitt 3 umgesetzt (Kapitel, Stufenlieder):** `app/src/srs/chapters.ts` (Kapitel aus den
+     Meilensteinen, `STAGE_SONG_TITLES`, `snippetSong`), Abschnitte `app/src/songs/snippets.ts`
+     (`songSnippets`), in der Sitzung `PlanItem.snippet`/`Folge.song`; Fortschrittsseite und Ergebnis in
+     `app/src/ui/pages.ts`. Tests `chapters.test.ts`, `session.test.ts`, `play.spec.ts` („Stufe geschafft“).
+     Abschnitte seit dem 15.11.2026 mit Rhythmus: Taktbereiche (`Snippet.from/to`), in der Übung als
+     Ausschnitt `songExcerpt` mit `renderScore` gesetzt (`Folge.songId/bars`, `els()` in `renderFolge`
+     markiert die Noten über die Kennungen des Zeitplans). Die „Ersten Übungen“ des Hefts sind als Kapitel in
+     der App (`heft-songs.py` liest auch `EXERCISES`); Übung 1 ist das Stufenlied von Stufe 1. Offen: Lied für
+     Stufe 8 (das Heft hat keins mit nur a² h² c³ als neuen Tönen).
+   - **Abschnitt 5 umgesetzt (Im Takt):** Start durch Spielen (`ReadyGate`, Knopf „Los“
+     `data-testid="follow-ready"`), zwei Takte Einzählen (`withExtraCountInBar`), Verzögerung nebenbei
+     (`autoLatency`, `nudgeLatency` in `song-follow.ts`). Regeln am Ende von `docs/app-lieder.md`.
+     Browser-Tests im Takt-Modus tippen „Los“: `beatStarted(page)` in `tests/e2e/util.ts`.
+   - **Abschnitt 4 umgesetzt (Hören/Echo):** Seite `#/hoeren` in `app/src/ui/echo.ts` (Link auf der
+     Startseite, kein Menüeintrag), Tests `app/tests/e2e/echo.spec.ts`. Zählt nicht für die Lernspuren.
+   - Damit sind alle Abschnitte von `docs/app-uebungen.md` umgesetzt. Offen: Lied für Stufe 8, Abgleich ohne Kopfhörer per Lautsprecher-Klick, Rhythmus in Folgen.

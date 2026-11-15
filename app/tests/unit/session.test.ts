@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildPlan, MAX_NEW, Session, type Step } from "../../src/srs/session";
 import { cardKey, defaultData, type AppData } from "../../src/store/data";
 import { addDays } from "../../src/store/dates";
+import { note } from "../../src/music/notes";
 import { answers, master, seeded, TODAY } from "./helpers";
 
 function mkSession(d: AppData, track: "lesen" | "spielen" = "lesen", opts: { limitCards?: number; limitMs?: number; seed?: number; clock?: { t: number } } = {}) {
@@ -508,11 +509,112 @@ describe("Tonfolgen", () => {
     expect(plan[0].folge).toBeUndefined();
     expect(plan.filter((p) => p.folge).every((p) => p.type === "extra")).toBe(true);
   });
-  it("Spielen auch", () => {
-    const s = mkSession(onlyExtras("spielen"), "spielen");
-    const steps = run(s);
-    expect(steps.filter((x) => x.type === "folge").length).toBe(10);
-    expect(steps.every((x) => x.type !== "folge" || x.track === "spielen")).toBe(true);
+  it("die Folge erbt die Übungsart des Platzes; Lesen höchstens 4 verschiedene Töne, Griffbilder höchstens 5", () => {
+    const seen = new Set<string>();
+    for (let seed = 1; seed <= 40; seed++) {
+      const s = mkSession(onlyExtras(), "lesen", { seed });
+      const kindOf = new Map(s.plan.map((p) => [p.uid, p.kind]));
+      for (let st = s.next(); st; st = s.next()) {
+        if (st.type === "folge") {
+          expect(st.folge.kind).toBe(kindOf.get(st.folge.uid));
+          seen.add(st.folge.kind);
+          expect(new Set(st.folge.notes).size).toBeLessThanOrEqual(4);
+          if (st.folge.kind === "note") expect(st.folge.notes.length).toBeLessThanOrEqual(5);
+          s.answerFolge(st.folge.notes.map(() => true));
+        } else if (st.type === "card") s.answer(true);
+        else s.introDone(st.note);
+      }
+    }
+    expect([...seen].sort()).toEqual(["griff", "name", "note"]);
+  });
+  it("Spielen: drei von vier Zusatzkarten werden Folgen, eine davon ein Wechsel-Drill", () => {
+    for (let seed = 1; seed <= 30; seed++) {
+      const s = mkSession(onlyExtras("spielen"), "spielen", { seed });
+      const steps = run(s).filter((x) => x.type !== "intro" && !x.retry);
+      expect(steps.filter((x) => x.type === "folge").length).toBe(15);
+      expect(steps.every((x) => x.type !== "folge" || x.track === "spielen")).toBe(true);
+      const drills = steps.filter((x) => x.type === "folge" && x.folge.drill);
+      expect(drills).toHaveLength(1);
+      const f = (drills[0] as Extract<Step, { type: "folge" }>).folge.notes;
+      expect(f).toHaveLength(6);
+      expect(new Set(f).size).toBe(2);
+      for (let i = 1; i < f.length; i++) expect(f[i]).not.toBe(f[i - 1]);
+    }
+  });
+  it("Spielen: fällige Karten werden Folgen mit ihrem Ton und danach gewertet; neue bleiben Karten", () => {
+    for (let seed = 1; seed <= 30; seed++) {
+      const d = onlyExtras("spielen");
+      d.cards["e1|spiel"] = { box: 2, day: addDays(TODAY, -3), session: 1 };
+      d.cards["a1|spiel"] = { box: 3, day: addDays(TODAY, -3), session: 1 };
+      d.stages.spielen = "e2-f1"; // e² und f¹ neu
+      const s = mkSession(d, "spielen", { seed });
+      const due = s.plan.filter((p) => p.type === "due");
+      expect(due.map((p) => p.note).sort()).toEqual(["a1", "e1"]);
+      expect(due.every((p) => p.folge)).toBe(true);
+      expect(s.plan.filter((p) => p.type === "new").every((p) => !p.folge)).toBe(true);
+      const carried: string[] = [];
+      run(
+        s,
+        () => true,
+        (st) => {
+          if (st.folge.carry && !st.retry) {
+            carried.push(st.folge.carry);
+            expect(st.folge.notes).toContain(st.folge.carry);
+          }
+          // e¹ an einer Stelle falsch, alles andere richtig
+          let once = false;
+          return st.folge.notes.map((n) => !(n === "e1" && st.folge.carry === "e1" && !once && (once = true)));
+        },
+      );
+      expect(carried.sort()).toEqual(["a1", "e1"]);
+      expect(d.cards["e1|spiel"].box).toBe(1);
+      expect(d.cards["a1|spiel"].box).toBe(4);
+      expect(d.cards["a1|spiel"].day).toBe(TODAY);
+    }
+  });
+  it("Spielen: nach „Weiß nicht“ zählen nur die wirklich versuchten Griffwechsel", () => {
+    const d = onlyExtras("spielen");
+    const s = mkSession(d, "spielen", { seed: 5 });
+    let st = s.next();
+    while (st && st.type !== "folge") {
+      if (st.type === "card") s.answer(true);
+      st = s.next();
+    }
+    expect(st?.type).toBe("folge");
+    const notes = (st as Extract<Step, { type: "folge" }>).folge.notes;
+    // nur der erste Ton gespielt, dann „Weiß nicht“: kein Wechsel versucht
+    s.answerFolge(notes.map((_, i) => i === 0), false, 1);
+    expect(d.pairs).toBeUndefined();
+  });
+  it("Spielen: etwa jede vierte Folge ist ein Abschnitt des Stufenlieds (nur vorgestellte Töne)", () => {
+    let withSong = 0;
+    for (let seed = 1; seed <= 20; seed++) {
+      const d = onlyExtras("spielen");
+      const s = mkSession(d, "spielen", { seed });
+      const steps = run(s).filter((x) => x.type === "folge" && !x.retry) as Extract<Step, { type: "folge" }>[];
+      const songs = steps.filter((x) => x.folge.song);
+      expect(songs.length).toBeLessThanOrEqual(4);
+      for (const x of songs) {
+        expect(x.folge.song).toBe("Alle Vögel sind schon da");
+        expect(x.folge.notes.every((n) => d.introduced.spielen.includes(n))).toBe(true);
+      }
+      withSong += songs.length;
+    }
+    expect(withSong).toBeGreaterThan(20);
+  });
+  it("Spielen: Griffwechsel werden gemerkt (nach einem richtigen Ton), höchstens 10 je Paar", () => {
+    const d = onlyExtras("spielen");
+    const s = mkSession(d, "spielen", { seed: 3 });
+    run(s, () => true, (st) => st.folge.notes.map((_, i) => i !== 1));
+    const keys = Object.keys(d.pairs ?? {});
+    expect(keys.length).toBeGreaterThan(0);
+    for (const k of keys) {
+      const [a, b] = k.split("-");
+      expect(note(a).midi).toBeLessThan(note(b).midi);
+      expect(d.pairs![k].length).toBeLessThanOrEqual(10);
+    }
+    // der Wechsel zum 2. Ton misslang immer, der vom 2. zum 3. zählt nicht (2. Ton falsch)
+    expect(Object.values(d.pairs!).flat()).toContain(0);
   });
   it("unter 5 vorgestellten Tönen keine Folgen", () => {
     const d = onlyExtras();

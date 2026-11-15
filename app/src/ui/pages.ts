@@ -7,7 +7,9 @@ import { joinNames, nameHtml, nameText } from "../music/names";
 import { CHART, NOTES } from "../music/notes";
 import { staffRange, staffSvg } from "../music/staff";
 import { isWeak, level, noteAccuracy, startLevel } from "../srs/progress";
-import { pressGuard, topbar, type View } from "./common";
+import { chapterOf, chaptersOf, snippetSong, stageSong } from "../srs/chapters";
+import { esc, pressGuard, topbar, type View } from "./common";
+import { milestoneTitle } from "./startpoint";
 
 export const summaryView: View = (root, ctx) => {
   const r = ctx.lastResult;
@@ -17,10 +19,14 @@ export const summaryView: View = (root, ctx) => {
   }
   const allRight = r.graded > 0 && r.correct === r.graded;
   const unlocks = r.unlocks
-    .map(
-      (u) =>
-        `<div class="new" data-testid="unlock"><span class="soft">${TRACK_LABEL[u.track]} · Stufe ${u.level}</span><span class="v">Neu: ${joinNames(u.notes)}</span><span class="soft">Die neuen Töne kommen ab der nächsten Sitzung.</span></div>`,
-    )
+    .map((u) => {
+      // Spielen: Das Stufenlied der eben geschafften Stufe kann sie jetzt ganz spielen (docs/app-uebungen.md)
+      const song = u.track === "spielen" ? stageSong("spielen", u.level - 1) : undefined;
+      const songLine = song
+        ? `<span data-testid="unlock-song">Jetzt kannst du <a href="#/lied/${encodeURIComponent(song.id)}">${esc(song.title)}</a> ganz spielen.</span>`
+        : "";
+      return `<div class="new" data-testid="unlock"><span class="soft">${TRACK_LABEL[u.track]} · Stufe ${u.level}</span><span class="v">Neu: ${joinNames(u.notes)}</span>${songLine}<span class="soft">Die neuen Töne kommen ab der nächsten Sitzung.</span></div>`;
+    })
     .join("");
   root.innerHTML = `
 <main class="screen summary">
@@ -62,8 +68,13 @@ export const progressView: View = (root, ctx) => {
       })
       .join("");
     const next = stagesOf(track)[lv];
+    // Kapitel (Meilensteine) und beim Spielen das Lied, aus dem die Abschnitte kommen
+    const ch = chapterOf(track, lv);
+    const song = track === "spielen" ? snippetSong(track, lv) : undefined;
     return `<section aria-label="${TRACK_LABEL[track]}">
       <div class="stagebar"><h2>${TRACK_LABEL[track]}</h2><span class="soft">Stufe ${lv} von ${max}</span></div>
+      <p class="chap" data-testid="chapter-${track}">Kapitel ${ch.no} von ${chaptersOf(track).length} · ${milestoneTitle(ch.milestone)} <span class="soft">(Stufe ${ch.from}–${ch.to})</span></p>
+      ${song ? `<p class="chap" data-testid="stage-song">Lied dieser Stufe: <a href="#/lied/${encodeURIComponent(song.id)}">${esc(song.title)}</a> <span class="soft">– seine Abschnitte kommen beim Spielen vor</span></p>` : ""}
       <div class="rows">${rows}</div>
       <p class="help">${
         next

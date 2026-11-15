@@ -42,7 +42,8 @@ describe("Heft-Lieder", () => {
 
   it("Kapitel gelten bis zum nächsten Kapitel", () => {
     const ch = chapters();
-    expect(ch.map((c) => c.chapter)).toEqual(["Kinder- und Weihnachtslieder", "Alte Lieder und Tänze", "Schöne Melodien"]);
+    expect(ch.map((c) => c.chapter)).toEqual(["Erste Übungen", "Kinder- und Weihnachtslieder", "Alte Lieder und Tänze", "Schöne Melodien"]);
+    expect(songById("uebung-1")!.chapter).toBe("Erste Übungen");
     expect(songById("haenschen-klein")!.chapter).toBe("Kinder- und Weihnachtslieder");
     expect(songById("musette")!.chapter).toBe("Schöne Melodien");
     expect(ch.reduce((n, c) => n + c.songs.length, 0)).toBe(SONGS.length);

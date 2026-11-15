@@ -13,6 +13,10 @@ import { nameSvgText, staffRange, staffSeqSvg, staffSvg, type Range } from "../m
 import { choiceCount, makeChoices } from "../srs/choices";
 import { folgeChoices } from "../srs/sequences";
 import { toneTimeline } from "../songs/timeline";
+import { songById } from "../songs/library";
+import { renderScore, type Score } from "../songs/engrave";
+import { excerptTimeline, songExcerpt } from "../songs/snippets";
+import { secPerQuarter } from "../songs/tempo";
 import { GRIP_TIPS, introSentence } from "../srs/hints";
 import type { Session, Step } from "../srs/session";
 import { activeFlute, cardKey } from "../store/data";
@@ -29,6 +33,9 @@ const QUESTION: Record<Kind, string> = {
 const FOLGE_SEC = 0.6;
 const HINT_VOL = 0.4;
 
+/** größter Zwischenraum der Notenlinien (px) im Ausschnitt eines Stufenlieds */
+const SNIP_SP = 11;
+
 /** Nach „Richtig“ so lange stehen lassen, dass man die Bestätigung in Ruhe sieht (Tippen geht schneller) */
 const AUTO_NEXT_MS = 1800;
 /** fortlaufende Nummer jeder angezeigten Karte (für automatische Tests) */
@@ -36,6 +43,16 @@ let seq = 0;
 
 function flute(id: string): string {
   return fluteSvg(note(id).fingering, `Griffbild ${nameText(id)}`);
+}
+
+/**
+ * Griffbilder → Namen: die Folge als Reihe von Griffbildern. Jedes ist wie eine Note der Notenzeile eine
+ * Gruppe `.sn[data-i]` mit Strich für die aktuelle (.seqcur) und Zeile für den getippten Namen (.sl).
+ */
+function gripSeq(ids: string[]): string {
+  return `<div class="gseq" role="img" aria-label="${ids.length} Griffbilder">${ids
+    .map((id, i) => `<div class="sn" data-i="${i}">${fluteSvg(note(id).fingering, `Griffbild ${i + 1}`)}<i class="seqcur"></i><span class="sl"></span></div>`)
+    .join("")}</div>`;
 }
 
 /**
@@ -282,7 +299,7 @@ export const practiceView: View = (root, ctx) => {
     if (kind !== "spiel") {
       choices = makeChoices(id, kind, choiceCount(kind, box), lesenNotes, Math.random);
       if (kind === "name") {
-        btns = `<div class="btns${choices.length > 4 ? " n8" : ""}">${choices
+        btns = `<div class="btns">${choices
           .map((c) => `<button data-choice="${c}" aria-label="${nameText(c)}">${nameHtml(c)}</button>`)
           .join("")}</div>`;
       } else if (kind === "griff") {
@@ -436,19 +453,50 @@ export const practiceView: View = (root, ctx) => {
 
   // ------------------------------------------------------------ Tonfolgen
   function renderFolge(st: Extract<Step, { type: "folge" }>) {
-    // Nur für Browser-Tests: feste Folgen vorgeben (window.__folgen = [["g1", "e1", "e1"], …])
-    const forced = (window as unknown as { __folgen?: string[][] }).__folgen;
-    if (forced?.length && !st.retry) st.folge.notes = forced.shift()!;
+    // Nur für Browser-Tests: feste Folgen vorgeben (window.__folgen = [["g1", "e1", "a1"], …]; mit Übungsart
+    // als { kind: "griff", notes: [...] })
+    const forced = (window as unknown as { __folgen?: (string[] | { kind: Kind; notes: string[] })[] }).__folgen;
+    if (forced?.length && !st.retry) {
+      const f = forced.shift()!;
+      if (Array.isArray(f)) st.folge.notes = f;
+      else Object.assign(st.folge, f);
+    }
     const notes = st.folge.notes;
     const n = notes.length;
+    // Abschnitt eines Stufenlieds (Spielen): kleiner Ausschnitt des Notenbilds mit echtem Rhythmus
+    const snipSong = playing && st.folge.songId && st.folge.bars ? songById(st.folge.songId) : undefined;
+    let excerpt = snipSong ? songExcerpt(snipSong, st.folge.bars![0], st.folge.bars![1]) : null;
+    const exTl = excerpt ? excerptTimeline(excerpt) : null;
+    if (exTl && exTl.tones.length !== n) excerpt = null;
+    // Übungsart der Folge (docs/app-uebungen.md): Noten → Namen, Noten → Griffe, Griffbilder → Namen
+    const fkind = playing ? "spiel" : st.folge.kind;
     const label = st.retry ? "nochmal" : `${s.position} von ${s.total}`;
-    const question = playing ? "Spiel diese Töne nacheinander." : "Wie heißen diese Noten? Der Reihe nach.";
+    const question = playing
+      ? st.folge.drill
+        ? "Wechsle ruhig hin und her."
+        : st.folge.song
+          ? `Aus „${st.folge.song}“ – spiel diese Töne.`
+          : "Spiel diese Töne nacheinander."
+      : fkind === "griff"
+        ? "Welche Griffe sind das? Der Reihe nach."
+        : fkind === "note"
+          ? "Welche Töne sind das? Der Reihe nach."
+          : "Wie heißen diese Noten? Der Reihe nach.";
     // Beim Lesen verrät die Beschriftung für Vorleser die Namen nicht (wie bei der einzelnen Note→Name-Karte)
-    const staff = staffSeqSvg(notes, { range, label: playing ? `Noten ${notes.map(nameText).join(" ")}` : `${n} Noten` });
+    const staff = excerpt
+      ? `<div class="snip" role="img" aria-label="Noten ${notes.map(nameText).join(" ")}"></div>`
+      : fkind === "note"
+        ? gripSeq(notes)
+        : staffSeqSvg(notes, { range, label: playing ? `Noten ${notes.map(nameText).join(" ")}` : `${n} Noten` });
     let btns = "";
-    if (!playing) {
+    if (fkind === "griff") {
+      const choices = folgeChoices(notes, lesenNotes, Math.random, "griff");
+      btns = `<div class="btns fing">${choices
+        .map((c, i) => `<button data-choice="${c}" aria-label="Griff ${i + 1}">${fluteSvg(note(c).fingering, `Griff ${i + 1}`)}</button>`)
+        .join("")}</div>`;
+    } else if (!playing) {
       const choices = folgeChoices(notes, lesenNotes, Math.random);
-      btns = `<div class="btns${choices.length > 4 ? " n8" : ""}">${choices
+      btns = `<div class="btns">${choices
         .map((c) => `<button data-choice="${c}" aria-label="${nameText(c)}">${nameHtml(c)}</button>`)
         .join("")}</div>`;
     }
@@ -459,7 +507,7 @@ export const practiceView: View = (root, ctx) => {
       ? `<div class="answer"><div class="anchor"><div class="slot" aria-live="polite"></div></div>${listenBox()}${idk}</div>`
       : `<div class="answer">${btns}${idk}<div class="slot" aria-live="polite"></div></div>`;
     root.innerHTML = `
-<main class="screen fit prac ask kind-folge" data-step="folge" data-kind="folge" data-notes="${notes.join(" ")}" data-note="${notes[0]}" data-i="0" data-retry="${st.retry}" data-seq="${++seq}">
+<main class="screen fit prac ask kind-folge folge-${fkind}" data-step="folge" data-kind="folge" data-fkind="${fkind}"${st.folge.drill ? ' data-drill="true"' : ""}${st.folge.song ? ` data-song="${st.folge.song}"` : ""} data-notes="${notes.join(" ")}" data-note="${notes[0]}" data-i="0" data-retry="${st.retry}" data-seq="${++seq}">
   ${header(label)}
   <div class="stage">${staff}<p class="q" aria-live="polite">${question}</p></div>
   ${answer}
@@ -470,15 +518,28 @@ export const practiceView: View = (root, ctx) => {
     const slot = main.querySelector(".slot")!;
     const idkRow = main.querySelector(".idkrow")!;
     const q = main.querySelector(".q")!;
+    // Ausschnitt setzen (Breite der Bühne)
+    let score: Score | null = null;
+    if (excerpt) {
+      const box = main.querySelector<HTMLElement>(".snip")!;
+      // so groß, dass zwei Takte noch in eine Zeile passen (etwa 40 Zwischenräume), höchstens SNIP_SP
+      const width = Math.max(240, Math.min(600, box.clientWidth || main.clientWidth - 32));
+      score = renderScore(excerpt, { width, sp: Math.max(7.5, Math.min(SNIP_SP, width / 42)) });
+      box.appendChild(score.el);
+    }
     /** je Note: richtig? (undefined = noch offen) und was zuerst falsch getippt bzw. gespielt wurde */
     const ok: (boolean | undefined)[] = [];
     const wrongAt: (string | null)[] = [];
     let cur = 0;
 
-    const g = (k: number) => main.querySelector<SVGGElement>(`.sn[data-i="${k}"]`);
+    /** Elemente der Note k: in der Notenzeile ihre Gruppe, im Ausschnitt alle Noten des Tons (Haltebogen) */
+    const els = (k: number): Element[] =>
+      score && exTl
+        ? (exTl.tones[k]?.ids ?? []).map((id) => score!.noteEl(id)).filter((x): x is SVGGElement => !!x)
+        : [...main.querySelectorAll(`.sn[data-i="${k}"]`)];
     const setCur = (k: number) => {
-      main.querySelectorAll(".sn.cur").forEach((x) => x.classList.remove("cur"));
-      g(k)?.classList.add("cur");
+      main.querySelectorAll(".stage .cur").forEach((x) => x.classList.remove("cur"));
+      els(k).forEach((x) => x.classList.add("cur"));
       main.dataset.i = String(k);
       main.dataset.note = notes[k] ?? "";
     };
@@ -488,11 +549,14 @@ export const practiceView: View = (root, ctx) => {
      * answer null: nichts darunter (Weiß nicht, Ton außerhalb der Grifftabelle).
      */
     const mark = (k: number, good: boolean, answer: string | null) => {
-      const el = g(k);
-      if (!el) return;
-      el.classList.remove("hit", "miss");
-      el.classList.add(good ? "hit" : "miss");
-      el.querySelector(".sl")!.innerHTML = answer ? nameSvgText(answer) : "";
+      for (const el of els(k)) {
+        el.classList.remove("hit", "miss");
+        el.classList.add(good ? "hit" : "miss");
+        // Griffbilder → Namen: HTML-Zeile unter dem Griffbild, sonst Text in der Notenzeile (SVG); im
+        // Ausschnitt eines Lieds gibt es keine Zeile dafür
+        const sl = el.querySelector(".sl");
+        if (sl) sl.innerHTML = answer ? (fkind === "note" ? nameHtml(answer) : nameSvgText(answer)) : "";
+      }
     };
     setCur(0);
     const rowTypo = idkRow.querySelector<HTMLButtonElement>('[data-act="typo"]');
@@ -502,10 +566,11 @@ export const practiceView: View = (root, ctx) => {
       for (let j = k; j < cur; j++) {
         ok[j] = undefined;
         wrongAt[j] = null;
-        const el = g(j);
-        el?.classList.remove("hit", "miss");
-        const sl = el?.querySelector(".sl");
-        if (sl) sl.innerHTML = "";
+        for (const el of els(j)) {
+          el.classList.remove("hit", "miss");
+          const sl = el.querySelector(".sl");
+          if (sl) sl.innerHTML = "";
+        }
       }
       cur = k;
       setCur(cur);
@@ -517,7 +582,7 @@ export const practiceView: View = (root, ctx) => {
       phase = p;
       main.classList.remove("ask");
       main.classList.add(p);
-      main.querySelectorAll(".sn.cur").forEach((x) => x.classList.remove("cur"));
+      main.querySelectorAll(".stage .cur").forEach((x) => x.classList.remove("cur"));
       main.dataset.note = "";
       main.querySelectorAll<HTMLButtonElement>(".btns button").forEach((b) => {
         b.disabled = true;
@@ -530,15 +595,19 @@ export const practiceView: View = (root, ctx) => {
         e.stopPropagation();
         // nach „Richtig“: nicht von selbst weiter, solange sie zuhört (Tippen geht weiter)
         clearTimer();
-        playTones(notes.map((x) => note(x).midi), true);
+        // Abschnitt eines Lieds: mit seinem Rhythmus im Grundtempo des Lieds
+        if (excerpt && exTl && snipSong)
+          songPlayer.play(exTl, { secPerQuarter: secPerQuarter(snipSong, 100), a4: myFlute.tuning.hz, countIn: false, melody: true });
+        else playTones(notes.map((x) => note(x).midi), true);
       });
     };
 
     /** Folge fertig: werten und Rückmeldung */
     /** typed: alle Antworten getippt (nicht „Weiß nicht“, nicht gespielt) – dann gibt es „Vertippt“ */
-    const done = (head: string, typed = false) => {
+    /** judged: so viele Töne von vorn wurden wirklich gespielt bzw. versucht (nach „Weiß nicht“ weniger) */
+    const done = (head: string, typed = false, judged = n) => {
       const res = notes.map((_, k) => ok[k] === true);
-      s.answerFolge(res, typed);
+      s.answerFolge(res, typed, judged);
       if (res.every(Boolean)) {
         setPhase("ok");
         idkRow.innerHTML = `<span class="okline" data-testid="panel">${ICON_CHECK}<span>Richtig</span>${listenBtn}</span>`;
@@ -548,10 +617,19 @@ export const practiceView: View = (root, ctx) => {
       }
       setPhase("err");
       // Die ganze richtige Folge, Fehler rot; ihre Antworten stehen darüber unter den Noten
-      const names = notes.map((x, j) => `<span class="${res[j] ? "" : "bad"}">${nameHtml(x)}</span>`).join(" ");
+      const names =
+        fkind === "griff"
+          ? // Noten → Griffe: die richtigen Griffe klein nebeneinander, darunter die Namen
+            `<span class="grips">${notes
+              .map(
+                (x, j) =>
+                  `<span class="g${res[j] ? "" : " bad"}">${fluteSvg(note(x).fingering, `Griffbild ${nameText(x)}`)}<span>${nameHtml(x)}</span></span>`,
+              )
+              .join("")}</span>`
+          : `<span class="names">${notes.map((x, j) => `<span class="${res[j] ? "" : "bad"}">${nameHtml(x)}</span>`).join(" ")}</span>`;
       slot.innerHTML =
         `<div class="panel err center solo" data-testid="panel"><div class="txt"><span class="head">${head}</span>` +
-        `<span class="names">${names}</span></div></div>` +
+        `${names}</div></div>` +
         `<div class="gorow">${listenBtn}${s.canUndo ? typoBtn() : ""}<button class="go" data-act="next">Weiter</button></div>`;
       bindListen(slot);
       // „Vertippt“ nach dem Ende: Wertung zurücknehmen, Folge wieder offen ab der ersten falschen Note
@@ -577,12 +655,14 @@ export const practiceView: View = (root, ctx) => {
       e.stopPropagation();
       if (phase !== "ask" || !pressedHere(e, idkBtn)) return;
       onFolgeFrame = null;
+      // versucht: die Töne vor der aktuellen und die aktuelle, wenn schon ein falscher Ton kam
+      const judged = wrongAt[cur] != null ? cur + 1 : cur;
       for (let k = cur; k < n; k++) {
         ok[k] = false;
         // beim Spielen: ein schon falsch gespielter Ton bleibt stehen
         mark(k, false, wrongAt[k] ?? null);
       }
-      done("Auflösung");
+      done("Auflösung", false, judged);
     });
 
     if (!playing) {
@@ -612,7 +692,7 @@ export const practiceView: View = (root, ctx) => {
     // Spielen: Warte-Wertung wie beim Mitspielen (neuer Einsatz für Tonwiederholungen, Übergangsklänge
     // beim Fingerwechsel verziehen, Oktave zu hoch nur ein Hinweis); Toleranz und Haltedauer wie bei der
     // Spielen-Karte, Stimmton und Werte der aktiven Flöte.
-    const w = new WaitFollower(toneTimeline(notes.map((x) => note(x).midi)), {
+    const w = new WaitFollower(exTl && excerpt ? exTl : toneTimeline(notes.map((x) => note(x).midi)), {
       cfg: {
         tuning: myFlute.tuning.hz,
         toleranceCents: d.settings.toleranceCents,

@@ -7,6 +7,12 @@ import type { Song, TimeSig } from "./model";
 
 /** Grundtempo je Liedtitel (wie in heft/songs.py), Schläge pro Minute in der Zählzeit der Taktart. */
 export const BASE_TEMPO: Record<string, number> = {
+  // Erste Übungen des Hefts: ruhig, zum Kennenlernen der Griffe
+  "Übung 1": 72,
+  "Übung 2": 72,
+  "Übung 3": 72,
+  "Übung 4": 72,
+  "Übung 5": 66,
   // Kinder- und Weihnachtslieder
   "Kuckuck, Kuckuck, ruft’s aus dem Wald": 100,
   "Hänschen klein": 96,

@@ -1,7 +1,7 @@
 // Bildschirmfotos für die Durchsicht (nur mit SHOTS=1): npx playwright test shots
 import { expect, test, type Page } from "@playwright/test";
 import { sampleData } from "./seed";
-import { answer, FAKE_MIC, info, next, menuTo, skipIntros } from "./util";
+import { answer, FAKE_MIC, info, next, menuTo, skipIntros, beatStarted } from "./util";
 import { FAKE_AUDIO } from "./fake-audio";
 import { note, soundingFreq } from "../../src/music/notes";
 import { dayKey } from "../../src/store/dates";
@@ -129,7 +129,10 @@ for (const s of SIZES) {
     });
     test("Spielen und Stimmgerät", async ({ page }) => {
       await page.addInitScript(FAKE_MIC);
-      await seed(page);
+      // mit 4 vorgestellten Tönen bleiben fällige Spielen-Karten Einzelkarten (ab 5 wären es Folgen)
+      const d = sampleData();
+      d.introduced.spielen = ["h1", "a1", "g1", "c2"];
+      await seed(page, d);
       const p = (x: string) => `${OUT}/${scheme}-${s.name}-${x}.png`;
       const osc = (id: string) => page.evaluate((f) => (window as never as { __osc: { play(f: number): void } }).__osc.play(f), soundingFreq(note(id)));
       await page.goto("./");
@@ -157,16 +160,24 @@ for (const s of SIZES) {
       for (const k of Object.keys(d.cards)) d.cards[k] = { box: 5, day: today, session: 5 };
       await page.addInitScript(FAKE_MIC);
       await seed(page, d);
-      const folgen = [["fis1", "g1", "a1", "g1", "h1"], ["e1", "fis1", "g1", "fis1", "e1"], ["d1", "e1", "fis1", "g1"], ["g1", "a1", "h1", "c2", "h1"]];
+      const folgen = [
+        { kind: "name", notes: ["fis1", "g1", "a1", "g1", "h1"] },
+        { kind: "name", notes: ["e1", "fis1", "g1", "fis1", "e1"] },
+        { kind: "griff", notes: ["d1", "e1", "fis1", "g1"] },
+        { kind: "note", notes: ["g1", "a1", "h1", "c2", "h1"] },
+      ];
       await page.addInitScript((f) => {
         if (!sessionStorage.getItem("folgen")) {
           sessionStorage.setItem("folgen", "1");
-          (window as never as { __folgen: string[][] }).__folgen = f;
+          (window as never as { __folgen: unknown[] }).__folgen = f;
         }
       }, folgen);
       const p = (x: string) => `${OUT}/${scheme}-${s.name}-${x}.png`;
+      // bis zur nächsten neuen Folge (Wiederholungen nach Fehlern richtig beantworten)
       const toFolge = async () => {
-        for (let i = 0; i < 6 && (await info(page)).step !== "folge"; i++) {
+        for (let i = 0; i < 10; i++) {
+          const st = await info(page);
+          if (st.step === "folge" && !st.retry) return;
           await answer(page, true);
           await next(page);
         }
@@ -192,6 +203,23 @@ for (const s of SIZES) {
       const ids = (await page.locator("main").getAttribute("data-notes"))!.split(" ");
       for (const id of ids) await tap(id);
       await page.screenshot({ path: p("t5-folge-richtig") });
+      // Noten → Griffe (docs/app-uebungen.md)
+      await next(page);
+      await toFolge();
+      await page.screenshot({ path: p("t8-griffe-anfang") });
+      await tap("d1");
+      await tap("fis1"); // falsch (e¹)
+      await tap("fis1");
+      await tap("g1");
+      await page.waitForTimeout(400);
+      await page.screenshot({ path: p("t9-griffe-fehler") });
+      // Griffbilder → Namen
+      await page.locator('[data-act="next"]').click();
+      await toFolge();
+      await page.screenshot({ path: p("t10-griffbilder-anfang") });
+      await tap("g1");
+      await tap("a1");
+      await page.screenshot({ path: p("t11-griffbilder-mitten") });
       // Spielen
       await page.goto("./");
       await page.evaluate(() => ((window as never as { __folgen: string[][] }).__folgen = [["g1", "a1", "g1", "h1", "c2"]]));
@@ -354,7 +382,7 @@ for (const s of SIZES) {
       await page.waitForTimeout(200);
       await page.screenshot({ path: p("f1b-mitspielen-auswahl") });
       await page.getByRole("button", { name: "Takt 5–8 mitspielen" }).click();
-      await page.waitForFunction(() => (window as unknown as { __lied: { follow(): Dbg } }).__lied.follow().startMs !== null);
+      await beatStarted(page);
       const d = await dbg();
       const spq = await page.evaluate(() => (window as unknown as { __lied: { player: { secPerQuarter: number } } }).__lied.player.secPerQuarter);
       const beat: [number, number | null][] = [];
@@ -414,6 +442,12 @@ for (const s of SIZES.filter((x) => x.name === "360x740" || x.name === "740x360"
       await page.waitForTimeout(150);
       await page.screenshot({ path: p("r2-abgleich-start") });
       await page.getByRole("button", { name: "Abgleich starten" }).click();
+      // erst nach einem Bereit-Ton wird eingezählt
+      await page.waitForFunction(() => (window as unknown as { __osc: unknown }).__osc !== null);
+      await page.waitForTimeout(150);
+      await page.screenshot({ path: p("r2b-abgleich-bereit") });
+      const tReady = await now();
+      await schedule([[tReady + 100, hz(69)], [tReady + 500, null]]);
       await page.waitForFunction(() => !!(window as unknown as { __lied: { follow(): Dbg } }).__lied.follow().cal?.clicks);
       const clicks = (await dbg()).cal!.clicks!;
       await schedule(clicks.flatMap((c): [number, number | null][] => [[c + 140, hz(69)], [c + 340, null]]));

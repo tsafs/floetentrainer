@@ -4,7 +4,17 @@ import { note, soundingFreq } from "../../src/music/notes";
 import { sampleData } from "./seed";
 import { FAKE_MIC, menuTo } from "./util";
 
-async function setup(page: Page, data: unknown = sampleData()) {
+/**
+ * Beispieldaten für Einzelkarten: Ab 5 vorgestellten Tönen wären fällige Spielen-Karten Folgen
+ * (docs/app-uebungen.md); mit 4 vorgestellten bleiben es Karten.
+ */
+function singleCards() {
+  const d = sampleData();
+  d.introduced.spielen = ["h1", "a1", "g1", "c2"];
+  return d;
+}
+
+async function setup(page: Page, data: unknown = singleCards()) {
   await page.addInitScript(FAKE_MIC);
   await page.addInitScript((d) => {
     if (!sessionStorage.getItem("seeded")) {
@@ -255,4 +265,26 @@ test("Mikrofon verweigert: verständliche Erklärung", async ({ page }) => {
   await page.getByRole("button", { name: /Spielen/ }).click();
   await expect(page.getByRole("heading", { name: "Das Mikrofon ist nicht erlaubt" })).toBeVisible();
   await expect(page.getByText("Bei „Mikrofon“ auf „Zulassen“ stellen.")).toBeVisible();
+});
+
+test("Stufe geschafft: Hinweis auf das Stufenlied; Fortschritt zeigt Kapitel und Lied der Stufe", async ({ page }) => {
+  const d = singleCards();
+  const day = d.days[d.days.length - 1];
+  // alle Töne der Spielen-Stufe 2 sitzen schon (12 von 12): die nächste richtige Antwort schaltet frei
+  for (const n of ["h1", "a1", "g1", "c2", "d2"] as const) d.history.spielen[n] = Array.from({ length: 12 }, (_, i) => [1, day, Date.now() - 100000 + i]);
+  await setup(page, d);
+  await startPlaying(page);
+  const t = await target(page);
+  await page.waitForTimeout(450);
+  await play(page, t);
+  await expect(page.getByTestId("panel")).toContainText("Richtig");
+  await silence(page);
+  await page.getByRole("button", { name: "Sitzung beenden" }).click();
+  await expect(page.getByTestId("unlock")).toContainText("Spielen · Stufe 3");
+  await expect(page.getByTestId("unlock-song")).toHaveText("Jetzt kannst du Hänschen klein ganz spielen.");
+  await expect(page.getByTestId("unlock-song").locator("a")).toHaveAttribute("href", "#/lied/haenschen-klein");
+  await page.goto("./#/fortschritt");
+  await expect(page.getByTestId("chapter-spielen")).toContainText("Kapitel 2 von 4");
+  await expect(page.getByTestId("chapter-lesen")).toContainText("Kapitel 2 von 4");
+  await expect(page.getByTestId("stage-song")).toContainText("Es tanzt ein Bi-Ba-Butzemann");
 });

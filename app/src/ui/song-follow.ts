@@ -31,13 +31,13 @@
 import { diag, offerDiag } from "../audio/diagnose";
 import { LiveTuning } from "../audio/flute-profile";
 import { BeatFollower, DEFAULT_FOLLOW, followConfig, inputLatency, LATENCY_MAX, LATENCY_MIN, WaitFollower } from "../audio/follow";
-import { CAL_CLICKS, CAL_COUNT_IN, CAL_SPQ, DEFAULT_LATENCY, latencyFromOnsets, OnsetDetector } from "../audio/latency";
+import { autoLatency, CAL_CLICKS, CAL_COUNT_IN, CAL_SPQ, DEFAULT_LATENCY, latencyFromOnsets, OnsetDetector, ReadyGate } from "../audio/latency";
 import { keepAwake, mic } from "../audio/mic";
 import { heardAtPerf, outputClock, songPlayer } from "../audio/song-player";
 import { midiNameHtml, nameHtml } from "../music/names";
 import type { NoteEvent, Song } from "../songs/model";
 import { clampPercent, secPerQuarter, TEMPO_MAX, TEMPO_MIN } from "../songs/tempo";
-import { sectionTimeline, type Timeline } from "../songs/timeline";
+import { sectionTimeline, withExtraCountInBar, type Timeline } from "../songs/timeline";
 import { A4, centsBetween, recenter, tuningShort } from "../music/tuning";
 import { activeFlute, tuningHz, type FollowMode } from "../store/data";
 import { esc, type Ctx } from "./common";
@@ -155,6 +155,7 @@ export function followBarHtml(): string {
           <span class="pcount" data-testid="follow-count" hidden></span>
           <span class="fwrong" data-testid="follow-wrong" aria-live="polite"></span>
           <span class="pstat" data-testid="follow-status" aria-live="polite"></span>
+          <button class="clear fready" data-act="fready" data-testid="follow-ready" hidden>Los</button>
         </div>
         ${tempoStepHtml("frun-tempo")}
       </div>
@@ -213,6 +214,12 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
   const fwrong = q<HTMLElement>(".fwrong");
   const fstat = q<HTMLElement>('[data-testid="follow-status"]');
   const goBtn = q<HTMLButtonElement>('[data-act="fstart"]');
+  const readyBtn = q<HTMLButtonElement>('[data-act="fready"]');
+  /**
+   * Hinweis nach dem Nachstellen der Verzögerung (bis zum nächsten Start); gilt nur, solange Wert und
+   * Kopfhörer-Zustand noch dieselben sind (danach geändert, abgeglichen oder umgeschaltet: normale Anzeige)
+   */
+  let latNote: { ms: number; phones: boolean } | null = null;
   const goText = q<HTMLElement>('[data-testid="follow-go"]');
   const tempoBoxes = [...el.querySelectorAll<HTMLElement>(".tstep")];
   const fluteLine = q<HTMLElement>('[data-testid="flute-line"]');
@@ -241,6 +248,10 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
     started: boolean;
     /** Takt-Modus: Beginn des Zeitplans (ms, Uhr der Frames) */
     startMs: number | null;
+    /** Takt-Modus, solange auf den Bereit-Ton gewartet wird: sofort einzählen („Los“) */
+    ready?: () => void;
+    /** Takt-Modus: Einsätze der getroffenen Noten (ms relativ zum Notenbeginn) fürs Nachstellen */
+    onsets?: (number | null)[];
   } | null = null;
   let shownMidi: number | null | undefined;
   /**
@@ -341,8 +352,9 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
     }
     const lat = inputLatency(settings);
     latLine.hidden = mode !== "beat";
+    const nudged = latNote && latNote.ms === lat.ms && latNote.phones === settings.headphones;
     latLine.innerHTML =
-      `Verzögerung ${lat.ms} ms ` +
+      (nudged ? `<span data-testid="latency-nudged">Verzögerung nachgestellt: ${lat.ms} ms</span> · ` : `Verzögerung ${lat.ms} ms `) +
       (lat.calibrated ? "" : settings.headphones ? "<span class=\"warn\">· mit Kopfhörern noch nicht abgeglichen</span> " : "(Standard) ") +
       `· <button class="clear" data-act="lat-open">${lat.calibrated ? "ändern" : "abgleichen"}</button>`;
     diagBtn.hidden = !diag.available;
@@ -379,7 +391,7 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
     }
     if (cal.state === "intro") {
       fcalText.textContent =
-        "Nach vier Klicks zum Einzählen klickt es acht Mal. Spiel zu jedem Klick einen kurzen Ton – egal welchen." +
+        "Spiel einen Ton, wenn du bereit bist. Nach vier Klicks zum Einzählen klickt es acht Mal. Spiel zu jedem Klick einen kurzen Ton – egal welchen." +
         (lat.calibrated ? "" : " Bis dahin gilt ein Standardwert.");
     } else if (cal.state === "result") {
       fcalText.textContent = cal.ok
@@ -400,6 +412,7 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
     token++;
     run = null;
     r.unlisten?.();
+    readyBtn.hidden = true;
     if (diag.recording) {
       diag.end({ t: diag.rel(performance.now()), mic: mic.info(), tuning: r.tuning ? { ...r.tuning.values } : null });
     }
@@ -575,10 +588,48 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
     setStatus("");
   };
 
-  const beginBeat = (tl: Timeline, my: number) => {
+  /**
+   * Takt-Modus: erst einzählen, wenn sie bereit ist – nach einem beliebigen Ton und der Pause danach
+   * (ReadyGate) oder nach „Los“. So hat sie Zeit, die Flöte an den Mund zu nehmen.
+   */
+  const waitReady = (my: number, go: () => void) => {
+    const r = run!;
+    const gate = new ReadyGate();
+    let done = false;
+    const start = () => {
+      if (done || my !== token || run !== r) return;
+      done = true;
+      r.ready = undefined;
+      r.unlisten?.();
+      r.unlisten = undefined;
+      readyBtn.hidden = true;
+      go();
+    };
+    r.ready = start;
+    readyBtn.hidden = false;
+    setStatus("Bereit? Spiel einen Ton, dann zähle ich ein.");
+    r.unlisten = mic.listen((f) => {
+      if (gate.push(f)) start();
+    });
+  };
+
+  /** Nach einem vollständigen Durchgang im Takt die Verzögerung behutsam nachstellen (autoLatency) */
+  const nudgeLatency = (onsets: (number | null)[]) => {
+    const lat = inputLatency(settings);
+    const next = autoLatency(lat.ms, onsets);
+    if (next === null) return;
+    diag.event(performance.now(), "nachgestellt", { from: lat.ms, to: next, n: onsets.length });
+    setLatency(settings.headphones ? "headphones" : "speaker", next);
+    latNote = { ms: next, phones: settings.headphones };
+  };
+
+  const beginBeat = (tl0: Timeline, my: number) => {
     const r = run!;
     const ok = () => my === token && run === r;
     const spq = secPerQuarter(song, host.percent());
+    // zwei Takte einzählen (docs/app-uebungen.md)
+    const tl = withExtraCountInBar(tl0);
+    r.onsets = [];
     songPlayer.play(tl, {
       secPerQuarter: spq,
       a4: tuningHz(ctx.data),
@@ -602,7 +653,10 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
       onEnd: () => {
         if (!ok()) return;
         const s = b.finish(performance.now());
-        if (s?.complete) saveTuning(tuning);
+        if (s?.complete) {
+          saveTuning(tuning);
+          nudgeLatency(r.onsets ?? []);
+        }
         finishRun();
       },
     });
@@ -618,6 +672,7 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
         if (!ok()) return;
         diag.event(performance.now(), "note", { i, midi: tl.tones[i].midi, ...nr });
         host.paint(tl.tones[i].ids, nr.ok ? "hit" : "miss");
+        if (nr.ok) r.onsets!.push(nr.onsetMs);
       },
     });
     r.beat = b;
@@ -644,6 +699,7 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
     }
     const my = ++token;
     run = { tl, started: false, startMs: null };
+    latNote = null;
     host.clearPaint();
     host.setCur([]);
     shownMidi = undefined;
@@ -658,7 +714,7 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
       .then(() => {
         if (my !== token || !run) return;
         run.started = true;
-        if (mode === "beat") beginBeat(tl, my);
+        if (mode === "beat") waitReady(my, () => beginBeat(tl, my));
         else beginWait(tl, my);
       })
       .catch((e) => {
@@ -718,49 +774,13 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
       .start()
       .then(() => {
         if (my !== token || cal !== c) return;
-        songPlayer.play(calTimeline(), {
-          secPerQuarter: CAL_SPQ,
-          a4: tuningHz(ctx.data),
-          countIn: true,
-          metronome: true,
-          melody: false,
-          onPosition: (p) => {
-            if (my !== token || cal !== c) return;
-            fcalText.textContent = p.countIn != null ? `Einzählen … ${p.countIn}` : "Spiel zu jedem Klick einen kurzen Ton.";
-          },
-          onFrame: (p) => {
-            if (my !== token || cal !== c) return;
-            const passed = p.quarter < 0 ? 0 : Math.min(CAL_CLICKS, Math.floor(p.quarter) + 1);
-            if (passed !== c.passed) {
-              c.passed = passed;
-              renderCal();
-            }
-          },
-          onEnd: () => {
-            // die Antwort auf den letzten Klick (bis 450 ms danach) noch abwarten
-            if (my === token && cal === c) c.timer = window.setTimeout(() => stopCal(true), 500);
-          },
-        });
-        const ac = songPlayer.context!;
-        const t0 = songPlayer.timelineStart!;
-        c.clicks = Array.from({ length: CAL_CLICKS }, (_, k) => heardAt(ac, t0 + k * CAL_SPQ));
-        const det = new OnsetDetector(DEFAULT_LATENCY, { tuning: tuningHz(ctx.data) });
-        c.det = det;
-        beginDiag("abgleich", performance.now(), null, null);
-        diag.setMeta({ clicks: c.clicks.map((x) => diag.rel(x)), which, spq: CAL_SPQ });
+        // erst nach einem Ton einzählen (wie im Takt-Modus): Zeit, die Flöte an den Mund zu nehmen
+        fcalText.textContent = "Bereit? Spiel einen Ton, dann zähle ich ein.";
+        const gate = new ReadyGate();
         c.unlisten = mic.listen((f) => {
-          if (my !== token || cal !== c) return;
-          diag.frame(f);
-          const n = det.onsets.length;
-          det.push(f);
-          for (const o of det.onsets.slice(n)) {
-            diag.event(o, "einsatz");
-            const k = c.clicks!.findIndex((t, i) => !c.hits![i] && o >= t - DEFAULT_LATENCY.before && o <= t + DEFAULT_LATENCY.after);
-            if (k >= 0) {
-              c.hits![k] = true;
-              renderCal();
-            }
-          }
+          if (my !== token || cal !== c || !gate.push(f)) return;
+          c.unlisten?.();
+          playCal();
         });
       })
       .catch((e) => {
@@ -771,6 +791,52 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
         ctx.micRetry = () => mic.start().then(() => ctx.go(`#/lied/${encodeURIComponent(song.id)}`));
         ctx.go("#/mikrofon");
       });
+    const playCal = () => {
+      songPlayer.play(calTimeline(), {
+        secPerQuarter: CAL_SPQ,
+        a4: tuningHz(ctx.data),
+        countIn: true,
+        metronome: true,
+        melody: false,
+        onPosition: (p) => {
+          if (my !== token || cal !== c) return;
+          fcalText.textContent = p.countIn != null ? `Einzählen … ${p.countIn}` : "Spiel zu jedem Klick einen kurzen Ton.";
+        },
+        onFrame: (p) => {
+          if (my !== token || cal !== c) return;
+          const passed = p.quarter < 0 ? 0 : Math.min(CAL_CLICKS, Math.floor(p.quarter) + 1);
+          if (passed !== c.passed) {
+            c.passed = passed;
+            renderCal();
+          }
+        },
+        onEnd: () => {
+          // die Antwort auf den letzten Klick (bis 450 ms danach) noch abwarten
+          if (my === token && cal === c) c.timer = window.setTimeout(() => stopCal(true), 500);
+        },
+      });
+      const ac = songPlayer.context!;
+      const t0 = songPlayer.timelineStart!;
+      c.clicks = Array.from({ length: CAL_CLICKS }, (_, k) => heardAt(ac, t0 + k * CAL_SPQ));
+      const det = new OnsetDetector(DEFAULT_LATENCY, { tuning: tuningHz(ctx.data) });
+      c.det = det;
+      beginDiag("abgleich", performance.now(), null, null);
+      diag.setMeta({ clicks: c.clicks.map((x) => diag.rel(x)), which, spq: CAL_SPQ });
+      c.unlisten = mic.listen((f) => {
+        if (my !== token || cal !== c) return;
+        diag.frame(f);
+        const n = det.onsets.length;
+        det.push(f);
+        for (const o of det.onsets.slice(n)) {
+          diag.event(o, "einsatz");
+          const k = c.clicks!.findIndex((t, i) => !c.hits![i] && o >= t - DEFAULT_LATENCY.before && o <= t + DEFAULT_LATENCY.after);
+          if (k >= 0) {
+            c.hits![k] = true;
+            renderCal();
+          }
+        }
+      });
+    };
   };
 
   /** Abgleich beenden: done = Klicks vorbei, auswerten; sonst abgebrochen */
@@ -843,6 +909,7 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
   });
   goBtn.addEventListener("click", () => startRun());
   q<HTMLButtonElement>('[data-act="fstop"]').addEventListener("click", () => stopRun());
+  readyBtn.addEventListener("click", () => run?.ready?.());
   q<HTMLButtonElement>('[data-act="fclear"]').addEventListener("click", () => host.clearSection());
   for (const box of tempoBoxes) {
     box.addEventListener("click", (e) => {

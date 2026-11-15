@@ -77,7 +77,8 @@ test("Liste: „Kannst du schon spielen“ und „Fehlt noch“ nach dem Lernsta
   const entchen = page.locator('.chap a[data-song="alle-meine-entchen"]');
   await expect(entchen).toContainText("Fehlt noch: e2");
   await expect(entchen).toContainText("2/4");
-  await expect(page.locator(".card.chap .ct").first()).toHaveText("Kinder- und Weihnachtslieder");
+  await expect(page.locator(".card.chap .ct").first()).toHaveText("Erste Übungen");
+  await expect(page.locator(".card.chap .ct").nth(1)).toHaveText("Kinder- und Weihnachtslieder");
   // anderer Lernstand: e² und f¹ bekannt → Alle meine Entchen spielbar
   await page.evaluate(() => {
     const d = JSON.parse(localStorage.getItem("floetentrainer")!);
@@ -446,7 +447,7 @@ test("Liederliste: Karten klappen über die Kopfzeile auf und zu; der Zustand bl
   await page.goto("./#/lieder");
   const can = page.getByTestId("can-play");
   const own = page.getByTestId("own-songs");
-  const kinder = page.locator(".card.chap").first();
+  const kinder = page.locator(".card.chap").filter({ hasText: "Kinder- und Weihnachtslieder" });
   const head = (c: typeof can) => c.locator("button.cardhd");
   // Standard: „Kannst du schon spielen“ offen; „Eigene Lieder“ (nur Hinweis und Knopf) offen; Kapitel zu
   await expect(head(can)).toHaveAttribute("aria-expanded", "true");
@@ -478,12 +479,13 @@ test("Liederliste: Karten klappen über die Kopfzeile auf und zu; der Zustand bl
   await expect(head(can)).toHaveAttribute("aria-expanded", "true");
 });
 
-test("Liederliste: ist „Kannst du schon spielen“ leer, ist das erste Kapitel offen", async ({ page }) => {
+test("Liederliste: schon auf Stufe 1 ist „Übung 1“ (nur h¹ a¹ g¹) spielbar; Kapitel „Erste Übungen“ vorn", async ({ page }) => {
+  // (Seit die ersten Übungen des Hefts in der App sind, ist „Kannst du schon spielen“ nie mehr leer.)
   await seed(page, withStage("erste-toene"));
   await page.goto("./#/lieder");
-  await expect(page.getByTestId("can-play")).toContainText("Noch keins");
-  await expect(page.locator(".card.chap").first().locator("button.cardhd")).toHaveAttribute("aria-expanded", "true");
-  await expect(page.locator(".card.chap").nth(1).locator("button.cardhd")).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByTestId("can-play").locator('a[data-song="uebung-1"]')).toBeVisible();
+  await expect(page.getByTestId("can-play")).not.toContainText("Noch keins");
+  await expect(page.locator(".card.chap .ct").first()).toHaveText("Erste Übungen");
 });
 
 test("Drehen bricht neu um, Markierung und Auswahl bleiben", async ({ page }) => {
