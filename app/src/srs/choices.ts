@@ -37,6 +37,14 @@ function compatible(c: Note, chosen: Note[]): boolean {
   return chosen.every((x) => x.fingering !== c.fingering && x.midi !== c.midi);
 }
 
+/**
+ * Derselbe Name in einer anderen Oktave (d¹/d²)? Bei Namen als Antwort nie als falsche Möglichkeit:
+ * Die kleine Oktavzahl übersieht man leicht, und die Lage auf den Linien verrät ohnehin, welches d gemeint ist.
+ */
+export function isOctaveTwin(a: Note, b: Note): boolean {
+  return a.name === b.name && a.octave !== b.octave;
+}
+
 /** Wie viele Möglichkeiten: Note→Name ab Fach 3 acht, sonst vier. */
 export function choiceCount(kind: Kind, box: number | undefined): number {
   return kind === "name" && (box ?? 0) >= 3 ? 8 : 4;
@@ -51,7 +59,8 @@ export function choiceCount(kind: Kind, box: number | undefined): number {
 export function makeChoices(targetId: string, kind: Kind, wanted: number, unlocked: string[], rng: Rng): string[] {
   const t = note(targetId);
   const allowAlt = kind !== "note"; // Griff→Note: keine anderen Schreibweisen
-  const usable = (n: Note) => n.id !== t.id && (allowAlt || !isAltSpelling(n.id));
+  const usable = (n: Note) =>
+    n.id !== t.id && (allowAlt || !isAltSpelling(n.id)) && !(kind === "name" && isOctaveTwin(t, n));
   const unlockedSet = new Set(unlocked);
   const ranked = (list: Note[]) =>
     list

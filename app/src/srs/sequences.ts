@@ -5,7 +5,7 @@
 import { isAltSpelling, levelOf, stageIndexOfNote, unlockedNotes, type Track } from "../music/levels";
 import { ALL_NOTES, note, type Note } from "../music/notes";
 import type { AppData } from "../store/data";
-import { confusability, type Rng } from "./choices";
+import { confusability, isOctaveTwin, type Rng } from "./choices";
 
 /** Ab so vielen vorgestellten Tönen einer Spur gibt es Tonfolgen. */
 export const FOLGE_MIN_NOTES = 5;
@@ -160,7 +160,8 @@ function compatible(c: Note, chosen: Note[]): boolean {
  */
 export function folgeChoices(notes: string[], unlocked: string[], rng: Rng): string[] {
   const distinct = [...new Set(notes)].map(note);
-  const usable = (n: Note) => !isAltSpelling(n.id) && !distinct.some((d) => d.id === n.id);
+  // kein Ton der Folge in anderer Oktave als falsche Möglichkeit (d¹ in der Folge → kein d² dazu)
+  const usable = (n: Note) => !isAltSpelling(n.id) && !distinct.some((d) => d.id === n.id || isOctaveTwin(d, n));
   const unlockedSet = new Set(unlocked.filter((n) => !isAltSpelling(n)));
   const want = Math.min(FOLGE_CHOICES, Math.max(unlockedSet.size, distinct.length + FOLGE_DECOYS));
   const score = (c: Note) => Math.max(...distinct.map((t) => confusability(t, c, "name"))) + rng() * 1.5;
