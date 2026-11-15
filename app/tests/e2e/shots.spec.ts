@@ -129,7 +129,10 @@ for (const s of SIZES) {
     });
     test("Spielen und Stimmgerät", async ({ page }) => {
       await page.addInitScript(FAKE_MIC);
-      await seed(page);
+      // mit 4 vorgestellten Tönen bleiben fällige Spielen-Karten Einzelkarten (ab 5 wären es Folgen)
+      const d = sampleData();
+      d.introduced.spielen = ["h1", "a1", "g1", "c2"];
+      await seed(page, d);
       const p = (x: string) => `${OUT}/${scheme}-${s.name}-${x}.png`;
       const osc = (id: string) => page.evaluate((f) => (window as never as { __osc: { play(f: number): void } }).__osc.play(f), soundingFreq(note(id)));
       await page.goto("./");
@@ -439,6 +442,12 @@ for (const s of SIZES.filter((x) => x.name === "360x740" || x.name === "740x360"
       await page.waitForTimeout(150);
       await page.screenshot({ path: p("r2-abgleich-start") });
       await page.getByRole("button", { name: "Abgleich starten" }).click();
+      // erst nach einem Bereit-Ton wird eingezählt
+      await page.waitForFunction(() => (window as unknown as { __osc: unknown }).__osc !== null);
+      await page.waitForTimeout(150);
+      await page.screenshot({ path: p("r2b-abgleich-bereit") });
+      const tReady = await now();
+      await schedule([[tReady + 100, hz(69)], [tReady + 500, null]]);
       await page.waitForFunction(() => !!(window as unknown as { __lied: { follow(): Dbg } }).__lied.follow().cal?.clicks);
       const clicks = (await dbg()).cal!.clicks!;
       await schedule(clicks.flatMap((c): [number, number | null][] => [[c + 140, hz(69)], [c + 340, null]]));
