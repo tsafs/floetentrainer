@@ -58,9 +58,19 @@ describe("Antwortmöglichkeiten", () => {
     let neighbor = 0;
     for (let s = 1; s <= 30; s++) {
       const ids = makeChoices("e1", "name", 4, unlockedNotes("lesen", 11), seeded(s));
-      if (ids.includes("d1") || ids.includes("f1") || ids.includes("es1") || ids.includes("e2")) neighbor++;
+      if (ids.includes("d1") || ids.includes("f1") || ids.includes("es1")) neighbor++;
     }
     expect(neighbor).toBe(30);
+  });
+  it("Namen: nie derselbe Name in anderer Oktave (d¹ ↔ d²)", () => {
+    const un = unlockedNotes("lesen", 12);
+    for (let s = 1; s <= 40; s++) {
+      for (const t of ["d1", "d2", "e1", "e2", "c1", "c2", "f1", "f2", "cis1", "cis2"]) {
+        const ids = makeChoices(t, "name", 8, un, seeded(s));
+        const tn = note(t);
+        expect(ids.filter((i) => i !== t && note(i).name === tn.name)).toEqual([]);
+      }
+    }
   });
   it("andere Schreibweise und Partner nie zusammen", () => {
     const un = unlockedNotes("lesen", 12);

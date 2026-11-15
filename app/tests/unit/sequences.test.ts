@@ -176,6 +176,16 @@ describe("Antwortknöpfe fürs Lesen", () => {
     expect(c.filter((x) => !["g1", "a1", "h1", "c2"].includes(x)).length).toBeGreaterThanOrEqual(2);
     expect(folgeChoices(["g1", "a1"], pool5, seeded(1))).toHaveLength(5);
   });
+  it("kein Ton der Folge in anderer Oktave als falsche Möglichkeit", () => {
+    const rng = seeded(5);
+    for (let k = 0; k < 200; k++) {
+      const f = makeFolge(POOL_F, 5, rng);
+      const c = folgeChoices(f, POOL_F, rng);
+      for (const x of c.filter((x) => !f.includes(x))) {
+        expect(f.some((n) => note(n).name === note(x).name)).toBe(false);
+      }
+    }
+  });
   it("keine anderen Schreibweisen", () => {
     const all = unlockedNotes("lesen", 12);
     const c = folgeChoices(["es1", "f1", "g1"], all, seeded(4));

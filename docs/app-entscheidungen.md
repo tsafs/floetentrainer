@@ -163,6 +163,9 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
 - **Note→Griff:** 4 Griffbilder. **Griff→Note:** ein Griffbild, zur Wahl 4 kleine Notenzeilen.
 - **Falsche Antworten möglichst verwechselbar:** Nachbartöne, dieselbe Note mit ♯/♭, ähnliche Griffe
   (wenige Löcher anders), derselbe Ton in der anderen Oktave.
+  - Ausnahme (seit 15.11.2026): Sind die Antworten **Namen** (Note→Name, Tonfolge), nie derselbe Name in
+    der anderen Oktave (bei d¹ kein d²). Die kleine Oktavzahl übersieht oder verliest man leicht, und welche
+    Oktave gemeint ist, zeigt die Notenzeile ohnehin. Bei Griffen und Notenzeilen bleibt die andere Oktave.
   - Reichen die freigeschalteten Töne nicht, kommen Töne aus späteren Stufen dazu. Diese werden selbst
     nie abgefragt.
   - Nie zwei Möglichkeiten mit demselben Griff und nie zwei Schreibweisen desselben Tons.
