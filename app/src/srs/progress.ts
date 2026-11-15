@@ -77,6 +77,35 @@ export function readyForNext(data: AppData, track: Track): boolean {
   return countedNotes(data, track).every((n) => noteMastered(data.history[track][n], data.countFrom[track]));
 }
 
+/**
+ * Töne, die gerade das Freischalten der nächsten Stufe aufhalten (zählen fürs Freischalten, Bedingung
+ * noch nicht erfüllt). Leer, wenn die Spur an ihrer Grenze steht. Sie kommen wie schwache Töne häufiger
+ * dran – sonst bräuchte ein einzelner Ton mit 17 von 20 sehr viele Sitzungen, bis ein alter Fehler aus
+ * den letzten 20 fällt.
+ */
+export function blockingNotes(data: AppData, track: Track): string[] {
+  if (level(data, track) >= levelCap(data, track)) return [];
+  return countedNotes(data, track).filter((n) => !noteMastered(data.history[track][n], data.countFrom[track]));
+}
+
+/**
+ * Gewicht eines Tons in Zusatzkarten und Tonfolgen: 1, schwach +2, aufhaltend +2. Ein Ton, der beides ist,
+ * kommt also fünffach – so bleibt ein schwacher Ton vorn, auch wenn (etwa auf Stufe 1 oder nach dem
+ * Senken einer Stufe) alle Töne aufhalten.
+ */
+export function noteWeight(data: AppData, track: Track): (note: string) => number {
+  const blocking = new Set(blockingNotes(data, track));
+  const cache = new Map<string, number>();
+  return (n) => {
+    let w = cache.get(n);
+    if (w === undefined) {
+      w = 1 + (blocking.has(n) ? 2 : 0) + (isWeak(noteAccuracy(data, track, n)) ? 2 : 0);
+      cache.set(n, w);
+    }
+    return w;
+  };
+}
+
 export interface Unlock {
   track: Track;
   level: number;

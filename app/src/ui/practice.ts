@@ -38,6 +38,9 @@ function flute(id: string): string {
   return fluteSvg(note(id).fingering, `Griffbild ${nameText(id)}`);
 }
 
+/** Nach einem Tippfehler: Antwort zurücknehmen (zählt nicht als Fehler) */
+const TYPO_BTN = `<button class="textbtn" data-act="typo" data-testid="typo">Vertippt</button>`;
+
 /** kleines Häkchen am richtigen Antwortknopf */
 const TICK = `<span class="okmark" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 7.4l2.6 2.6L11 4.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
 
@@ -136,6 +139,17 @@ export const practiceView: View = (root, ctx) => {
     clearTimer();
     timer = window.setTimeout(advance, AUTO_NEXT_MS);
     advanceArmed = true;
+  }
+
+  /** „Vertippt“: die falsche Antwort zählt nicht (Session.undoLast), weiter zur nächsten Karte */
+  function bindTypo(scope: Element, pressedHere: (e: Event, el: Element) => boolean) {
+    const b = scope.querySelector<HTMLButtonElement>('[data-act="typo"]');
+    b?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (!pressedHere(e, b) || !s.canUndo) return;
+      s.undoLast();
+      advance();
+    });
   }
 
   function header(label: string): string {
@@ -297,7 +311,7 @@ export const practiceView: View = (root, ctx) => {
       return (
         `<div class="panel err center${pic ? "" : " solo"}" data-testid="panel">${pic}<div class="txt"><span class="head">${head}</span>` +
         `<span class="name">${nameHtml(id)}</span></div></div>` +
-        `<button class="go" data-act="next">Weiter</button>`
+        (s.canUndo ? `<div class="gorow">${TYPO_BTN}<button class="go" data-act="next">Weiter</button></div>` : `<button class="go" data-act="next">Weiter</button>`)
       );
     };
 
@@ -309,6 +323,7 @@ export const practiceView: View = (root, ctx) => {
         if (!pressedHere(e, go)) return;
         advance();
       });
+      bindTypo(slot, pressedHere);
       // die Antwortknöpfe sind jetzt verdeckt: Fokus auf „Weiter“, damit er nicht verloren geht
       go?.focus({ preventScroll: true });
     };
@@ -333,7 +348,7 @@ export const practiceView: View = (root, ctx) => {
         if (phase !== "ask" || !pressedHere(e, b)) return;
         const c = b.dataset.choice!;
         const ok = c === id;
-        s.answer(ok);
+        s.answer(ok, true);
         markButtons(c);
         if (ok) {
           setPhase("ok");
@@ -469,9 +484,10 @@ export const practiceView: View = (root, ctx) => {
     };
 
     /** Folge fertig: werten und Rückmeldung */
-    const done = (head: string) => {
+    /** typed: alle Antworten getippt (nicht „Weiß nicht“, nicht gespielt) – dann gibt es „Vertippt“ */
+    const done = (head: string, typed = false) => {
       const res = notes.map((_, k) => ok[k] === true);
-      s.answerFolge(res);
+      s.answerFolge(res, typed);
       if (res.every(Boolean)) {
         setPhase("ok");
         idkRow.innerHTML = `<span class="okline" data-testid="panel">${ICON_CHECK}<span>Richtig</span>${listenBtn}</span>`;
@@ -485,8 +501,9 @@ export const practiceView: View = (root, ctx) => {
       slot.innerHTML =
         `<div class="panel err center solo" data-testid="panel"><div class="txt"><span class="head">${head}</span>` +
         `<span class="names">${names}</span></div></div>` +
-        `<div class="gorow">${listenBtn}<button class="go" data-act="next">Weiter</button></div>`;
+        `<div class="gorow">${listenBtn}${s.canUndo ? TYPO_BTN : ""}<button class="go" data-act="next">Weiter</button></div>`;
       bindListen(slot);
+      bindTypo(slot, pressedHere);
       const go = slot.querySelector<HTMLButtonElement>('[data-act="next"]')!;
       go.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -527,7 +544,7 @@ export const practiceView: View = (root, ctx) => {
           b.classList.add(good ? "tap-ok" : "tap-err");
           cur++;
           if (cur < n) setCur(cur);
-          else done("Nicht ganz");
+          else done("Nicht ganz", true);
         }),
       );
       return;
