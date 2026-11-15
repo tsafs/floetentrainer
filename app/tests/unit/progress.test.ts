@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { maxLevel, unlockedNotes } from "../../src/music/levels";
 import {
   accuracy,
+  blockingNotes,
   checkUnlocks,
   isWeak,
   level,
@@ -97,6 +98,23 @@ describe("Freischalten", () => {
     d.stages.spielen = "hohe-griffe";
     master(d, "spielen", unlockedNotes("spielen", 11));
     expect(readyForNext(d, "spielen")).toBe(false);
+  });
+});
+
+describe("Aufhaltende Töne", () => {
+  it("die Töne der Stufe, die die Bedingung noch nicht erfüllen", () => {
+    const d = defaultData();
+    expect(blockingNotes(d, "lesen")).toEqual(["h1", "a1", "g1"]);
+    master(d, "lesen", ["h1", "g1"]);
+    d.history.lesen.a1 = answers(20, 3, [TODAY]); // 17 von 20
+    expect(blockingNotes(d, "lesen")).toEqual(["a1"]);
+  });
+  it("an der Grenze der Spur hält nichts auf", () => {
+    const d = defaultData();
+    // Spielen steht an der Lesen-Stufe
+    expect(blockingNotes(d, "spielen")).toEqual([]);
+    d.stages.lesen = "andere-schreibweisen";
+    expect(blockingNotes(d, "lesen")).toEqual([]);
   });
 });
 

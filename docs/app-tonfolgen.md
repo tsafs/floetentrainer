@@ -62,7 +62,8 @@ wie f¹ – fis¹ – g¹.
 - **Halbtonschritte** bevorzugen, wo beide Töne freigeschaltet sind (f¹–fis¹, fis¹–g¹, cis²–d², b¹–h¹ …):
   Gerade diese Griffwechsel sind schwer.
 - ~~**Tonwiederholung** in etwa jeder vierten Folge einmal~~ – entfällt (siehe Entscheidung 5).
-- **Schwache Töne** (`isWeak`) häufiger einbauen (wie bei Zusatzkarten dreifach gewichtet).
+- **Schwache Töne** (`isWeak`) und Töne, die die nächste Stufe aufhalten (`blockingNotes`, seit 15.11.2026),
+  häufiger einbauen (wie bei Zusatzkarten dreifach gewichtet, `focusNotes`).
 - In einer Sitzung keine Folge zweimal (außer der Wiederholung nach einem Fehler).
 - Zufall nur über das übergebene `rng`, damit Tests feste Folgen bekommen.
 - Später denkbar (nicht jetzt): Schnipsel aus den Heft-Liedern, die nur freigeschaltete Töne enthalten.

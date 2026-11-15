@@ -1,9 +1,9 @@
 // Ablauf einer Sitzung: Zusammensetzung, Reihenfolge, Wiederholungen nach Fehlern, Wertung.
 
 import { levelOf, type Kind, type Track } from "../music/levels";
-import { cardKey, type AppData } from "../store/data";
+import { cardKey, type Answer, type AppData, type CardState } from "../store/data";
 import { applyAnswer, dueCards, newCards, trackCards, type CardRef } from "./leitner";
-import { checkUnlocks, isWeak, noteAccuracy, recordAnswer, type Unlock } from "./progress";
+import { checkUnlocks, focusNotes, recordAnswer, type Unlock } from "./progress";
 import type { Rng } from "./choices";
 import { FolgeLength, folgeKey, folgeMaxLen, folgePool, makeFolge } from "./sequences";
 
@@ -41,6 +41,19 @@ export type Step =
 type Retry = { at: number } & ({ item: PlanItem; folge?: undefined } | { folge: Folge; item?: undefined });
 
 const firstOf = (r: Retry) => (r.folge ? r.folge.notes[0] : r.item!.note);
+
+/**
+ * Was eine gewertete falsche Antwort verändert hat, damit „Vertippt“ es zurücknehmen kann: Verlauf der
+ * falschen Töne, Fach der Karte, Wiederholung, „Schwierig waren“, Länge der Tonfolgen.
+ */
+interface Undo {
+  uid: number;
+  folge: boolean;
+  history: [string, Answer[] | undefined][];
+  card?: { key: string; prev: CardState | undefined };
+  difficult: string[];
+  folgeLen?: { len: number; streak: number };
+}
 
 export interface SessionResult {
   graded: number;
@@ -89,10 +102,10 @@ export function buildPlan(data: AppData, track: Track, today: string, sessionNo:
     }
   }
   if (plan.length < limit) {
-    // Zusatzkarten: bekannte Karten und die neuen dieser Sitzung; schwache Töne dreifach
+    // Zusatzkarten: bekannte Karten und die neuen dieser Sitzung; schwache und aufhaltende Töne dreifach
     const planned = new Set(plan.filter((p) => p.type === "new").map((p) => cardKey(p.note, p.kind)));
     const pool = trackCards(data, track).filter((c) => data.cards[cardKey(c.note, c.kind)] || planned.has(cardKey(c.note, c.kind)));
-    const weak = new Set(pool.map((c) => c.note).filter((n) => isWeak(noteAccuracy(data, track, n))));
+    const weak = focusNotes(data, track, pool.map((c) => c.note));
     while (plan.length < limit && pool.length) {
       const last = plan[plan.length - 1]?.note;
       const options = pool.filter((c) => c.note !== last);
@@ -137,6 +150,8 @@ export class Session {
   /** Länge der Tonfolgen (erst bei der ersten Folge angelegt) */
   private folgeLen: FolgeLength | null = null;
   private usedFolgen = new Set<string>();
+  /** letzte gewertete falsche Antwort, solange sie noch zurückgenommen werden kann */
+  private undo: Undo | null = null;
   current: Step | null = null;
   graded = 0;
   correct = 0;
@@ -180,6 +195,7 @@ export class Session {
 
   /** Nächster Schritt oder null, wenn die Sitzung endet. */
   next(): Step | null {
+    this.undo = null;
     if (this.pendingIntro) {
       // Nach der Vorstellung kommt die zugehörige Karte
       const s = this.pendingIntro;
@@ -213,7 +229,7 @@ export class Session {
   private makeFolge(p: PlanItem, pool: string[], avoidLast: string[]): Folge {
     const rng = this.opt.rng;
     this.folgeLen ??= new FolgeLength(pool.length, folgeMaxLen(levelOf(this.track, this.data.stages[this.track])), rng);
-    const weak = new Set(pool.filter((n) => isWeak(noteAccuracy(this.data, this.track, n))));
+    const weak = focusNotes(this.data, this.track, pool);
     const notes = makeFolge(pool, this.folgeLen.len, rng, { weak, avoidFirst: this.lastNote, used: this.usedFolgen, avoidLast });
     this.usedFolgen.add(folgeKey(notes));
     return { notes, uid: p.uid };
@@ -300,6 +316,8 @@ export class Session {
     const step = this.current;
     if (!step || step.type !== "card") return;
     const { item, retry } = step;
+    this.undo = null;
+    if (!retry && !ok) this.undo = this.snapshot(item.uid, false, [item.note], item.type !== "extra" ? cardKey(item.note, item.kind) : undefined);
     if (!retry) {
       this.graded += 1;
       if (ok) this.correct += 1;
@@ -336,6 +354,11 @@ export class Session {
     const per = new Map<string, boolean>();
     folge.notes.forEach((n, i) => per.set(n, (per.get(n) ?? true) && !!ok[i]));
     const all = [...per.values()].every(Boolean);
+    this.undo = null;
+    if (!retry && !all) {
+      const wrong = [...per].filter(([, good]) => !good).map(([n]) => n);
+      this.undo = this.snapshot(folge.uid, true, wrong);
+    }
     if (!retry) {
       this.graded += 1;
       if (all) this.correct += 1;
@@ -356,6 +379,57 @@ export class Session {
         this.retries.push({ folge, at: this.shown + gap });
       }
     }
+  }
+
+  private snapshot(uid: number, folge: boolean, notes: string[], key?: string): Undo {
+    const h = this.data.history[this.track];
+    return {
+      uid,
+      folge,
+      history: notes.map((n) => [n, h[n]?.slice()]),
+      card: key ? { key, prev: this.data.cards[key] && { ...this.data.cards[key] } } : undefined,
+      difficult: this.difficult.slice(),
+      folgeLen: folge && this.folgeLen ? { len: this.folgeLen.len, streak: this.folgeLen.streak } : undefined,
+    };
+  }
+
+  /** Lässt sich die letzte Antwort als „Vertippt“ zurücknehmen? (gewertet und falsch, noch auf derselben Karte) */
+  get canUndo(): boolean {
+    return this.undo !== null;
+  }
+
+  /**
+   * „Vertippt“: die falsche Antwort zählt nicht. Der Fehler verschwindet aus dem Verlauf (Trefferquote,
+   * Freischalten), das Fach der Karte bleibt wie vorher (sie bleibt also fällig), die Wiederholung entfällt.
+   * Bei einer Tonfolge nur die falsch getippten Töne; die richtigen bleiben gewertet. Im Ergebnis der
+   * Sitzung („7 von 20“, „18 richtig“) zählt der Schritt als richtig.
+   */
+  undoLast(): void {
+    const u = this.undo;
+    if (!u) return;
+    this.undo = null;
+    const h = this.data.history[this.track];
+    for (const [n, list] of u.history) {
+      if (list) h[n] = list;
+      else delete h[n];
+    }
+    if (u.card) {
+      if (u.card.prev) this.data.cards[u.card.key] = u.card.prev;
+      else delete this.data.cards[u.card.key];
+    }
+    this.difficult = u.difficult;
+    this.retries = this.retries.filter((r) => (r.folge ? r.folge.uid : r.item!.uid) !== u.uid);
+    this.retryCount.delete(u.uid);
+    // Im Ergebnis der Sitzung zählt der Schritt als richtig (sie wusste es ja)
+    this.correct += 1;
+    if (u.folgeLen && this.folgeLen) {
+      this.folgeLen.len = u.folgeLen.len;
+      this.folgeLen.streak = u.folgeLen.streak;
+      this.folgeLen.update(true);
+    }
+    // Ohne den Fehler kann die Bedingung jetzt erfüllt sein
+    this.unlocks.push(...checkUnlocks(this.data));
+    this.onChange();
   }
 
   result(): SessionResult {

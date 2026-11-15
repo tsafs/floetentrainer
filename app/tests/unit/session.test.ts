@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildPlan, MAX_NEW, Session, type Step } from "../../src/srs/session";
 import { cardKey, defaultData, type AppData } from "../../src/store/data";
 import { addDays } from "../../src/store/dates";
-import { seeded, TODAY } from "./helpers";
+import { answers, master, seeded, TODAY } from "./helpers";
 
 function mkSession(d: AppData, track: "lesen" | "spielen" = "lesen", opts: { limitCards?: number; limitMs?: number; seed?: number; clock?: { t: number } } = {}) {
   const clock = opts.clock ?? { t: 1_000_000 };
@@ -95,6 +95,7 @@ describe("Zusammensetzung", () => {
   it("Zusatzkarten: schwache Töne dreifach gewichtet", () => {
     const d = defaultData();
     for (const n of ["h1", "a1", "g1"]) for (const k of ["name", "griff", "note"]) d.cards[`${n}|${k}`] = { box: 4, day: TODAY, session: 1 };
+    master(d, "lesen", ["h1", "a1"]); // sonst hielten auch sie die nächste Stufe auf (ebenfalls dreifach)
     d.history.lesen.g1 = Array.from({ length: 10 }, (_, i) => [i < 5 ? 0 : 1, TODAY, i] as [0 | 1, string, number]);
     let g = 0;
     let total = 0;
@@ -105,6 +106,119 @@ describe("Zusammensetzung", () => {
     }
     // ohne Gewicht wäre g1 ein Drittel; mit Gewicht 3 deutlich mehr (wegen „nie zweimal hintereinander“ höchstens die Hälfte)
     expect(g / total).toBeGreaterThan(0.4);
+  });
+  it("Zusatzkarten: ein Ton, der die nächste Stufe aufhält (17 von 20), kommt dreifach", () => {
+    const d = defaultData();
+    for (const n of ["h1", "a1", "g1"]) for (const k of ["name", "griff", "note"]) d.cards[`${n}|${k}`] = { box: 4, day: TODAY, session: 1 };
+    master(d, "lesen", ["h1", "a1"]);
+    d.history.lesen.g1 = answers(20, 3, [TODAY]); // 85 %: nicht schwach, aber unter 90 %
+    let g = 0;
+    let total = 0;
+    for (let seed = 1; seed <= 40; seed++) {
+      const plan = buildPlan(d, "lesen", TODAY, 2, 20, seeded(seed));
+      g += plan.filter((p) => p.note === "g1").length;
+      total += plan.length;
+    }
+    expect(g / total).toBeGreaterThan(0.4);
+  });
+});
+
+describe("Vertippt", () => {
+  /** Stufe 1, alle Karten in Fach 4, nichts fällig: nur Zusatzkarten (noch keine Tonfolgen) */
+  function extrasOnly() {
+    const d = defaultData();
+    for (const n of ["h1", "a1", "g1"]) for (const k of ["name", "griff", "note"]) d.cards[`${n}|${k}`] = { box: 4, day: TODAY, session: 1 };
+    return d;
+  }
+  it("Karte: der Fehler verschwindet aus dem Verlauf, keine Wiederholung, zählt im Ergebnis als richtig", () => {
+    const d = extrasOnly();
+    d.history.lesen.g1 = answers(20, 2, [TODAY]);
+    const before = d.history.lesen.g1.slice();
+    const s = mkSession(d);
+    let st = s.next()!;
+    while (st.type !== "card" || st.item.note !== "g1") {
+      s.answer(true);
+      st = s.next()!;
+    }
+    const graded = s.graded;
+    const correct = s.correct;
+    expect(s.canUndo).toBe(false);
+    s.answer(false);
+    expect(s.canUndo).toBe(true);
+    s.undoLast();
+    expect(s.canUndo).toBe(false);
+    // auch die älteste Antwort, die der Fehler aus den letzten 20 verdrängt hatte, ist wieder da
+    expect(d.history.lesen.g1).toEqual(before);
+    expect(s.graded).toBe(graded + 1);
+    expect(s.correct).toBe(correct + 1);
+    expect(s.result().difficult).not.toContain("g1");
+    // keine Wiederholung von g1 in dieser Sitzung
+    const rest = run(s);
+    expect(rest.some((x) => x.type === "card" && x.retry)).toBe(false);
+  });
+  it("fällige Karte: Fach bleibt wie vorher", () => {
+    const d = defaultData();
+    d.cards["h1|name"] = { box: 3, day: addDays(TODAY, -5), session: 1 };
+    const s = mkSession(d);
+    const st = s.next()!;
+    expect(st.type === "card" && st.item.type === "due").toBe(true);
+    s.answer(false);
+    expect(d.cards["h1|name"].box).toBe(1);
+    s.undoLast();
+    expect(d.cards["h1|name"]).toEqual({ box: 3, day: addDays(TODAY, -5), session: 1 });
+  });
+  it("nur direkt nach einer gewerteten falschen Antwort", () => {
+    const d = extrasOnly();
+    const s = mkSession(d);
+    s.next();
+    s.answer(true);
+    expect(s.canUndo).toBe(false);
+    s.next();
+    s.answer(false);
+    expect(s.canUndo).toBe(true);
+    s.next(); // weitergegangen: zu spät
+    expect(s.canUndo).toBe(false);
+  });
+  it("kann die nächste Stufe freischalten", () => {
+    const d = extrasOnly();
+    master(d, "lesen", ["h1", "a1"]);
+    d.history.lesen.g1 = answers(9, 0, [TODAY]);
+    const s = mkSession(d);
+    let st = s.next()!;
+    while (st.type !== "card" || st.item.note !== "g1") {
+      s.answer(true);
+      st = s.next()!;
+    }
+    // 9 richtige + diese falsch: 9 von 10 = 90 % – würde schon reichen; also vorher einen Fehler einbauen
+    d.history.lesen.g1 = [[0, TODAY, 1], ...answers(9, 0, [TODAY], 10)];
+    s.answer(false); // jetzt 9 von 11
+    expect(d.stages.lesen).toBe("erste-toene");
+    s.undoLast(); // 9 von 10
+    expect(d.stages.lesen).toBe("c2-d2");
+    expect(s.result().unlocks.map((u) => u.level)).toEqual([2]);
+  });
+  it("Tonfolge: nur die falsch getippten Töne fallen weg, die richtigen bleiben gewertet", () => {
+    const d = defaultData();
+    d.stages.lesen = "fis1";
+    const notes = ["h1", "a1", "g1", "c2", "d2", "e1", "d1", "fis1"];
+    for (const n of notes) for (const k of ["name", "griff", "note"]) d.cards[`${n}|${k}`] = { box: 4, day: TODAY, session: 1 };
+    d.introduced.lesen = notes.slice();
+    const s = mkSession(d);
+    let st = s.next()!;
+    while (st.type !== "folge") {
+      s.answer(true);
+      st = s.next()!;
+    }
+    const f = st.folge.notes;
+    const wrong = f[1];
+    const res = f.map((n) => n !== wrong);
+    s.answerFolge(res);
+    expect(s.canUndo).toBe(true);
+    s.undoLast();
+    expect(d.history.lesen[wrong] ?? []).toEqual([]);
+    for (const n of new Set(f.filter((n) => n !== wrong))) expect(d.history.lesen[n]).toHaveLength(1);
+    expect(s.result().difficult).not.toContain(wrong);
+    expect(s.correct).toBe(s.graded);
   });
 });
 

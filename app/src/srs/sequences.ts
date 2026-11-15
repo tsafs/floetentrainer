@@ -121,7 +121,8 @@ export function makeFolge(poolIds: string[], len: number, rng: Rng, opt: FolgeOp
  */
 export class FolgeLength {
   len: number;
-  private streak = 0;
+  /** fehlerfreie Folgen in Reihe (öffentlich, damit „Vertippt“ den Stand zurücksetzen kann) */
+  streak = 0;
 
   constructor(
     poolSize: number,

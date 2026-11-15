@@ -93,6 +93,22 @@ test.describe("Üben", () => {
     expect(idx).toBeLessThanOrEqual(3);
   });
 
+  test("„Vertippt“ nimmt den Fehler zurück", async ({ page }) => {
+    await seed(page, sampleData());
+    await page.goto("./");
+    await page.getByRole("button", { name: /Üben/ }).click();
+    await skipIntros(page);
+    const i = await info(page);
+    const before = (await stored(page)).history.lesen[i.note]?.length ?? 0;
+    await answer(page, false);
+    await expect(page.getByTestId("panel")).toContainText("Nicht ganz");
+    expect((await stored(page)).history.lesen[i.note].at(-1)[0]).toBe(0);
+    await page.getByTestId("typo").click();
+    await waitNext(page, i.seq);
+    const d = await stored(page);
+    expect(d.history.lesen[i.note]?.length ?? 0).toBe(before);
+  });
+
   test("„Weiß nicht“ zeigt die Auflösung und zählt als Fehler", async ({ page }) => {
     await seed(page, sampleData());
     await page.goto("./");
@@ -100,6 +116,7 @@ test.describe("Üben", () => {
     const { note } = await info(page);
     await page.getByRole("button", { name: "Weiß nicht" }).click();
     await expect(page.getByTestId("panel")).toContainText("Auflösung");
+    await expect(page.getByTestId("typo")).toHaveCount(0); // kein Tippfehler
     const d = await stored(page);
     expect(d.history.lesen[note].at(-1)[0]).toBe(0);
   });
