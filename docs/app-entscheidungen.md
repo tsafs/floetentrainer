@@ -20,11 +20,13 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   2. **Neue Karten** der freigeschalteten Töne, **höchstens 6 je Sitzung**. Vor der ersten Karte
      eines neuen Tons kommt dessen Vorstellung (Abschnitt 4).
   3. **Zusatzkarten**, bis die Sitzung voll ist: zufällige Karten der freigeschalteten Töne,
-     schwache Töne dreifach gewichtet, ebenso **Töne, die die nächste Stufe aufhalten** (zählen fürs
+     schwache Töne häufiger, ebenso **Töne, die die nächste Stufe aufhalten** (zählen fürs
      Freischalten und erfüllen die Bedingung noch nicht, z. B. 17 von 20; seit 15.11.2026 auf Rückmeldung:
      „Ich hänge seit Ewigkeiten auf Stufe 4, nur weil ein Ton bei 17/20 hängt.“ Mit Gewicht 1 kam dieser
      Ton nur in jeder achten Zusatzkarte, und bis ein alter Fehler aus den letzten 20 fiel, vergingen viele
-     Sitzungen). Zusatzkarten zählen für die Trefferquote (Abschnitt 3),
+     Sitzungen). Gewicht je Ton: 1, schwach +2, aufhaltend +2 – also dreifach, wenn eins davon zutrifft,
+     fünffach bei beidem. So bleibt ein schwacher Ton vorn, auch wenn alle Töne aufhalten (Stufe 1, nach
+     dem Senken einer Stufe). Zusatzkarten zählen für die Trefferquote (Abschnitt 3),
      **verändern aber keine Fächer und Termine.**
      **Etwa jede zweite Zusatzkarte ist eine Tonfolge** (seit 14.11.2026, `docs/app-tonfolgen.md`;
      abwechselnd, nicht gehäuft): mehrere Töne hintereinander lesen bzw. spielen (Abschnitt 4). Sie gibt
@@ -51,7 +53,9 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   fällige Karte bleibt fällig), die Wiederholung entfällt, der Ton fehlt in „Schwierig waren“. Bei einer
   Tonfolge gilt das nur für die falsch getippten Töne; die richtigen bleiben gewertet. Im Ergebnis der
   Sitzung zählt der Schritt als richtig. Nur solange die Rückmeldung steht; danach nicht mehr. Ohne den
-  Fehler kann die nächste Stufe sofort freigeschaltet sein. Die App vertraut ihr hier: Wer es ausnutzt,
+  Fehler kann die nächste Stufe sofort freigeschaltet sein. Umgekehrt gilt eine Stufe, die erst der Fehler
+  freigeschaltet hat (9 von 9 sind zu wenige Antworten, 9 von 10 reichen), danach nicht mehr; ein
+  Übungstag, den nur diese Antwort eingetragen hat, ebenso. Die App vertraut ihr hier: Wer es ausnutzt,
   betrügt nur sich selbst.
 - **Abbrechen mit ×:** Bereits beantwortete Karten bleiben gewertet, alles andere bleibt unverändert.
 - **Nichts fällig, nichts neu:** Der Knopf heißt dann „Weiter üben“ bzw. „Weiter spielen“, darunter
@@ -185,7 +189,7 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
     Melodisch statt zufällig: nach Tonhöhe geordnet, meist der Nachbarton, oft eine Terz, selten ein
     größerer Sprung (höchstens eine Quinte); Halbtonschritte bevorzugt (f¹–fis¹, h¹–c² …); nie derselbe Ton
     zweimal direkt hintereinander (zu leicht; später in der Folge darf er wiederkommen, z. B. d¹ g¹ d¹ –
-    geändert am 14.11.2026, vorher gab es Tonwiederholungen); schwache und aufhaltende Töne dreifach gewichtet; in
+    geändert am 14.11.2026, vorher gab es Tonwiederholungen); schwache und aufhaltende Töne häufiger (wie bei Zusatzkarten); in
     einer Sitzung keine Folge zweimal. Erzeugt in `app/src/srs/sequences.ts`.
   - Länge: Beginn mit 3 Tönen (bei genau 5 Tönen 2 oder 3), nach zwei fehlerfreien Folgen in Reihe +1,
     nach einer fehlerhaften −1, 2 bis 5 Töne (ab Stufe 8 bis 6). Gilt nur innerhalb der Sitzung.

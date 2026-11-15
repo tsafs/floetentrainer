@@ -299,7 +299,7 @@ export const practiceView: View = (root, ctx) => {
       idkRow.innerHTML = `<span class="okline" data-testid="panel">${ICON_CHECK}<span>${head}</span><span class="name">${nameHtml(id)}</span></span>`;
     };
 
-    const errPanel = (head: string, typo = false) => {
+    const errPanel = (head: string) => {
       // Nur der richtige Name, mittig. Wo die Antwort ein Bild ist (Griff wählen, Note zum Griff wählen),
       // bleibt sie als Bild daneben – das Feld verdeckt ja die Antwortknöpfe.
       const pic =
@@ -311,7 +311,7 @@ export const practiceView: View = (root, ctx) => {
       return (
         `<div class="panel err center${pic ? "" : " solo"}" data-testid="panel">${pic}<div class="txt"><span class="head">${head}</span>` +
         `<span class="name">${nameHtml(id)}</span></div></div>` +
-        (typo ? `<div class="gorow">${TYPO_BTN}<button class="go" data-act="next">Weiter</button></div>` : `<button class="go" data-act="next">Weiter</button>`)
+        (s.canUndo ? `<div class="gorow">${TYPO_BTN}<button class="go" data-act="next">Weiter</button></div>` : `<button class="go" data-act="next">Weiter</button>`)
       );
     };
 
@@ -348,7 +348,7 @@ export const practiceView: View = (root, ctx) => {
         if (phase !== "ask" || !pressedHere(e, b)) return;
         const c = b.dataset.choice!;
         const ok = c === id;
-        s.answer(ok);
+        s.answer(ok, true);
         markButtons(c);
         if (ok) {
           setPhase("ok");
@@ -356,7 +356,7 @@ export const practiceView: View = (root, ctx) => {
           autoAdvance();
         } else {
           setPhase("err");
-          slot.innerHTML = errPanel("Nicht ganz", s.canUndo);
+          slot.innerHTML = errPanel("Nicht ganz");
           bindNext();
         }
       }),
@@ -484,9 +484,10 @@ export const practiceView: View = (root, ctx) => {
     };
 
     /** Folge fertig: werten und Rückmeldung */
-    const done = (head: string) => {
+    /** typed: alle Antworten getippt (nicht „Weiß nicht“, nicht gespielt) – dann gibt es „Vertippt“ */
+    const done = (head: string, typed = false) => {
       const res = notes.map((_, k) => ok[k] === true);
-      s.answerFolge(res);
+      s.answerFolge(res, typed);
       if (res.every(Boolean)) {
         setPhase("ok");
         idkRow.innerHTML = `<span class="okline" data-testid="panel">${ICON_CHECK}<span>Richtig</span>${listenBtn}</span>`;
@@ -500,7 +501,7 @@ export const practiceView: View = (root, ctx) => {
       slot.innerHTML =
         `<div class="panel err center solo" data-testid="panel"><div class="txt"><span class="head">${head}</span>` +
         `<span class="names">${names}</span></div></div>` +
-        `<div class="gorow">${listenBtn}${!playing && head === "Nicht ganz" && s.canUndo ? TYPO_BTN : ""}<button class="go" data-act="next">Weiter</button></div>`;
+        `<div class="gorow">${listenBtn}${s.canUndo ? TYPO_BTN : ""}<button class="go" data-act="next">Weiter</button></div>`;
       bindListen(slot);
       bindTypo(slot, pressedHere);
       const go = slot.querySelector<HTMLButtonElement>('[data-act="next"]')!;
@@ -543,7 +544,7 @@ export const practiceView: View = (root, ctx) => {
           b.classList.add(good ? "tap-ok" : "tap-err");
           cur++;
           if (cur < n) setCur(cur);
-          else done("Nicht ganz");
+          else done("Nicht ganz", true);
         }),
       );
       return;

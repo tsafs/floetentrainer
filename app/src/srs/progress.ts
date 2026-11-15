@@ -88,10 +88,22 @@ export function blockingNotes(data: AppData, track: Track): string[] {
   return countedNotes(data, track).filter((n) => !noteMastered(data.history[track][n], data.countFrom[track]));
 }
 
-/** Töne, die in Zusatzkarten und Tonfolgen dreifach gewichtet werden: schwache und aufhaltende. */
-export function focusNotes(data: AppData, track: Track, notes: string[]): Set<string> {
+/**
+ * Gewicht eines Tons in Zusatzkarten und Tonfolgen: 1, schwach +2, aufhaltend +2. Ein Ton, der beides ist,
+ * kommt also fünffach – so bleibt ein schwacher Ton vorn, auch wenn (etwa auf Stufe 1 oder nach dem
+ * Senken einer Stufe) alle Töne aufhalten.
+ */
+export function noteWeight(data: AppData, track: Track): (note: string) => number {
   const blocking = new Set(blockingNotes(data, track));
-  return new Set(notes.filter((n) => blocking.has(n) || isWeak(noteAccuracy(data, track, n))));
+  const cache = new Map<string, number>();
+  return (n) => {
+    let w = cache.get(n);
+    if (w === undefined) {
+      w = 1 + (blocking.has(n) ? 2 : 0) + (isWeak(noteAccuracy(data, track, n)) ? 2 : 0);
+      cache.set(n, w);
+    }
+    return w;
+  };
 }
 
 export interface Unlock {

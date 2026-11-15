@@ -62,6 +62,8 @@ function pickWeighted<T>(items: T[], weight: (t: T) => number, rng: Rng): T | nu
 export interface FolgeOptions {
   /** schwache Töne (dreifach gewichtet) */
   weak?: Set<string>;
+  /** Gewicht je Ton (ersetzt weak, z. B. noteWeight aus progress.ts) */
+  weight?: (id: string) => number;
   /** mit diesem Ton nicht beginnen (Ton der Karte davor) */
   avoidFirst?: string | null;
   /** schon benutzte Folgen (Schlüssel von folgeKey): nicht noch einmal */
@@ -77,7 +79,7 @@ export function folgeKey(notes: string[]): string {
 /** Eine Folge erzeugen (ohne Rücksicht auf schon benutzte). */
 function makeOne(pool: Note[], len: number, rng: Rng, opt: FolgeOptions): string[] {
   const weak = opt.weak ?? new Set<string>();
-  const wNote = (n: Note) => (weak.has(n.id) ? 3 : 1);
+  const wNote = (n: Note) => (opt.weight ? opt.weight(n.id) : weak.has(n.id) ? 3 : 1);
   const idx = pool.map((_, i) => i);
   const startFrom = idx.filter((i) => pool[i].id !== opt.avoidFirst);
   let cur = pickWeighted(startFrom.length ? startFrom : idx, (i) => wNote(pool[i]), rng)!;
@@ -121,8 +123,7 @@ export function makeFolge(poolIds: string[], len: number, rng: Rng, opt: FolgeOp
  */
 export class FolgeLength {
   len: number;
-  /** fehlerfreie Folgen in Reihe (öffentlich, damit „Vertippt“ den Stand zurücksetzen kann) */
-  streak = 0;
+  private streak = 0;
 
   constructor(
     poolSize: number,
@@ -131,6 +132,17 @@ export class FolgeLength {
   ) {
     this.len = poolSize <= FOLGE_MIN_NOTES ? (rng() < 0.5 ? 2 : 3) : 3;
     this.len = Math.min(this.len, max);
+  }
+
+  /** Stand merken (für „Vertippt“) … */
+  snapshot(): { len: number; streak: number } {
+    return { len: this.len, streak: this.streak };
+  }
+
+  /** … und wiederherstellen */
+  restore(st: { len: number; streak: number }): void {
+    this.len = st.len;
+    this.streak = st.streak;
   }
 
   /** Ergebnis einer gewerteten Folge */

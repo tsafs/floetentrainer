@@ -3,7 +3,7 @@
 import { levelOf, type Kind, type Track } from "../music/levels";
 import { cardKey, type Answer, type AppData, type CardState } from "../store/data";
 import { applyAnswer, dueCards, newCards, trackCards, type CardRef } from "./leitner";
-import { checkUnlocks, focusNotes, recordAnswer, type Unlock } from "./progress";
+import { checkUnlocks, noteWeight, recordAnswer, type Unlock } from "./progress";
 import type { Rng } from "./choices";
 import { FolgeLength, folgeKey, folgeMaxLen, folgePool, makeFolge } from "./sequences";
 
@@ -48,11 +48,15 @@ const firstOf = (r: Retry) => (r.folge ? r.folge.notes[0] : r.item!.note);
  */
 interface Undo {
   uid: number;
-  folge: boolean;
   history: [string, Answer[] | undefined][];
   card?: { key: string; prev: CardState | undefined };
   difficult: string[];
   folgeLen?: { len: number; streak: number };
+  /** Stufen vorher und Zahl der Meldungen: auch eine falsche Antwort kann freischalten (9 von 9 → 9 von 10) */
+  stages: AppData["stages"];
+  unlocks: number;
+  /** Übungstag entfernen, wenn erst diese Antwort ihn eingetragen hat und nichts von ihr gewertet bleibt */
+  dropDay: boolean;
 }
 
 export interface SessionResult {
@@ -102,15 +106,15 @@ export function buildPlan(data: AppData, track: Track, today: string, sessionNo:
     }
   }
   if (plan.length < limit) {
-    // Zusatzkarten: bekannte Karten und die neuen dieser Sitzung; schwache und aufhaltende Töne dreifach
+    // Zusatzkarten: bekannte Karten und die neuen dieser Sitzung; schwache und aufhaltende Töne häufiger (noteWeight)
     const planned = new Set(plan.filter((p) => p.type === "new").map((p) => cardKey(p.note, p.kind)));
     const pool = trackCards(data, track).filter((c) => data.cards[cardKey(c.note, c.kind)] || planned.has(cardKey(c.note, c.kind)));
-    const weak = focusNotes(data, track, pool.map((c) => c.note));
+    const weight = noteWeight(data, track);
     while (plan.length < limit && pool.length) {
       const last = plan[plan.length - 1]?.note;
       const options = pool.filter((c) => c.note !== last);
       const from = options.length ? options : pool;
-      const c = weightedPick(from, (x) => (weak.has(x.note) ? 3 : 1), rng);
+      const c = weightedPick(from, (x) => weight(x.note), rng);
       plan.push({ note: c.note, kind: c.kind, type: "extra", uid: uid++ });
     }
     // Etwa jede zweite Zusatzkarte wird eine Tonfolge (abwechselnd: die 2., 4., …)
@@ -229,8 +233,8 @@ export class Session {
   private makeFolge(p: PlanItem, pool: string[], avoidLast: string[]): Folge {
     const rng = this.opt.rng;
     this.folgeLen ??= new FolgeLength(pool.length, folgeMaxLen(levelOf(this.track, this.data.stages[this.track])), rng);
-    const weak = focusNotes(this.data, this.track, pool);
-    const notes = makeFolge(pool, this.folgeLen.len, rng, { weak, avoidFirst: this.lastNote, used: this.usedFolgen, avoidLast });
+    const weight = noteWeight(this.data, this.track);
+    const notes = makeFolge(pool, this.folgeLen.len, rng, { weight, avoidFirst: this.lastNote, used: this.usedFolgen, avoidLast });
     this.usedFolgen.add(folgeKey(notes));
     return { notes, uid: p.uid };
   }
@@ -311,13 +315,18 @@ export class Session {
     }
   }
 
-  /** Antwort auf die aktuelle Karte. */
-  answer(ok: boolean): void {
+  /**
+   * Antwort auf die aktuelle Karte. typed: die Antwort wurde getippt (nicht „Weiß nicht“, nicht gespielt) –
+   * nur dann lässt sich ein Fehler als „Vertippt“ zurücknehmen.
+   */
+  answer(ok: boolean, typed = false): void {
     const step = this.current;
     if (!step || step.type !== "card") return;
     const { item, retry } = step;
     this.undo = null;
-    if (!retry && !ok) this.undo = this.snapshot(item.uid, false, [item.note], item.type !== "extra" ? cardKey(item.note, item.kind) : undefined);
+    if (!retry && !ok && typed && this.track === "lesen") {
+      this.undo = this.snapshot(item.uid, [item.note], true, item.type !== "extra" ? cardKey(item.note, item.kind) : undefined);
+    }
     if (!retry) {
       this.graded += 1;
       if (ok) this.correct += 1;
@@ -345,9 +354,9 @@ export class Session {
    * Ergebnis der aktuellen Tonfolge: ok[i] gehört zu folge.notes[i]. Je *verschiedenem* Ton einmal
    * gewertet (richtig nur, wenn er an allen Stellen richtig war); keine Fächer und Termine. Im Ergebnis
    * zählt die Folge als eine Position, richtig nur ganz fehlerfrei. Bei einem Fehler kommt sie einmal
-   * wieder (ungewertet).
+   * wieder (ungewertet). typed wie bei answer: alle Antworten getippt (nicht „Weiß nicht“, nicht gespielt).
    */
-  answerFolge(ok: boolean[]): void {
+  answerFolge(ok: boolean[], typed = false): void {
     const step = this.current;
     if (!step || step.type !== "folge") return;
     const { folge, retry } = step;
@@ -355,9 +364,9 @@ export class Session {
     folge.notes.forEach((n, i) => per.set(n, (per.get(n) ?? true) && !!ok[i]));
     const all = [...per.values()].every(Boolean);
     this.undo = null;
-    if (!retry && !all) {
+    if (!retry && !all && typed && this.track === "lesen") {
       const wrong = [...per].filter(([, good]) => !good).map(([n]) => n);
-      this.undo = this.snapshot(folge.uid, true, wrong);
+      this.undo = this.snapshot(folge.uid, wrong, wrong.length === per.size);
     }
     if (!retry) {
       this.graded += 1;
@@ -381,15 +390,18 @@ export class Session {
     }
   }
 
-  private snapshot(uid: number, folge: boolean, notes: string[], key?: string): Undo {
+  /** Stand vor einer gewerteten falschen Antwort. notes: die falschen Töne; allWrong: nichts davon bleibt gewertet. */
+  private snapshot(uid: number, notes: string[], allWrong: boolean, key?: string): Undo {
     const h = this.data.history[this.track];
     return {
       uid,
-      folge,
       history: notes.map((n) => [n, h[n]?.slice()]),
       card: key ? { key, prev: this.data.cards[key] && { ...this.data.cards[key] } } : undefined,
       difficult: this.difficult.slice(),
-      folgeLen: folge && this.folgeLen ? { len: this.folgeLen.len, streak: this.folgeLen.streak } : undefined,
+      folgeLen: this.current?.type === "folge" ? this.folgeLen?.snapshot() : undefined,
+      stages: { ...this.data.stages },
+      unlocks: this.unlocks.length,
+      dropDay: allWrong && !this.data.days.includes(this.opt.today),
     };
   }
 
@@ -417,14 +429,17 @@ export class Session {
       if (u.card.prev) this.data.cards[u.card.key] = u.card.prev;
       else delete this.data.cards[u.card.key];
     }
+    if (u.dropDay) this.data.days = this.data.days.filter((x) => x !== this.opt.today);
+    // Hat erst diese Antwort freigeschaltet, gilt das nicht mehr; was ohne sie gilt, prüft checkUnlocks unten
+    this.data.stages = u.stages;
+    this.unlocks.length = u.unlocks;
     this.difficult = u.difficult;
     this.retries = this.retries.filter((r) => (r.folge ? r.folge.uid : r.item!.uid) !== u.uid);
     this.retryCount.delete(u.uid);
     // Im Ergebnis der Sitzung zählt der Schritt als richtig (sie wusste es ja)
     this.correct += 1;
     if (u.folgeLen && this.folgeLen) {
-      this.folgeLen.len = u.folgeLen.len;
-      this.folgeLen.streak = u.folgeLen.streak;
+      this.folgeLen.restore(u.folgeLen);
       this.folgeLen.update(true);
     }
     // Ohne den Fehler kann die Bedingung jetzt erfüllt sein

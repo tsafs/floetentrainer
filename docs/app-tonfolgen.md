@@ -63,7 +63,7 @@ wie f¹ – fis¹ – g¹.
   Gerade diese Griffwechsel sind schwer.
 - ~~**Tonwiederholung** in etwa jeder vierten Folge einmal~~ – entfällt (siehe Entscheidung 5).
 - **Schwache Töne** (`isWeak`) und Töne, die die nächste Stufe aufhalten (`blockingNotes`, seit 15.11.2026),
-  häufiger einbauen (wie bei Zusatzkarten dreifach gewichtet, `focusNotes`).
+  häufiger einbauen (Gewicht wie bei Zusatzkarten: `noteWeight`).
 - In einer Sitzung keine Folge zweimal (außer der Wiederholung nach einem Fehler).
 - Zufall nur über das übergebene `rng`, damit Tests feste Folgen bekommen.
 - Später denkbar (nicht jetzt): Schnipsel aus den Heft-Liedern, die nur freigeschaltete Töne enthalten.

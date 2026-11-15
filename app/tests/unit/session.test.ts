@@ -121,6 +121,23 @@ describe("Zusammensetzung", () => {
     }
     expect(g / total).toBeGreaterThan(0.4);
   });
+  it("ein schwacher Ton bleibt vorn, auch wenn alle Töne aufhalten", () => {
+    const d = defaultData();
+    for (const n of ["h1", "a1", "g1"]) for (const k of ["name", "griff", "note"]) d.cards[`${n}|${k}`] = { box: 4, day: TODAY, session: 1 };
+    // alle unter 10 Antworten (halten auf), g1 dazu schwach
+    d.history.lesen.h1 = answers(6, 0, [TODAY]);
+    d.history.lesen.a1 = answers(6, 0, [TODAY]);
+    d.history.lesen.g1 = answers(6, 3, [TODAY]);
+    let g = 0;
+    let h = 0;
+    for (let seed = 1; seed <= 100; seed++) {
+      const plan = buildPlan(d, "lesen", TODAY, 2, 20, seeded(seed));
+      g += plan.filter((p) => p.note === "g1").length;
+      h += plan.filter((p) => p.note === "h1").length;
+    }
+    // Gewicht 5 gegen 3; bei nur drei Tönen dämpft „nie zweimal hintereinander“ das stark. Gleich wäre 1.
+    expect(g / h).toBeGreaterThan(1.15);
+  });
 });
 
 describe("Vertippt", () => {
@@ -143,7 +160,7 @@ describe("Vertippt", () => {
     const graded = s.graded;
     const correct = s.correct;
     expect(s.canUndo).toBe(false);
-    s.answer(false);
+    s.answer(false, true);
     expect(s.canUndo).toBe(true);
     s.undoLast();
     expect(s.canUndo).toBe(false);
@@ -162,7 +179,7 @@ describe("Vertippt", () => {
     const s = mkSession(d);
     const st = s.next()!;
     expect(st.type === "card" && st.item.type === "due").toBe(true);
-    s.answer(false);
+    s.answer(false, true);
     expect(d.cards["h1|name"].box).toBe(1);
     s.undoLast();
     expect(d.cards["h1|name"]).toEqual({ box: 3, day: addDays(TODAY, -5), session: 1 });
@@ -174,28 +191,66 @@ describe("Vertippt", () => {
     s.answer(true);
     expect(s.canUndo).toBe(false);
     s.next();
-    s.answer(false);
+    s.answer(false, true);
     expect(s.canUndo).toBe(true);
     s.next(); // weitergegangen: zu spät
     expect(s.canUndo).toBe(false);
   });
+  /** Bis zur ersten Karte mit diesem Ton alles richtig beantworten */
+  function untilCard(s: Session, note: string) {
+    let st = s.next()!;
+    while (st.type !== "card" || st.item.note !== note) {
+      if (st.type === "folge") s.answerFolge(st.folge.notes.map(() => true));
+      else s.answer(true);
+      st = s.next()!;
+    }
+  }
   it("kann die nächste Stufe freischalten", () => {
     const d = extrasOnly();
     master(d, "lesen", ["h1", "a1"]);
-    d.history.lesen.g1 = answers(9, 0, [TODAY]);
-    const s = mkSession(d);
-    let st = s.next()!;
-    while (st.type !== "card" || st.item.note !== "g1") {
-      s.answer(true);
-      st = s.next()!;
-    }
-    // 9 richtige + diese falsch: 9 von 10 = 90 % – würde schon reichen; also vorher einen Fehler einbauen
     d.history.lesen.g1 = [[0, TODAY, 1], ...answers(9, 0, [TODAY], 10)];
-    s.answer(false); // jetzt 9 von 11
+    const s = mkSession(d);
+    // vorher kein g1: sonst zählte eine richtige Antwort schon
+    untilCard(s, "g1");
+    s.answer(false, true); // 9 von 11
     expect(d.stages.lesen).toBe("erste-toene");
     s.undoLast(); // 9 von 10
     expect(d.stages.lesen).toBe("c2-d2");
     expect(s.result().unlocks.map((u) => u.level)).toEqual([2]);
+  });
+  it("eine Stufe, die erst der Fehler freigeschaltet hat, gilt danach nicht mehr", () => {
+    const d = extrasOnly();
+    master(d, "lesen", ["h1", "a1"]);
+    d.history.lesen.g1 = answers(9, 0, [TODAY]); // 9 Antworten: zu wenige
+    const s = mkSession(d);
+    untilCard(s, "g1");
+    s.answer(false, true); // 9 von 10 = 90 %: frei
+    expect(d.stages.lesen).toBe("c2-d2");
+    s.undoLast(); // wieder 9 von 9
+    expect(d.stages.lesen).toBe("erste-toene");
+    expect(s.result().unlocks).toEqual([]);
+  });
+  it("Übungstag nur durch diese Antwort: wird wieder entfernt", () => {
+    const d = extrasOnly();
+    const s = mkSession(d);
+    s.next();
+    s.answer(false, true);
+    expect(d.days).toEqual([TODAY]);
+    s.undoLast();
+    expect(d.days).toEqual([]);
+  });
+  it("nicht nach „Weiß nicht“ oder beim Spielen (nicht getippt)", () => {
+    const d = extrasOnly();
+    const s = mkSession(d);
+    s.next();
+    s.answer(false);
+    expect(s.canUndo).toBe(false);
+    const d2 = defaultData();
+    d2.cards["h1|spiel"] = { box: 3, day: addDays(TODAY, -5), session: 1 };
+    const sp = mkSession(d2, "spielen");
+    sp.next();
+    sp.answer(false, true);
+    expect(sp.canUndo).toBe(false);
   });
   it("Tonfolge: nur die falsch getippten Töne fallen weg, die richtigen bleiben gewertet", () => {
     const d = defaultData();
@@ -212,11 +267,12 @@ describe("Vertippt", () => {
     const f = st.folge.notes;
     const wrong = f[1];
     const res = f.map((n) => n !== wrong);
-    s.answerFolge(res);
+    const before = structuredClone(d.history.lesen);
+    s.answerFolge(res, true);
     expect(s.canUndo).toBe(true);
     s.undoLast();
-    expect(d.history.lesen[wrong] ?? []).toEqual([]);
-    for (const n of new Set(f.filter((n) => n !== wrong))) expect(d.history.lesen[n]).toHaveLength(1);
+    expect(d.history.lesen[wrong]).toEqual(before[wrong]);
+    for (const n of new Set(f.filter((n) => n !== wrong))) expect(d.history.lesen[n]).toHaveLength((before[n]?.length ?? 0) + 1);
     expect(s.result().difficult).not.toContain(wrong);
     expect(s.correct).toBe(s.graded);
   });
