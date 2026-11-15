@@ -27,11 +27,14 @@ async function toFolge(page: Page) {
 
 const folge = (page: Page) => page.locator('main[data-step="folge"]');
 const tap = (page: Page, id: string) => folge(page).locator(`.btns button[data-choice="${id}"]`).click();
+/** ein Antwortknopf, der nicht in der Folge vorkommt (bei 5 Knöpfen ist nicht jeder Ton dabei) */
+const wrongChoice = async (page: Page, notes: string[]) =>
+  (await folge(page).locator(".btns button").evaluateAll((bs) => bs.map((b) => (b as HTMLElement).dataset.choice!))).find((c) => !notes.includes(c))!;
 
 test.describe("Lesen", () => {
   test("Folge richtig durchtippen: Markierung rückt weiter, Namen wachsen mit, „Richtig“", async ({ page }) => {
     await seed(page, extrasOnly());
-    await page.addInitScript(() => ((window as never as { __folgen: string[][] }).__folgen = [["g1", "fis1", "g1", "a1"]]));
+    await page.addInitScript(() => ((window as never as { __folgen: unknown[] }).__folgen = [{ kind: "name", notes: ["g1", "fis1", "g1", "a1"] }]));
     await page.goto("./");
     await page.getByRole("button", { name: /Weiter üben/ }).click();
     const s = await toFolge(page);
@@ -43,10 +46,12 @@ test.describe("Lesen", () => {
     await expect(m.locator(".sn")).toHaveCount(4);
     await expect(m.locator(".sn.cur")).toHaveAttribute("data-i", "0");
     await expect(page.getByTestId("count")).toHaveText("2 von 20");
-    // 8 Knöpfe (8 Töne freigeschaltet), nach Tonhöhe; mindestens 2 nicht aus der Folge
+    // 5 Knöpfe in einer Zeile, nach Tonhöhe; mindestens einer nicht aus der Folge
     const choices = await m.locator(".btns button").evaluateAll((bs) => bs.map((b) => (b as HTMLElement).dataset.choice!));
-    expect(choices).toHaveLength(8);
-    expect(choices.filter((c) => !["g1", "fis1", "a1"].includes(c)).length).toBeGreaterThanOrEqual(2);
+    expect(choices).toHaveLength(5);
+    expect(choices.filter((c) => !["g1", "fis1", "a1"].includes(c)).length).toBeGreaterThanOrEqual(1);
+    const tops = await m.locator(".btns button").evaluateAll((bs) => bs.map((b) => Math.round(b.getBoundingClientRect().top)));
+    expect(new Set(tops).size).toBe(1);
     // Vorzeichen an jeder Note: fis¹ hat ein Kreuz (zwei Pfade: Kopf und Vorzeichen)
     await expect(m.locator('.sn[data-i="1"] path')).toHaveCount(2);
     await tap(page, "g1");
@@ -72,17 +77,21 @@ test.describe("Lesen", () => {
 
   test("Folge mit Fehler: Note rot, richtiger Name darunter, weiter mit der nächsten; Auflösung und Wiederholung", async ({ page }) => {
     await seed(page, extrasOnly());
-    await page.addInitScript(() => ((window as never as { __folgen: string[][] }).__folgen = [["e1", "g1", "e1", "a1"]]));
+    await page.addInitScript(() => ((window as never as { __folgen: unknown[] }).__folgen = [{ kind: "name", notes: ["e1", "g1", "e1", "a1"] }]));
     await page.goto("./");
     await page.getByRole("button", { name: /Weiter üben/ }).click();
     const s = await toFolge(page);
     const m = folge(page);
-    const before = (await stored(page)).history.lesen.fis1.length;
+    // ein falscher Knopf (bei 5 Knöpfen ist nicht jeder Ton dabei)
+    const wrong = (await m.locator(".btns button").evaluateAll((bs) => bs.map((b) => (b as HTMLElement).dataset.choice!))).find(
+      (c) => !["e1", "g1", "a1"].includes(c),
+    )!;
+    const before = (await stored(page)).history.lesen[wrong]?.length ?? 0;
     await tap(page, "e1");
     await tap(page, "g1");
-    await tap(page, "fis1"); // falsch (e¹)
+    await tap(page, wrong); // falsch (e¹)
     await expect(m.locator('.sn[data-i="2"]')).toHaveClass(/miss/);
-    await expect(m.locator('.sn[data-i="2"] .sl')).toHaveText("fis1"); // ihre Antwort, rot
+    await expect(m.locator('.sn[data-i="2"] .sl')).toHaveText(wrong); // ihre Antwort, rot
     await expect(m.locator(".sn.cur")).toHaveAttribute("data-i", "3");
     await tap(page, "a1");
     await expect(page.getByTestId("panel")).toContainText("Nicht ganz");
@@ -93,7 +102,7 @@ test.describe("Lesen", () => {
     const d = await stored(page);
     expect(d.history.lesen.e1.at(-1)[0]).toBe(0); // an einer Stelle falsch → falsch
     expect(d.history.lesen.g1.at(-1)[0]).toBe(1);
-    expect(d.history.lesen.fis1.length).toBe(before); // getippt, aber nicht in der Folge
+    expect(d.history.lesen[wrong]?.length ?? 0).toBe(before); // getippt, aber nicht in der Folge
     await page.getByRole("button", { name: "Weiter" }).click();
     await waitNext(page, s.seq);
     // nach 2–3 anderen Schritten kommt dieselbe Folge noch einmal
@@ -112,7 +121,7 @@ test.describe("Lesen", () => {
 
   test("„Vertippt“ nimmt den letzten Tipp zurück – mitten in der Folge und nach dem Ende", async ({ page }) => {
     await seed(page, extrasOnly());
-    await page.addInitScript(() => ((window as never as { __folgen: string[][] }).__folgen = [["g1", "a1", "h1"]]));
+    await page.addInitScript(() => ((window as never as { __folgen: unknown[] }).__folgen = [{ kind: "name", notes: ["g1", "a1", "h1"] }]));
     await page.goto("./");
     await page.getByRole("button", { name: /Weiter üben/ }).click();
     const s = await toFolge(page);
@@ -132,7 +141,7 @@ test.describe("Lesen", () => {
     await tap(page, "a1");
     // letzte Note vertippt: Ergebnis erscheint, „Vertippt“ macht die Folge wieder auf
     const before = (await stored(page)).history.lesen.h1.length;
-    await tap(page, "c2");
+    await tap(page, await wrongChoice(page, ["g1", "a1", "h1"]));
     await expect(page.getByTestId("panel")).toContainText("Nicht ganz");
     expect((await stored(page)).history.lesen.h1.length).toBe(Math.min(20, before + 1));
     await m.locator('.slot [data-act="typo"]').click();
@@ -149,13 +158,13 @@ test.describe("Lesen", () => {
 
   test("„Vertippt“ nach dem Ende mit Fehler weiter vorn: wieder offen ab der ersten falschen Note", async ({ page }) => {
     await seed(page, extrasOnly());
-    await page.addInitScript(() => ((window as never as { __folgen: string[][] }).__folgen = [["g1", "a1", "h1"]]));
+    await page.addInitScript(() => ((window as never as { __folgen: unknown[] }).__folgen = [{ kind: "name", notes: ["g1", "a1", "h1"] }]));
     await page.goto("./");
     await page.getByRole("button", { name: /Weiter üben/ }).click();
     await toFolge(page);
     const m = folge(page);
     await tap(page, "g1");
-    await tap(page, "c2"); // vertippt
+    await tap(page, await wrongChoice(page, ["g1", "a1", "h1"])); // vertippt
     await tap(page, "h1");
     await expect(page.getByTestId("panel")).toContainText("Nicht ganz");
     await m.locator('.slot [data-act="typo"]').click();
@@ -171,7 +180,7 @@ test.describe("Lesen", () => {
 
   test("„Weiß nicht“ löst die restlichen Noten auf", async ({ page }) => {
     await seed(page, extrasOnly());
-    await page.addInitScript(() => ((window as never as { __folgen: string[][] }).__folgen = [["a1", "h1", "c2"]]));
+    await page.addInitScript(() => ((window as never as { __folgen: unknown[] }).__folgen = [{ kind: "name", notes: ["a1", "h1", "c2"] }]));
     await page.goto("./");
     await page.getByRole("button", { name: /Weiter üben/ }).click();
     await toFolge(page);
@@ -187,9 +196,70 @@ test.describe("Lesen", () => {
     expect(d.history.lesen.c2.at(-1)[0]).toBe(0);
   });
 
+  test("Noten → Griffe: Griffbilder in einer Zeile, Name des getippten Griffs unter der Note, Fehlerfeld mit Griffen", async ({ page }) => {
+    await seed(page, extrasOnly());
+    await page.addInitScript(() => ((window as never as { __folgen: unknown[] }).__folgen = [{ kind: "griff", notes: ["g1", "fis1", "a1", "g1"] }]));
+    await page.goto("./");
+    await page.getByRole("button", { name: /Weiter üben/ }).click();
+    await toFolge(page);
+    const m = folge(page);
+    await expect(m).toHaveAttribute("data-fkind", "griff");
+    await expect(m.locator(".q")).toHaveText("Welche Griffe sind das? Der Reihe nach.");
+    await expect(m.locator(".stage .staff .sn")).toHaveCount(4);
+    const btns = m.locator(".btns.fing button");
+    await expect(btns).toHaveCount(5);
+    await expect(btns.locator("svg.flute")).toHaveCount(5);
+    const tops = await btns.evaluateAll((bs) => bs.map((b) => Math.round(b.getBoundingClientRect().top)));
+    expect(new Set(tops).size).toBe(1);
+    // g¹ richtig, statt fis¹ ein falscher Griff, dann a¹ und g¹ richtig
+    await tap(page, "g1");
+    await expect(m.locator('.sn[data-i="0"]')).toHaveClass(/hit/);
+    await expect(m.locator('.sn[data-i="0"] .sl')).toHaveText("g1");
+    const wrong = (await btns.evaluateAll((bs) => bs.map((b) => (b as HTMLElement).dataset.choice!))).find((c) => !["g1", "fis1", "a1"].includes(c))!;
+    await tap(page, wrong);
+    await expect(m.locator('.sn[data-i="1"]')).toHaveClass(/miss/);
+    await tap(page, "a1");
+    await tap(page, "g1");
+    const panel = page.getByTestId("panel");
+    await expect(panel).toContainText("Nicht ganz");
+    await expect(panel.locator(".grips .g")).toHaveCount(4);
+    await expect(panel.locator(".grips .g.bad")).toHaveCount(1);
+    await expect(panel.locator(".grips .g").nth(1)).toHaveClass(/bad/);
+    await expect(panel.locator(".grips .g").nth(1).locator("svg")).toHaveAttribute("data-fingering", note("fis1").fingering);
+    const d = await stored(page);
+    expect(d.history.lesen.fis1.at(-1)[0]).toBe(0);
+    expect(d.history.lesen.g1.at(-1)[0]).toBe(1);
+  });
+
+  test("Griffbilder → Namen: Reihe von Griffbildern, getippte Namen darunter, „Richtig“", async ({ page }) => {
+    await seed(page, extrasOnly());
+    await page.addInitScript(() => ((window as never as { __folgen: unknown[] }).__folgen = [{ kind: "note", notes: ["d1", "e1", "fis1", "g1", "e1"] }]));
+    await page.goto("./");
+    await page.getByRole("button", { name: /Weiter üben/ }).click();
+    await toFolge(page);
+    const m = folge(page);
+    await expect(m).toHaveAttribute("data-fkind", "note");
+    await expect(m.locator(".q")).toHaveText("Welche Töne sind das? Der Reihe nach.");
+    await expect(m.locator(".stage .staff")).toHaveCount(0);
+    const grips = m.locator(".gseq .sn");
+    await expect(grips).toHaveCount(5);
+    await expect(grips.nth(2).locator("svg")).toHaveAttribute("data-fingering", note("fis1").fingering);
+    await expect(m.locator(".gseq .sn.cur")).toHaveAttribute("data-i", "0");
+    await expect(m.locator(".btns button")).toHaveCount(5);
+    for (const [i, n] of ["d1", "e1", "fis1", "g1"].entries()) {
+      await tap(page, n);
+      await expect(grips.nth(i).locator(".sl")).toHaveText(n);
+      await expect(grips.nth(i)).toHaveClass(/hit/);
+    }
+    await expect(m.locator(".gseq .sn.cur")).toHaveAttribute("data-i", "4");
+    await tap(page, "e1");
+    await expect(page.getByTestId("panel")).toContainText("Richtig");
+  });
+
   test("Querformat: Notenzeile links, Antworten rechts, nichts verschoben", async ({ page }) => {
     await page.setViewportSize({ width: 740, height: 360 });
     await seed(page, extrasOnly());
+    await page.addInitScript(() => ((window as never as { __folgen: unknown[] }).__folgen = [{ kind: "name", notes: ["g1", "a1", "h1", "a1"] }]));
     await page.goto("./");
     await page.getByRole("button", { name: /Weiter üben/ }).click();
     await toFolge(page);
@@ -208,10 +278,10 @@ test.describe("Lesen", () => {
 });
 
 test.describe("Spielen", () => {
-  async function setup(page: Page, folgen: string[][]) {
+  async function setup(page: Page, folgen: unknown[]) {
     await page.addInitScript(FAKE_MIC);
     await seed(page, extrasOnly());
-    await page.addInitScript((f) => ((window as never as { __folgen: string[][] }).__folgen = f), folgen);
+    await page.addInitScript((f) => ((window as never as { __folgen: unknown[] }).__folgen = f), folgen);
     await page.goto("./");
     await page.getByRole("button", { name: /Weiter spielen/ }).click();
     await page.waitForFunction(() => (window as never as { __osc: unknown }).__osc !== null);
@@ -266,6 +336,20 @@ test.describe("Spielen", () => {
     await m.getByRole("button", { name: "Anhören" }).click();
     await page.waitForTimeout(2500);
     await expect(page.locator(`main[data-seq="${s.seq}"]`)).toHaveCount(1);
+  });
+
+  test("Wechsel-Drill: eigene Frage, Griffwechsel werden gemerkt", async ({ page }) => {
+    await setup(page, [{ kind: "spiel", drill: true, notes: ["h1", "c2", "h1", "c2", "h1", "c2"] }]);
+    await toFolge(page);
+    const m = folge(page);
+    await expect(m).toHaveAttribute("data-drill", "true");
+    await expect(m.locator(".q")).toHaveText("Wechsle ruhig hin und her.");
+    await expect(m.locator(".sn")).toHaveCount(6);
+    await page.waitForTimeout(300);
+    await playSeq(page, ["h1", "c2", "h1", "c2", "h1", "c2"]);
+    await expect(page.getByTestId("panel")).toContainText("Richtig");
+    const d = await stored(page);
+    expect(d.pairs["h1-c2"]).toEqual([1, 1, 1, 1, 1]);
   });
 
   test("Folge mit Halbtonschritt und falschem Ton: Note rot, wartet weiter auf den richtigen", async ({ page }) => {

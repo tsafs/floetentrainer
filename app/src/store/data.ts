@@ -132,6 +132,9 @@ export type OctaveShift = 0 | 12 | -12;
 /** Eine gewertete Antwort: [richtig 1/0, Tag, Zeitpunkt in ms] */
 export type Answer = [0 | 1, string, number];
 
+/** So viele Versuche je Griffwechsel (Tonpaar) werden gemerkt */
+export const PAIR_LEN = 10;
+
 export interface AppData {
   version: number;
   app: "floetentrainer";
@@ -159,6 +162,12 @@ export interface AppData {
   days: string[];
   /** Zahl der begonnenen Sitzungen */
   sessions: number;
+  /**
+   * Griffwechsel beim Spielen von Folgen (seit 15.11.2026, docs/app-uebungen.md): je Tonpaar "a-b" (nach
+   * Tonhöhe, Richtung egal) die letzten PAIR_LEN Versuche, 1 = gelungen. Für die Wechsel-Drills. Optional,
+   * ohne Versionssprung (eine ältere App ließe es weg – dann beginnt die Zählung neu).
+   */
+  pairs?: Record<string, (0 | 1)[]>;
   /** Einstellungen je Lied (Tempo) */
   songs: Record<string, SongPrefs>;
   /** eingelesene eigene Lieder (ab Version 2), in der Reihenfolge des Einlesens */
@@ -396,6 +405,17 @@ export function normalizeData(raw: unknown): AppData {
     out.days = [...new Set(d.days.filter(isValidDayKey))].sort();
   }
   if (isNum(d.sessions)) out.sessions = Math.max(0, Math.round(d.sessions));
+  // Griffwechsel: Fehlerhaftes wird still übergangen (zählt sich neu)
+  if (isObj(d.pairs)) {
+    const pairs: Record<string, (0 | 1)[]> = {};
+    for (const [key, list] of Object.entries(d.pairs)) {
+      const [a, b] = key.split("-");
+      if (!NOTES[a] || !NOTES[b] || !Array.isArray(list)) continue;
+      const clean = list.filter((x): x is 0 | 1 => x === 0 || x === 1).slice(-PAIR_LEN);
+      if (clean.length) pairs[key] = clean;
+    }
+    if (Object.keys(pairs).length) out.pairs = pairs;
+  }
   // Einstellungen je Lied: Fehlerhaftes wird still übergangen (es geht nur um Bequemlichkeit)
   if (isObj(d.songs)) {
     for (const [id, p] of Object.entries(d.songs)) {

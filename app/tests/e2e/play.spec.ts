@@ -4,7 +4,17 @@ import { note, soundingFreq } from "../../src/music/notes";
 import { sampleData } from "./seed";
 import { FAKE_MIC, menuTo } from "./util";
 
-async function setup(page: Page, data: unknown = sampleData()) {
+/**
+ * Beispieldaten für Einzelkarten: Ab 5 vorgestellten Tönen wären fällige Spielen-Karten Folgen
+ * (docs/app-uebungen.md); mit 4 vorgestellten bleiben es Karten.
+ */
+function singleCards() {
+  const d = sampleData();
+  d.introduced.spielen = ["h1", "a1", "g1", "c2"];
+  return d;
+}
+
+async function setup(page: Page, data: unknown = singleCards()) {
   await page.addInitScript(FAKE_MIC);
   await page.addInitScript((d) => {
     if (!sessionStorage.getItem("seeded")) {

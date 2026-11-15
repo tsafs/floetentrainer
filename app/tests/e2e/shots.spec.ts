@@ -157,16 +157,24 @@ for (const s of SIZES) {
       for (const k of Object.keys(d.cards)) d.cards[k] = { box: 5, day: today, session: 5 };
       await page.addInitScript(FAKE_MIC);
       await seed(page, d);
-      const folgen = [["fis1", "g1", "a1", "g1", "h1"], ["e1", "fis1", "g1", "fis1", "e1"], ["d1", "e1", "fis1", "g1"], ["g1", "a1", "h1", "c2", "h1"]];
+      const folgen = [
+        { kind: "name", notes: ["fis1", "g1", "a1", "g1", "h1"] },
+        { kind: "name", notes: ["e1", "fis1", "g1", "fis1", "e1"] },
+        { kind: "griff", notes: ["d1", "e1", "fis1", "g1"] },
+        { kind: "note", notes: ["g1", "a1", "h1", "c2", "h1"] },
+      ];
       await page.addInitScript((f) => {
         if (!sessionStorage.getItem("folgen")) {
           sessionStorage.setItem("folgen", "1");
-          (window as never as { __folgen: string[][] }).__folgen = f;
+          (window as never as { __folgen: unknown[] }).__folgen = f;
         }
       }, folgen);
       const p = (x: string) => `${OUT}/${scheme}-${s.name}-${x}.png`;
+      // bis zur nächsten neuen Folge (Wiederholungen nach Fehlern richtig beantworten)
       const toFolge = async () => {
-        for (let i = 0; i < 6 && (await info(page)).step !== "folge"; i++) {
+        for (let i = 0; i < 10; i++) {
+          const st = await info(page);
+          if (st.step === "folge" && !st.retry) return;
           await answer(page, true);
           await next(page);
         }
@@ -192,6 +200,23 @@ for (const s of SIZES) {
       const ids = (await page.locator("main").getAttribute("data-notes"))!.split(" ");
       for (const id of ids) await tap(id);
       await page.screenshot({ path: p("t5-folge-richtig") });
+      // Noten → Griffe (docs/app-uebungen.md)
+      await next(page);
+      await toFolge();
+      await page.screenshot({ path: p("t8-griffe-anfang") });
+      await tap("d1");
+      await tap("fis1"); // falsch (e¹)
+      await tap("fis1");
+      await tap("g1");
+      await page.waitForTimeout(400);
+      await page.screenshot({ path: p("t9-griffe-fehler") });
+      // Griffbilder → Namen
+      await page.locator('[data-act="next"]').click();
+      await toFolge();
+      await page.screenshot({ path: p("t10-griffbilder-anfang") });
+      await tap("g1");
+      await tap("a1");
+      await page.screenshot({ path: p("t11-griffbilder-mitten") });
       // Spielen
       await page.goto("./");
       await page.evaluate(() => ((window as never as { __folgen: string[][] }).__folgen = [["g1", "a1", "g1", "h1", "c2"]]));

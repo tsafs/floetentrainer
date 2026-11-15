@@ -45,15 +45,18 @@ export function isOctaveTwin(a: Note, b: Note): boolean {
   return a.name === b.name && a.octave !== b.octave;
 }
 
-/** Wie viele Möglichkeiten: Note→Name ab Fach 3 acht, sonst vier. */
+/**
+ * Wie viele Möglichkeiten (eine Zeile, docs/app-uebungen.md): vier, Note→Name und Note→Griff ab Fach 3
+ * fünf. Griff→Note (Notenbilder) bleibt bei vier.
+ */
 export function choiceCount(kind: Kind, box: number | undefined): number {
-  return kind === "name" && (box ?? 0) >= 3 ? 8 : 4;
+  return kind !== "note" && (box ?? 0) >= 3 ? 5 : 4;
 }
 
 /**
  * Antwortmöglichkeiten (inklusive der richtigen) für eine Karte.
  * unlocked: freigeschaltete Töne der Lesen-Spur. Reichen sie nicht für 4, kommen Töne aus späteren
- * Stufen dazu (die selbst nie abgefragt werden). Bei 8 Möglichkeiten nur freigeschaltete Töne,
+ * Stufen dazu (die selbst nie abgefragt werden). Bei 5 Möglichkeiten nur freigeschaltete Töne,
  * entsprechend weniger, mindestens 4.
  */
 export function makeChoices(targetId: string, kind: Kind, wanted: number, unlocked: string[], rng: Rng): string[] {

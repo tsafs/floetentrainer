@@ -697,9 +697,11 @@ svg.acc {
   margin-top: auto;
   position: relative;
 }
+/* Antwortknöpfe immer in einer Zeile, höchstens 5 (docs/app-uebungen.md) */
 .btns {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   gap: 10px;
 }
 .btns button {
@@ -715,22 +717,19 @@ svg.acc {
     background-color 0.2s;
   min-width: 0;
 }
-.btns.n8 button {
-  height: 56px;
-  font-size: 1.6rem;
-}
 .btns.fing button {
   height: clamp(112px, 21vh, 176px);
   padding: 10px 0;
   display: grid;
   place-items: center;
 }
+/* Notenbilder in einer Zeile: wenig Abstand und Rand, damit die schmalen Notenzeilen möglichst groß bleiben */
 .btns.staffs {
-  grid-template-columns: 1fr 1fr;
+  gap: 6px;
 }
 .btns.staffs button {
   height: clamp(80px, 13vh, 112px);
-  padding: 4px;
+  padding: 2px;
   display: grid;
   place-items: center;
 }
@@ -966,6 +965,66 @@ svg.acc {
   padding-top: 0.15em;
 }
 .panel .names .bad {
+  color: var(--err);
+}
+/* Noten → Griffe, Fehlerfeld: die richtigen Griffe klein nebeneinander, darunter die Namen */
+.panel .grips {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+}
+.panel .grips .g {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  font-size: 1.35rem;
+  font-weight: 500;
+  line-height: 1;
+}
+.panel .grips .flute {
+  height: clamp(72px, 12vh, 104px);
+  width: auto;
+}
+.panel .grips .bad {
+  color: var(--err);
+}
+/* Griffbilder → Namen: die Folge als Reihe von Griffbildern, darunter Strich (aktuell) und getippter Name */
+.gseq {
+  display: flex;
+  justify-content: center;
+  gap: clamp(10px, 4vw, 26px);
+  padding: 4px 0;
+}
+.gseq .sn {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+}
+.gseq .flute {
+  height: clamp(110px, 20vh, 160px);
+  width: auto;
+}
+.gseq .seqcur {
+  display: block;
+  width: 26px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--soft);
+  visibility: hidden;
+}
+.gseq .sn.cur .seqcur {
+  visibility: visible;
+}
+.gseq .sl {
+  min-height: 1.2em;
+  font-size: 1.5rem;
+  font-weight: 500;
+  line-height: 1;
+}
+.gseq .sn.hit .sl {
+  color: var(--ok);
+}
+.gseq .sn.miss .sl {
   color: var(--err);
 }
 /* Fehlerfeld: alles mittig. Mit Bild (Griff- und Griff→Note-Karten) stehen Bild und Name als Gruppe
@@ -1434,27 +1493,15 @@ svg.acc {
     bottom: 0;
     min-height: 100%;
   }
-  .btns {
-    grid-template-columns: 1fr 1fr;
-  }
   .btns button {
     height: 58px;
-  }
-  .btns.n8 {
-    grid-template-columns: repeat(4, 1fr);
-  }
-  .btns.n8 button {
-    height: 52px;
-    font-size: 1.45rem;
-  }
-  .btns.fing {
-    grid-template-columns: repeat(4, 1fr);
+    font-size: 1.55rem;
   }
   .btns.fing button {
     height: min(200px, calc(100vh - 170px));
   }
   .btns.staffs button {
-    height: min(96px, calc((100vh - 190px) / 2));
+    height: min(120px, calc(100vh - 190px));
   }
   .panel {
     padding: 12px 16px;

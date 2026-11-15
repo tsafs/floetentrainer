@@ -38,19 +38,22 @@ describe("Antwortmöglichkeiten", () => {
     expect(ids).toHaveLength(4);
     expect(ids).toEqual(expect.arrayContaining(["h1", "a1", "g1"]));
   });
-  it("8 Namen ab Fach 3, nur freigeschaltete, sonst weniger (mindestens 4)", () => {
+  it("eine Zeile: 4, Name und Griff ab Fach 3 fünf, nur freigeschaltete, sonst weniger (mindestens 4)", () => {
     expect(choiceCount("name", 2)).toBe(4);
-    expect(choiceCount("name", 3)).toBe(8);
-    expect(choiceCount("griff", 5)).toBe(4);
-    const un5 = unlockedNotes("lesen", 3); // 7 Töne
-    const ids = makeChoices("c2", "name", 8, un5, seeded(2));
-    expect(ids).toHaveLength(7);
-    expect(ids.every((i) => un5.includes(i))).toBe(true);
-    const un10 = unlockedNotes("lesen", 6);
-    expect(makeChoices("c2", "name", 8, un10, seeded(2))).toHaveLength(8);
+    expect(choiceCount("name", 3)).toBe(5);
+    expect(choiceCount("griff", 2)).toBe(4);
+    expect(choiceCount("griff", 5)).toBe(5);
+    expect(choiceCount("note", 5)).toBe(4);
+    const un3 = unlockedNotes("lesen", 1); // 3 Töne
+    const ids = makeChoices("a1", "name", 5, un3, seeded(2));
+    expect(ids).toHaveLength(4);
+    const un7 = unlockedNotes("lesen", 3);
+    const ids7 = makeChoices("c2", "name", 5, un7, seeded(2));
+    expect(ids7).toHaveLength(5);
+    expect(ids7.every((i) => un7.includes(i))).toBe(true);
   });
   it("Namen nach Tonhöhe geordnet", () => {
-    const ids = makeChoices("f1", "name", 8, unlockedNotes("lesen", 8), seeded(3));
+    const ids = makeChoices("f1", "name", 5, unlockedNotes("lesen", 8), seeded(3));
     const m = ids.map((i) => note(i).midi);
     expect(m).toEqual([...m].sort((a, b) => a - b));
   });

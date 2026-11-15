@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import { isAltSpelling, unlockedNotes } from "../../src/music/levels";
 import { note } from "../../src/music/notes";
 import {
+  counterMotion,
+  drillNotes,
+  drillPair,
+  pairKey,
+  FOLGE_MAX_DISTINCT,
   FOLGE_MAX_LEAP,
   FolgeLength,
   folgeChoices,
@@ -50,6 +55,17 @@ describe("Töne für Tonfolgen", () => {
 });
 
 describe("Erzeugen", () => {
+  it("höchstens so viele verschiedene Töne wie maxDistinct, Länge bleibt, nie zweimal hintereinander", () => {
+    const rng = seeded(11);
+    for (const len of [4, 5, 6]) {
+      for (let k = 0; k < 200; k++) {
+        const f = makeFolge(POOL_F, len, rng, { maxDistinct: 4 });
+        expect(f).toHaveLength(len);
+        expect(new Set(f).size).toBeLessThanOrEqual(4);
+        for (let i = 1; i < f.length; i++) expect(f[i]).not.toBe(f[i - 1]);
+      }
+    }
+  });
   it("nur Töne aus dem Pool, richtige Länge", () => {
     for (const len of [2, 3, 4, 5, 6]) {
       for (const f of many(POOL_F, len, 200, len)) {
@@ -156,25 +172,41 @@ describe("Länge", () => {
 });
 
 describe("Antwortknöpfe fürs Lesen", () => {
-  it("alle Töne der Folge, mindestens 2 andere, insgesamt bis 8, nach Tonhöhe", () => {
+  it("alle Töne der Folge, mindestens 1 anderer, insgesamt bis 5 (eine Zeile), nach Tonhöhe", () => {
     const rng = seeded(3);
     for (let k = 0; k < 200; k++) {
-      const f = makeFolge(POOL_F, 5, rng);
+      const f = makeFolge(POOL_F, 5, rng, { maxDistinct: FOLGE_MAX_DISTINCT });
       const c = folgeChoices(f, POOL_F, rng);
-      expect(c.length).toBe(8);
+      expect(c.length).toBe(5);
       for (const n of f) expect(c).toContain(n);
-      expect(c.filter((x) => !f.includes(x)).length).toBeGreaterThanOrEqual(2);
+      expect(c.filter((x) => !f.includes(x)).length).toBeGreaterThanOrEqual(1);
       const midis = c.map((x) => note(x).midi);
       expect(midis).toEqual(midis.slice().sort((a, b) => a - b));
       expect(new Set(midis).size).toBe(c.length);
     }
   });
-  it("wenige Töne: entsprechend weniger, aber immer 2 nicht aus der Folge", () => {
+  it("wenige Töne: entsprechend weniger, aber immer einer nicht aus der Folge", () => {
     const pool5 = ["h1", "a1", "g1", "c2", "d2"];
     const c = folgeChoices(["g1", "a1", "h1", "c2"], pool5, seeded(1));
-    expect(c).toEqual(expect.arrayContaining(["g1", "a1", "h1", "c2", "d2"]));
-    expect(c.filter((x) => !["g1", "a1", "h1", "c2"].includes(x)).length).toBeGreaterThanOrEqual(2);
+    expect(c).toEqual(["g1", "a1", "h1", "c2", "d2"]);
     expect(folgeChoices(["g1", "a1"], pool5, seeded(1))).toHaveLength(5);
+    // fehlt ein Ton zum Ablenken, kommt einer aus einer späteren Stufe dazu
+    const c3 = folgeChoices(["g1", "a1", "h1"], ["h1", "a1", "g1"], seeded(1));
+    expect(c3).toHaveLength(4);
+  });
+  it("Griffe: verwechselbar nach Griff, gemischt, alle Töne der Folge, bis 5", () => {
+    const rng = seeded(8);
+    let unsorted = 0;
+    for (let k = 0; k < 200; k++) {
+      const f = makeFolge(POOL_F, 4, rng, { maxDistinct: FOLGE_MAX_DISTINCT });
+      const c = folgeChoices(f, POOL_F, rng, "griff");
+      expect(c.length).toBe(5);
+      for (const n of f) expect(c).toContain(n);
+      expect(new Set(c.map((x) => note(x).fingering)).size).toBe(c.length);
+      const midis = c.map((x) => note(x).midi);
+      if (midis.join() !== midis.slice().sort((a, b) => a - b).join()) unsorted++;
+    }
+    expect(unsorted).toBeGreaterThan(150);
   });
   it("kein Ton der Folge in anderer Oktave als falsche Möglichkeit", () => {
     const rng = seeded(5);
@@ -190,5 +222,46 @@ describe("Antwortknöpfe fürs Lesen", () => {
     const all = unlockedNotes("lesen", 12);
     const c = folgeChoices(["es1", "f1", "g1"], all, seeded(4));
     expect(c.some(isAltSpelling)).toBe(false);
+  });
+});
+
+describe("Pflichtton und Wechsel-Drills", () => {
+  it("must: der Ton kommt vor, an verschiedenen Stellen, nicht vorn, wenn er der Ton davor war", () => {
+    const rng = seeded(21);
+    const at = new Set<number>();
+    for (let k = 0; k < 300; k++) {
+      const f = makeFolge(POOL8, 4, rng, { must: "e1" });
+      expect(f).toHaveLength(4);
+      expect(f).toContain("e1");
+      at.add(f.indexOf("e1"));
+      for (let i = 1; i < f.length; i++) expect(f[i]).not.toBe(f[i - 1]);
+      const g = makeFolge(POOL8, 4, rng, { must: "a1", avoidFirst: "a1" });
+      expect(g).toContain("a1");
+      expect(g[0]).not.toBe("a1");
+    }
+    expect(at.size).toBe(4);
+  });
+  it("Gegenbewegung: h¹ → c² ja, g¹ → a¹ nein", () => {
+    expect(counterMotion("h1", "c2")).toBe(true);
+    expect(counterMotion("c2", "h1")).toBe(true);
+    expect(counterMotion("g1", "a1")).toBe(false);
+    expect(pairKey("c2", "h1")).toBe("h1-c2");
+  });
+  it("Drill-Paar: schwierige Paare zuerst, sonst Gegenbewegung; Nachbarn höchstens eine große Terz", () => {
+    const rng = seeded(5);
+    for (let k = 0; k < 100; k++) {
+      const p = drillPair(POOL8, undefined, rng)!;
+      expect(Math.abs(note(p[0]).midi - note(p[1]).midi)).toBeLessThanOrEqual(4);
+      expect(counterMotion(...p)).toBe(true);
+    }
+    const pairs = { "g1-a1": [1, 0, 1, 0, 1] as (0 | 1)[], "h1-c2": [1, 1, 1] as (0 | 1)[] };
+    for (let k = 0; k < 20; k++) expect(drillPair(POOL8, pairs, rng)!.slice().sort()).toEqual(["a1", "g1"]);
+  });
+  it("Drill: zwei Töne im Wechsel, beginnt nicht mit dem Ton davor", () => {
+    const rng = seeded(2);
+    for (let k = 0; k < 50; k++) {
+      const f = drillNotes(["h1", "c2"], rng, "h1");
+      expect(f).toEqual(["c2", "h1", "c2", "h1", "c2", "h1"]);
+    }
   });
 });

@@ -135,3 +135,17 @@ Silben, Atemzeichen, Seitenumbrüche.
    entfernt sie (dann wie beim allerersten Start). Nicht angefasst: `session.ts`, `practice.ts`, Startseite.
    Bekannte Grenze: Zusatzkarten verteilen sich auf alle Töne, auf hohen Stufen kommen die neuen darum
    langsam auf 10 Antworten; Abhilfe (aktuelle Stufe stärker gewichten) erst nach den Tonfolgen.
+6. **Abwechslung beim Üben und Spielen** (`docs/app-uebungen.md`, abgestimmt 15.11.2026, Umsetzung in
+   Abschnitten 1–5):
+   - **Abschnitt 1 umgesetzt (Üben):** Alle Antwortknöpfe in einer Zeile, höchstens 5 (`choiceCount` in
+     `app/src/srs/choices.ts`, `FOLGE_CHOICES`/`FOLGE_MAX_DISTINCT` in `sequences.ts`, CSS `.btns` mit
+     `grid-auto-flow: column`). Die Folge erbt die Übungsart des Platzes (`Folge.kind` in `session.ts`):
+     Noten → Namen, Noten → Griffe, Griffbilder → Namen (`gripSeq` und `renderFolge` in
+     `app/src/ui/practice.ts`). Browser-Tests können die Art vorgeben:
+     `window.__folgen = [{ kind: "griff", notes: [...] }]`. Bildschirmfotos `*-t8…t11-*.png`.
+   - **Abschnitt 2 umgesetzt (Spielen):** Fällige Spielen-Karten werden Folgen mit ihrem Ton
+     (`PlanItem.folge` bei `type: "due"`, `Folge.carry`, Wertung in `answerFolge`), drei von vier
+     Zusatzkarten Folgen, ein Wechsel-Drill je Sitzung (`PlanItem.drill`, `Folge.drill`; Paarwahl
+     `drillPair`/`counterMotion` in `sequences.ts`; Versuche je Tonpaar in `data.pairs`, optional, über
+     `recordPairs` in `session.ts`). Browser-Tests für Einzelkarten beim Spielen brauchen weniger als 5
+     vorgestellte Töne (`singleCards()` in `play.spec.ts`).

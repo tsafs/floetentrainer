@@ -29,11 +29,21 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
      dem Senken einer Stufe). Zusatzkarten zählen für die Trefferquote (Abschnitt 3),
      **verändern aber keine Fächer und Termine.**
      **Etwa jede zweite Zusatzkarte ist eine Tonfolge** (seit 14.11.2026, `docs/app-tonfolgen.md`;
-     abwechselnd, nicht gehäuft): mehrere Töne hintereinander lesen bzw. spielen (Abschnitt 4). Sie gibt
+     abwechselnd, nicht gehäuft), **beim Spielen drei von vier** (seit 15.11.2026, `docs/app-uebungen.md`;
+     dort in Reihe, ohne Abwechseln): mehrere Töne hintereinander lesen bzw. spielen (Abschnitt 4). Sie gibt
      es, sobald in der Spur mindestens 5 Töne vorgestellt sind; sonst bleibt der Platz eine Zusatzkarte.
      Eine Tonfolge ist keine Leitner-Karte, zählt in „7 von 20“ und für die Kartengrenze als **eine**
      Position und im Ergebnis als richtig, wenn alle Töne richtig waren; jeder falsche Ton kommt in
-     „Schwierig waren“. Fällige und neue Karten bleiben wie sie sind.
+     „Schwierig waren“. Fällige und neue Karten bleiben wie sie sind – **außer beim Spielen** (seit
+     15.11.2026, Rückmeldung: „voll oft einzelne Töne … finde ich langweilig“): Dort wird jede **fällige**
+     Karte eine Folge, die ihren Ton enthält (an zufälliger Stelle); nach der Folge wird die Karte im
+     Leitner-System gewertet, richtig nur, wenn ihr Ton an allen Stellen richtig war. Ist ihr Ton gesperrt
+     (Stufe gesenkt) oder gibt es noch keine Folgen, bleibt sie eine Karte. Neue Karten bleiben Einzeltöne.
+     Dazu je Sitzung ein **Wechsel-Drill** (der mittlere Folge-Platz der Zusatzkarten): zwei Töne im Wechsel,
+     6 lang, „Wechsle ruhig hin und her.“ Das Paar: schwierige Griffwechsel zuerst (ab 2 Fehlern in den
+     letzten 10 Versuchen, gemerkt in `pairs`), sonst ein Nachbarpaar (höchstens große Terz) mit
+     Gegenbewegung (ein Finger hebt, ein anderer setzt auf, wie h¹ → c²). Ein Versuch ist jeder Übergang
+     in einer gespielten Folge von einem richtig gespielten Ton zum nächsten.
 - Derselbe Ton kommt nie zweimal direkt hintereinander. Sonst würde die Auflösung der einen Karte
   die Antwort der nächsten verraten.
   Das gilt auch an der Grenze zu einer Tonfolge: Die Karte danach fragt nicht ihren letzten Ton ab, und
@@ -177,12 +187,17 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   - In der Spielen-Spur bittet die Karte zusätzlich, den Ton einmal zu spielen. Die App zeigt, was sie
     hört, und es geht weiter, wenn der Ton stimmt oder bei „Weiter“.
   - Eine Vorstellung zählt nicht als Antwort.
+- **Alle Antwortknöpfe in einer Zeile, höchstens 5** (seit 15.11.2026, `docs/app-uebungen.md`; vorher
+  Note→Name ab Fach 3 acht Namen in zwei Reihen und Notenzeilen 2×2 – Rückmeldung: „finde ich recht
+  schwer, mich zurechtzufinden“). Gemessen: 5 Griffbilder passen auf jedem Handy hoch und quer bequem,
+  6 werden auf kleinen Handys eng.
 - **Note→Name:**
   - In Fach 1 und 2: 4 Namen.
-  - Ab Fach 3: **8 Namen** in zwei Reihen zu 4. Gibt es nicht genug passende Töne, entsprechend
+  - Ab Fach 3: **5 Namen** (bis 15.11.2026: 8). Gibt es nicht genug passende Töne, entsprechend
     weniger, mindestens 4.
   - Die Knöpfe stehen nach Tonhöhe geordnet.
-- **Note→Griff:** 4 Griffbilder. **Griff→Note:** ein Griffbild, zur Wahl 4 kleine Notenzeilen.
+- **Note→Griff:** 4 Griffbilder, ab Fach 3 **5**. **Griff→Note:** ein Griffbild, zur Wahl 4 kleine
+  Notenzeilen in einer Zeile.
 - **Falsche Antworten möglichst verwechselbar:** Nachbartöne, dieselbe Note mit ♯/♭, ähnliche Griffe
   (wenige Löcher anders), derselbe Ton in der anderen Oktave.
   - Ausnahme (seit 15.11.2026): Sind die Antworten **Namen** (Note→Name, Tonfolge), nie derselbe Name in
@@ -203,8 +218,17 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   - Oben eine breite Notenzeile mit allen Noten (ganze Notenköpfe ohne Takt und Hals), **Vorzeichen an
     jeder Note**. Die aktuelle Note hat einen feinen Strich darunter; darunter wachsen die Namen mit.
   - **Lesen** („Wie heißen diese Noten? Der Reihe nach.“): Namenknöpfe nach Tonhöhe, alle Töne der Folge
-    plus verwechselbare, zusammen bis zu 8, mindestens 2 nicht aus der Folge. Unter jeder Note steht
-    *ihre Antwort*: richtig grün, falsch rot (der getippte Name), weiter mit der nächsten.
+    plus verwechselbare, zusammen bis zu **5** in einer Zeile, mindestens **einer** nicht aus der Folge
+    (bis 15.11.2026: bis 8, mindestens 2). Darum hat eine Folge beim Lesen **höchstens 4 verschiedene
+    Töne**; längere Folgen wiederholen Töne. Unter jeder Note steht *ihre Antwort*: richtig grün, falsch
+    rot (der getippte Name), weiter mit der nächsten.
+  - **Die Folge erbt die Übungsart** der Karte auf ihrem Platz (seit 15.11.2026; vorher waren alle
+    Lese-Folgen Noten → Namen, und Griff-Karten verloren die Hälfte ihrer Plätze):
+    Note→Name → **Noten → Namen**; Note→Griff → **Noten → Griffe** („Welche Griffe sind das? Der Reihe
+    nach.“, bis zu 5 Griffbilder gemischt, unter der Note der Name des getippten Griffs, im Fehlerfeld die
+    richtigen Griffe klein mit Namen, falsche rot); Griff→Note → **Griffbilder → Namen** („Welche Töne
+    sind das? Der Reihe nach.“, oben statt der Notenzeile die Griffbilder der Folge, **höchstens 5**,
+    darunter Strich und getippter Name; Namenknöpfe wie oben).
   - **Spielen** („Spiel diese Töne nacheinander.“, darunter „Ich höre“): gewertet wie das Mitspielen im
     Warte-Modus (wartet auf jede Note, Tonwiederholung braucht einen neuen Einsatz, Übergangsklänge beim
     Fingerwechsel zählen nicht, Oktave zu hoch nur ein Hinweis), mit Toleranz, Haltedauer und Klarheit
