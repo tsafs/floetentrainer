@@ -194,9 +194,11 @@ describe("Zurückgehen", () => {
     // e² wurde einmal wirklich beantwortet (z. B. als fällige Karte)
     d.history.lesen.e2 = answers(1, 0, [TODAY]);
     d.cards["e2|name"] = { box: 4, day: TODAY, session: 3 };
+    d.points = { lesen: { e2: 9 }, spielen: {} };
     chooseStart(d, ms("linke-hand"), "beide", NOW + 10, TODAY);
     expect(level(d, "lesen")).toBe(3);
     expect(d.countFrom.lesen).toBe(NOW + 10);
+    expect(d.points.lesen).toEqual({}); // Zurückgehen: Sicherheit beginnt neu
     // e¹, d¹: nie beantwortet → neu, mit Vorstellung
     expect(d.cards["e1|name"]).toBeUndefined();
     expect(d.introduced.lesen).not.toContain("e1");

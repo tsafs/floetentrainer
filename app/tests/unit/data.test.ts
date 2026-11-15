@@ -65,6 +65,11 @@ describe("Umwandlung und Prüfung", () => {
     });
     expect(d.pairs).toEqual({ "h1-c2": [1, 1, 1, 1, 1, 1, 1, 1, 0, 0], "e1-fis1": [1, 0] });
   });
+  it("Sicherheit (points): optional, zwischen 0 und 10, Fehlerhaftes still weg", () => {
+    expect(normalizeData({ version: 2 }).points).toBeUndefined();
+    const d = normalizeData({ version: 2, points: { lesen: { h1: 8, d2: 14, x1: 3, a1: "viel", g1: -1 }, spielen: "kaputt" } });
+    expect(d.points).toEqual({ lesen: { h1: 8, d2: 10, g1: 0 }, spielen: {} });
+  });
   it("Version 0 (ohne Versionsnummer, Stufen als Zahlen) wird umgewandelt", () => {
     const d = normalizeData({ level: { lesen: 3, spielen: 5 }, cards: { "h1|name": { box: 2, day: TODAY } } });
     expect(d.version).toBe(DATA_VERSION);

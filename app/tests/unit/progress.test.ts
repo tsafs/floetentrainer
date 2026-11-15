@@ -7,9 +7,13 @@ import {
   isWeak,
   level,
   noteMastered,
+  notePoints,
+  pointsFromHistory,
+  pointsMissing,
   readyForNext,
   recordAnswer,
   setLevel,
+  stepPoints,
   streak,
   weekDots,
 } from "../../src/srs/progress";
@@ -51,22 +55,59 @@ describe("Trefferquote", () => {
 });
 
 describe("Freischalten", () => {
-  it("10 Antworten, 90 %", () => {
-    expect(noteMastered(answers(10, 1, [Y, TODAY]), 0)).toBe(true); // 9 von 10
-    expect(noteMastered(answers(20, 2, [Y, TODAY]), 0)).toBe(true); // 18 von 20
-    expect(noteMastered(answers(20, 3, [Y, TODAY]), 0)).toBe(false); // 17 von 20
-    expect(noteMastered(answers(9, 0, [Y, TODAY]), 0)).toBe(false); // zu wenige
-    expect(noteMastered(answers(10, 2, [Y, TODAY]), 0)).toBe(false); // 80 %
+  it("Sicherheit: richtig +1, falsch −2, zwischen 0 und 10", () => {
+    expect(stepPoints(0, true)).toBe(1);
+    expect(stepPoints(10, true)).toBe(10);
+    expect(stepPoints(10, false)).toBe(8);
+    expect(stepPoints(1, false)).toBe(0);
+    // aus Antworten nachgerechnet (ab 0, in ihrer Reihenfolge)
+    expect(pointsFromHistory(answers(8, 0, [TODAY]), 0)).toBe(8);
+    expect(pointsFromHistory(answers(20, 3, [TODAY]), 0)).toBe(10); // Fehler am Anfang: kosten nichts
+    expect(pointsFromHistory([...answers(10, 0, [TODAY]), [0, TODAY, 9000]], 0)).toBe(8);
+    expect(pointsFromHistory([...answers(10, 0, [TODAY]), [0, TODAY, 9000]], 5000)).toBe(0); // vor countFrom zählt nicht
   });
-  it("alles an einem Tag reicht: fleißiges Üben wird nicht ausgebremst", () => {
-    expect(noteMastered(answers(10, 1, [TODAY]), 0)).toBe(true);
-    expect(noteMastered(answers(20, 0, [TODAY]), 0)).toBe(true);
+  it("sitzt ab 8 Punkten: 8 richtige reichen, ein Fehler kostet zwei weitere", () => {
+    const d = defaultData();
+    for (let i = 0; i < 7; i++) recordAnswer(d, "lesen", "h1", true, i, TODAY);
+    expect(noteMastered(d, "lesen", "h1")).toBe(false);
+    expect(pointsMissing(d, "lesen", "h1")).toBe(1);
+    recordAnswer(d, "lesen", "h1", false, 7, TODAY); // 7 → 5
+    expect(pointsMissing(d, "lesen", "h1")).toBe(3);
+    for (let i = 0; i < 3; i++) recordAnswer(d, "lesen", "h1", true, 8 + i, TODAY);
+    expect(noteMastered(d, "lesen", "h1")).toBe(true);
   });
-  it("es zählen nur die letzten 20: ältere Fehler fallen heraus", () => {
-    const l = [...answers(5, 5, [Y]), ...answers(20, 0, [TODAY], 5000)];
-    expect(noteMastered(l, 0)).toBe(true);
-    const l2 = [...answers(5, 5, [Y]), ...answers(17, 0, [TODAY], 5000)]; // 3 Fehler noch drin: 17 von 20
-    expect(noteMastered(l2, 0)).toBe(false);
+  it("ein Ausrutscher bei vollem Ton hält nicht auf – egal, wie lange er zurückliegt", () => {
+    const d = defaultData();
+    for (let i = 0; i < 19; i++) recordAnswer(d, "lesen", "d2", true, i, TODAY);
+    recordAnswer(d, "lesen", "d2", false, 19, TODAY);
+    expect(notePoints(d, "lesen", "d2")).toBe(8);
+    expect(noteMastered(d, "lesen", "d2")).toBe(true);
+    recordAnswer(d, "lesen", "d2", false, 20, TODAY); // zweiter Fehler: 6, zwei richtige holen ihn zurück
+    expect(pointsMissing(d, "lesen", "d2")).toBe(2);
+    recordAnswer(d, "lesen", "d2", true, 21, TODAY);
+    recordAnswer(d, "lesen", "d2", true, 22, TODAY);
+    expect(noteMastered(d, "lesen", "d2")).toBe(true);
+  });
+  it("jede richtige Antwort bringt einen Punkt (anders als die letzten 20, wo 17 von 20 stehen blieb)", () => {
+    const d = defaultData();
+    // 5 richtig, 3 falsch, dann richtig: kein Fenster, das alte Antworten verdrängt
+    [1, 1, 1, 1, 1, 0, 0, 0].forEach((a, i) => recordAnswer(d, "lesen", "d2", a === 1, i, TODAY));
+    let p = notePoints(d, "lesen", "d2");
+    for (let i = 0; i < 6; i++) {
+      recordAnswer(d, "lesen", "d2", true, 100 + i, TODAY);
+      expect(notePoints(d, "lesen", "d2")).toBe(Math.min(10, p + 1));
+      p = notePoints(d, "lesen", "d2");
+    }
+  });
+  it("gespeicherte Sicherheit gilt vor den Antworten; Senken einer Stufe setzt sie zurück", () => {
+    const d = defaultData();
+    d.stages.lesen = "c2-d2";
+    master(d, "lesen", ["h1"]);
+    expect(notePoints(d, "lesen", "h1")).toBe(10); // nachgerechnet
+    d.points = { lesen: { h1: 3 }, spielen: {} };
+    expect(notePoints(d, "lesen", "h1")).toBe(3);
+    setLevel(d, "lesen", 1, 99999);
+    expect(notePoints(d, "lesen", "h1")).toBe(0);
   });
   it("jeder freigeschaltete Ton muss es erfüllen", () => {
     const d = defaultData();
@@ -106,7 +147,7 @@ describe("Aufhaltende Töne", () => {
     const d = defaultData();
     expect(blockingNotes(d, "lesen")).toEqual(["h1", "a1", "g1"]);
     master(d, "lesen", ["h1", "g1"]);
-    d.history.lesen.a1 = answers(20, 3, [TODAY]); // 17 von 20
+    d.history.lesen.a1 = [...answers(10, 0, [TODAY]), ...answers(3, 3, [TODAY], 5000)]; // 10, dann 3 Fehler: 4 Punkte
     expect(blockingNotes(d, "lesen")).toEqual(["a1"]);
   });
   it("an der Grenze der Spur hält nichts auf", () => {
@@ -131,9 +172,11 @@ describe("Stufe von Hand", () => {
     const d = defaultData();
     setLevel(d, "lesen", 8, 100);
     setLevel(d, "spielen", 8, 100);
+    d.points = { lesen: { h1: 9 }, spielen: { h1: 9 } };
     setLevel(d, "lesen", 3, 5000);
     expect(level(d, "spielen")).toBe(3);
     expect(d.countFrom).toEqual({ lesen: 5000, spielen: 5000 });
+    expect(d.points).toEqual({ lesen: {}, spielen: {} }); // Sicherheit beider Spuren zurückgesetzt
   });
   it("nach dem Senken zählen nur neue Antworten", () => {
     const d = defaultData();

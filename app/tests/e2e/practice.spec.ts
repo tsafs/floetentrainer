@@ -177,6 +177,7 @@ test.describe("Üben", () => {
     const y = new Date(Date.now() - 86400000);
     const ykey = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, "0")}-${String(y.getDate()).padStart(2, "0")}`;
     for (const n of ["h1", "a1", "g1"]) d.history.lesen[n] = Array.from({ length: 12 }, (_, i) => [1, i % 2 ? ykey : key, Date.now() - 1000 + i]);
+    (d.history as { spielen: unknown }).spielen = {}; // nur Lesen schaltet frei (die Beispiel-Antworten beim Spielen säßen schon)
     await seed(page, d);
     await page.goto("./");
     await page.getByRole("button", { name: /Üben/ }).click();

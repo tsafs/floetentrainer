@@ -4,7 +4,7 @@ import { mic } from "../audio/mic";
 import { maxLevel, unlockedNotes, type Track } from "../music/levels";
 import { nameHtml } from "../music/names";
 import { dueCount } from "../srs/leitner";
-import { isWeak, level, noteAccuracy, streak, weekDots } from "../srs/progress";
+import { isWeak, level, noteAccuracy, noteMastered, streak, weekDots } from "../srs/progress";
 import { hasWork, Session } from "../srs/session";
 import { menuSlot, plural, type Ctx, type View } from "./common";
 
@@ -26,7 +26,7 @@ function buttonText(ctx: Ctx, track: Track): { label: string; sub: string } {
   const work = hasWork(ctx.data, track, today);
   const verb = track === "lesen" ? "Üben" : "Spielen";
   if (!work) {
-    // Nichts fällig, nichts neu: Weiterüben zählt trotzdem für die Trefferquote und damit für die nächste Stufe.
+    // Nichts fällig, nichts neu: Weiterüben zählt trotzdem für Trefferquote und Sicherheit und damit für die nächste Stufe.
     const lv = level(ctx.data, track);
     // Auch Spielen an der Lesen-Grenze zählt: Steigt Lesen, schaltet Spielen sofort mit frei.
     const sub = lv < maxLevel(track) ? `Fälliges erledigt · zählt für Stufe ${lv + 1}` : "Fälliges erledigt · alle Stufen erreicht";
@@ -77,7 +77,7 @@ export const homeView: View = (root, ctx) => {
     .map((n) => {
       const acc = noteAccuracy(d, "lesen", n);
       const w = acc.n ? Math.round(acc.ratio * 100) : 0;
-      return `<span class="chip${isWeak(acc) ? " weak" : ""}" title="${acc.n ? `${acc.correct} von ${acc.n} richtig` : "noch keine Antworten"}">${nameHtml(n)}<i><b style="width:${w}%"></b></i></span>`;
+      return `<span class="chip${isWeak(acc) && !noteMastered(d, "lesen", n) ? " weak" : ""}" title="${acc.n ? `${acc.correct} von ${acc.n} richtig` : "noch keine Antworten"}">${nameHtml(n)}<i><b style="width:${w}%"></b></i></span>`;
     })
     .join("");
   const lese = buttonText(ctx, "lesen");

@@ -772,7 +772,7 @@ svg.acc {
   margin: -6px 0 -10px;
   min-height: 48px;
 }
-/* Tonfolge beim Lesen: „Weiß nicht“ mittig wie auf den Karten, „Vertippt“ rechts daneben */
+/* Tonfolge beim Lesen: „Weiß nicht“ mittig wie auf den Karten, „Vertippt“ ganz links (wie im Fehlerfeld) */
 .idkrow.three {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -1194,10 +1194,21 @@ svg.acc {
   padding-top: 0.2em;
 }
 .prow .pb {
+  position: relative;
   height: 6px;
   border-radius: 3px;
   background: var(--track);
   overflow: hidden;
+}
+/* Kerbe: ab hier sitzt ein Ton (8 von 10 Punkten) */
+.prow .pb::after {
+  content: "";
+  position: absolute;
+  left: var(--mark, 80%);
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--paper);
 }
 .prow .pb b {
   display: block;

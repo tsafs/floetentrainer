@@ -6,7 +6,21 @@ import { maxLevel, stagesOf, TRACK_LABEL, unlockedNotes, type Track } from "../m
 import { joinNames, nameHtml, nameText } from "../music/names";
 import { CHART, NOTES } from "../music/notes";
 import { staffRange, staffSvg } from "../music/staff";
-import { isWeak, level, noteAccuracy, startLevel } from "../srs/progress";
+import {
+  countedNotes,
+  isWeak,
+  level,
+  levelCap,
+  noteAccuracy,
+  noteMastered,
+  notePoints,
+  POINTS_MAX,
+  POINTS_RIGHT,
+  POINTS_UNLOCK,
+  POINTS_WRONG,
+  pointsMissing,
+  startLevel,
+} from "../srs/progress";
 import { chapterOf, chaptersOf, snippetSong, stageSong } from "../srs/chapters";
 import { esc, pressGuard, topbar, type View } from "./common";
 import { milestoneTitle } from "./startpoint";
@@ -57,16 +71,26 @@ export const progressView: View = (root, ctx) => {
   const sec = (track: Track) => {
     const lv = level(ctx.data, track);
     const max = maxLevel(track);
+    // Balken: Sicherheit (Punkte), Kerbe bei POINTS_UNLOCK. Rot nur, wer schwach ist und noch nicht sitzt
+    // (nach anfänglichen Fehlern kann ein Ton schon voll sein, obwohl die Trefferquote noch unter 80 % liegt).
     const rows = unlockedNotes(track, lv)
       .map((n) => {
         const a = noteAccuracy(ctx.data, track, n);
+        const p = notePoints(ctx.data, track, n);
+        const weak = isWeak(a) && p < POINTS_UNLOCK;
         return (
-          `<div class="prow${isWeak(a) ? " weak" : ""}"><span class="nm">${nameHtml(n)}</span>` +
-          `<span class="pb"><b style="width:${a.n ? Math.round(a.ratio * 100) : 0}%"></b></span>` +
-          `<span class="cnt">${a.n ? `${a.correct} von ${a.n}` : "noch keine"}</span></div>`
+          `<div class="prow${weak ? " weak" : ""}" data-note="${n}"><span class="nm">${nameHtml(n)}</span>` +
+          `<span class="pb" style="--mark:${(POINTS_UNLOCK / POINTS_MAX) * 100}%"><b style="width:${(p / POINTS_MAX) * 100}%"></b></span>` +
+          `<span class="cnt">${a.n || p ? `${p} von ${POINTS_MAX}` : "noch keine"}</span></div>`
         );
       })
       .join("");
+    // Töne unter 8 Punkten – auch wenn Spielen gerade an der Lesen-Stufe ansteht (dort hält blockingNotes
+    // nichts auf, aber diese Töne entscheiden, ob Spielen mit Lesen mitzieht)
+    const missing = countedNotes(ctx.data, track).filter((n) => !noteMastered(ctx.data, track, n)).map((n) => {
+      const k = pointsMissing(ctx.data, track, n);
+      return `${nameHtml(n)} (${k} richtige)`;
+    });
     const next = stagesOf(track)[lv];
     // Kapitel (Meilensteine) und beim Spielen das Lied, aus dem die Abschnitte kommen
     const ch = chapterOf(track, lv);
@@ -78,13 +102,18 @@ export const progressView: View = (root, ctx) => {
       <div class="rows">${rows}</div>
       <p class="help">${
         next
-          ? `Als Nächstes: ${joinNames(next.notes)}. Dafür braucht jeder Ton${startLevel(ctx.data, track) > 1 ? ` ab deinem Startpunkt (Stufe ${startLevel(ctx.data, track)})` : ""} mindestens 10 Antworten, davon 90 % richtig.`
+          ? `Als Nächstes: ${joinNames(next.notes)}. Dafür braucht jeder Ton${startLevel(ctx.data, track) > 1 ? ` ab deinem Startpunkt (Stufe ${startLevel(ctx.data, track)})` : ""} ${POINTS_UNLOCK} Punkte.` +
+            (missing.length
+              ? ` <span data-testid="missing-${track}">Es fehlen noch: ${missing.join(", ")}.</span>`
+              : lv < levelCap(ctx.data, track)
+                ? ` <span data-testid="missing-${track}">Alle sitzen – die nächste Stufe kommt mit deiner nächsten richtigen Antwort.</span>`
+                : "")
           : "Alle Stufen sind freigeschaltet."
       }${track === "spielen" && next ? " Spielen kann Lesen nicht überholen." : ""}</p>
     </section>`;
   };
   const start = `<section aria-label="Startpunkt"><p class="help">Zu leicht oder zu schwer? Du kannst bei einem anderen Abschnitt einsteigen – weiter hinten oder wieder vorn.</p><a class="big alt" href="#/startpunkt" data-testid="to-startpoint">Startpunkt ändern</a></section>`;
-  root.innerHTML = `<main class="screen page">${topbar("Fortschritt")}<p class="help">Trefferquote der letzten 20 Antworten je Ton.</p>${sec("lesen")}${sec("spielen")}${start}</main>`;
+  root.innerHTML = `<main class="screen page">${topbar("Fortschritt")}<p class="help">Sicherheit je Ton: richtig +${POINTS_RIGHT}, falsch −${POINTS_WRONG}, höchstens ${POINTS_MAX}. Ab ${POINTS_UNLOCK} Punkten sitzt ein Ton. Wiederholt wird er trotzdem: am nächsten Tag, nach 3 Tagen, nach einer Woche …</p>${sec("lesen")}${sec("spielen")}${start}</main>`;
 };
 
 export const chartView: View = (root, ctx) => {

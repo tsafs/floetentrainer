@@ -81,6 +81,8 @@ const firstOf = (r: Retry) => (r.folge ? r.folge.notes[0] : r.item!.note);
 interface Undo {
   uid: number;
   history: [string, Answer[] | undefined][];
+  /** Sicherheit der Töne vorher (undefined: war nicht gespeichert, wird nachgerechnet) */
+  points: [string, number | undefined][];
   card?: { key: string; prev: CardState | undefined };
   days: string[];
   stages: AppData["stages"];
@@ -495,6 +497,7 @@ export class Session {
     return {
       uid,
       history: notes.map((n) => [n, h[n]?.slice()]),
+      points: notes.map((n) => [n, this.data.points?.[this.track]?.[n]]),
       card: key ? { key, prev: this.data.cards[key] && { ...this.data.cards[key] } } : undefined,
       days: this.data.days.slice(),
       stages: { ...this.data.stages },
@@ -516,7 +519,7 @@ export class Session {
   /**
    * „Vertippt“: die letzte getippte Antwort zurücknehmen, als wäre sie nie gegeben. Die Karte bzw. Folge
    * bleibt die aktuelle; die neue Antwort darauf wird ganz normal gewertet (answer bzw. answerFolge).
-   * Zurück kommen Verlauf, Fach, Übungstage, Stufen und Meldungen (auch eine Stufe, die erst diese Antwort
+   * Zurück kommen Verlauf, Sicherheit, Fach, Übungstage, Stufen und Meldungen (auch eine Stufe, die erst diese Antwort
    * freigeschaltet hat), Wiederholung, „Schwierig waren“ und die Zähler.
    */
   undoLast(): void {
@@ -527,6 +530,13 @@ export class Session {
     for (const [n, list] of u.history) {
       if (list) h[n] = list;
       else delete h[n];
+    }
+    const pts = this.data.points?.[this.track];
+    if (pts) {
+      for (const [n, v] of u.points) {
+        if (v === undefined) delete pts[n];
+        else pts[n] = v;
+      }
     }
     if (u.card) {
       if (u.card.prev) this.data.cards[u.card.key] = u.card.prev;

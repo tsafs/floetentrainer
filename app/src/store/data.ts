@@ -8,6 +8,8 @@ import { isValidDayKey } from "./dates";
 
 export const DATA_VERSION = 2;
 export const HISTORY_LEN = 20;
+/** Höchstwert der Sicherheit eines Tons (Punkte fürs Freischalten, ../srs/progress.ts) */
+export const POINTS_MAX = 10;
 
 /** Darstellung: wie das Handy, immer hell oder immer dunkel */
 export type Theme = "auto" | "light" | "dark";
@@ -156,6 +158,12 @@ export interface AppData {
   cards: Record<string, CardState>;
   /** letzte 20 gewertete Antworten je Spur und Ton */
   history: Record<Track, Record<string, Answer[]>>;
+  /**
+   * Sicherheit je Spur und Ton (seit 15.11.2026, Punkte 0–POINTS_MAX fürs Freischalten, ../srs/progress.ts):
+   * richtig +1, falsch −2. Optional, ohne Versionssprung: Fehlt ein Wert (ältere Daten, oder eine ältere App
+   * hat das Feld beim Speichern weggelassen), wird er aus den gespeicherten Antworten nachgerechnet.
+   */
+  points?: Record<Track, Record<string, number>>;
   /** Töne, deren Vorstellung schon gezeigt wurde, je Spur */
   introduced: Record<Track, string[]>;
   /** Tage mit mindestens einer gewerteten Antwort */
@@ -393,6 +401,21 @@ export function normalizeData(raw: unknown): AppData {
         out.history[t][n] = clean.slice(-HISTORY_LEN);
       }
     }
+  }
+  // Sicherheit je Ton: Fehlerhaftes wird still übergangen (wird aus den Antworten nachgerechnet)
+  if (isObj(d.points)) {
+    const pts: Record<Track, Record<string, number>> = { lesen: {}, spielen: {} };
+    let any = false;
+    for (const t of ["lesen", "spielen"] as Track[]) {
+      const p = d.points[t];
+      if (!isObj(p)) continue;
+      for (const [n, v] of Object.entries(p)) {
+        if (!NOTES[n] || !isNum(v)) continue;
+        pts[t][n] = Math.max(0, Math.min(POINTS_MAX, Math.round(v)));
+        any = true;
+      }
+    }
+    if (any) out.points = pts;
   }
   if (isObj(d.introduced)) {
     for (const t of ["lesen", "spielen"] as Track[]) {

@@ -1,11 +1,15 @@
-// Trefferquote, Freischalten der Stufen, Serie der Übungstage.
+// Trefferquote, Sicherheit (Punkte) und Freischalten der Stufen, Serie der Übungstage.
 
 import { levelOf, maxLevel, stageId, stagesOf, unlockedNotes, type Track } from "../music/levels";
-import { HISTORY_LEN, type Answer, type AppData } from "../store/data";
+import { HISTORY_LEN, POINTS_MAX, type Answer, type AppData } from "../store/data";
 import { addDays, mondayOf } from "../store/dates";
 
-export const UNLOCK_MIN_ANSWERS = 10;
-export const UNLOCK_RATIO = 0.9;
+export { POINTS_MAX };
+/** Punkte, ab denen ein Ton fürs Freischalten sitzt */
+export const POINTS_UNLOCK = 8;
+/** Punkte für eine richtige bzw. Abzug für eine falsche Antwort */
+export const POINTS_RIGHT = 1;
+export const POINTS_WRONG = 2;
 export const WEAK_MIN_ANSWERS = 5;
 export const WEAK_RATIO = 0.8;
 
@@ -30,8 +34,41 @@ export function isWeak(acc: Accuracy): boolean {
   return acc.n >= WEAK_MIN_ANSWERS && acc.ratio < WEAK_RATIO;
 }
 
-/** Gewertete Antwort festhalten: letzte 20 je Ton und Spur, Übungstag merken. */
+/** Neue Sicherheit nach einer Antwort: richtig +1, falsch −2, zwischen 0 und POINTS_MAX. */
+export function stepPoints(points: number, ok: boolean): number {
+  return Math.max(0, Math.min(POINTS_MAX, points + (ok ? POINTS_RIGHT : -POINTS_WRONG)));
+}
+
+/** Sicherheit aus gespeicherten Antworten nachrechnen (ab 0, nur Antworten ab countFrom). */
+export function pointsFromHistory(list: Answer[] | undefined, countFrom: number): number {
+  return (list ?? []).filter((a) => a[2] >= countFrom).reduce((p, a) => stepPoints(p, a[0] === 1), 0);
+}
+
+/**
+ * Sicherheit eines Tons in einer Spur (0–10). Gespeichert und nach jeder gewerteten Antwort fortgeschrieben;
+ * fehlt der Wert, wird er aus den Antworten nachgerechnet.
+ */
+export function notePoints(data: AppData, track: Track, note: string): number {
+  return data.points?.[track]?.[note] ?? pointsFromHistory(data.history[track][note], data.countFrom[track]);
+}
+
+/** So viele richtige Antworten (ohne Fehler) fehlen dem Ton noch, bis er sitzt. */
+export function pointsMissing(data: AppData, track: Track, note: string): number {
+  return Math.max(0, POINTS_UNLOCK - notePoints(data, track, note));
+}
+
+/** Zählung fürs Freischalten neu beginnen (nach dem Senken einer Stufe): alle Töne der Spur wieder bei 0. */
+export function resetCount(data: AppData, track: Track, now: number): void {
+  data.countFrom[track] = now;
+  data.points ??= { lesen: {}, spielen: {} };
+  data.points[track] = {};
+}
+
+/** Gewertete Antwort festhalten: letzte 20 je Ton und Spur, Sicherheit fortschreiben, Übungstag merken. */
 export function recordAnswer(data: AppData, track: Track, note: string, ok: boolean, now: number, today: string): void {
+  const before = notePoints(data, track, note);
+  data.points ??= { lesen: {}, spielen: {} };
+  (data.points[track] ??= {})[note] = stepPoints(before, ok);
   const list = (data.history[track][note] ??= []);
   list.push([ok ? 1 : 0, today, now]);
   if (list.length > HISTORY_LEN) list.splice(0, list.length - HISTORY_LEN);
@@ -41,14 +78,15 @@ export function recordAnswer(data: AppData, track: Track, note: string, ok: bool
   }
 }
 
-/** Erfüllt ein Ton die Freischalt-Bedingung? Es zählen nur Antworten ab countFrom. */
-export function noteMastered(list: Answer[] | undefined, countFrom: number): boolean {
-  const l = (list ?? []).slice(-HISTORY_LEN).filter((a) => a[2] >= countFrom);
-  if (l.length < UNLOCK_MIN_ANSWERS) return false;
-  // Keine Bedingung an die Zahl der Tage: Wer an einem Tag viel übt, soll weiterkommen.
-  // Dass die Töne auch am nächsten Tag sitzen, prüfen die fälligen Karten (Leitner).
-  const correct = l.filter((a) => a[0] === 1).length;
-  return correct / l.length >= UNLOCK_RATIO - 1e-9;
+/**
+ * Sitzt ein Ton fürs Freischalten? Mindestens POINTS_UNLOCK Punkte Sicherheit. Bis 15.11.2026 galten
+ * „mindestens 10 der letzten 20 Antworten, davon 90 % richtig“ – dort kostete ein Fehler je nach seiner
+ * Lage in den letzten 20 nichts oder bis zu 18 weitere richtige Antworten. Jetzt höchstens zwei.
+ * Keine Bedingung an die Zahl der Tage: Wer an einem Tag viel übt, soll weiterkommen.
+ * Dass die Töne auch am nächsten Tag sitzen, prüfen die fälligen Karten (Leitner).
+ */
+export function noteMastered(data: AppData, track: Track, note: string): boolean {
+  return notePoints(data, track, note) >= POINTS_UNLOCK;
 }
 
 export function level(data: AppData, track: Track): number {
@@ -74,18 +112,17 @@ export function countedNotes(data: AppData, track: Track): string[] {
 export function readyForNext(data: AppData, track: Track): boolean {
   const lv = level(data, track);
   if (lv >= levelCap(data, track)) return false;
-  return countedNotes(data, track).every((n) => noteMastered(data.history[track][n], data.countFrom[track]));
+  return countedNotes(data, track).every((n) => noteMastered(data, track, n));
 }
 
 /**
- * Töne, die gerade das Freischalten der nächsten Stufe aufhalten (zählen fürs Freischalten, Bedingung
- * noch nicht erfüllt). Leer, wenn die Spur an ihrer Grenze steht. Sie kommen wie schwache Töne häufiger
- * dran – sonst bräuchte ein einzelner Ton mit 17 von 20 sehr viele Sitzungen, bis ein alter Fehler aus
- * den letzten 20 fällt.
+ * Töne, die gerade das Freischalten der nächsten Stufe aufhalten (zählen fürs Freischalten, sitzen
+ * noch nicht). Leer, wenn die Spur an ihrer Grenze steht. Sie kommen wie schwache Töne häufiger dran,
+ * damit ein einzelner fehlender Ton nicht viele Sitzungen braucht.
  */
 export function blockingNotes(data: AppData, track: Track): string[] {
   if (level(data, track) >= levelCap(data, track)) return [];
-  return countedNotes(data, track).filter((n) => !noteMastered(data.history[track][n], data.countFrom[track]));
+  return countedNotes(data, track).filter((n) => !noteMastered(data, track, n));
 }
 
 /**
@@ -137,7 +174,7 @@ export function setLevel(data: AppData, track: Track, target: number, now: numbe
   const before = level(data, track);
   data.stages[track] = stageId(track, lv);
   if (lv < before) {
-    data.countFrom[track] = now;
+    resetCount(data, track, now);
     clampStart(data, track);
   }
   if (track === "lesen") {
@@ -145,7 +182,7 @@ export function setLevel(data: AppData, track: Track, target: number, now: numbe
     const spCap = Math.min(maxLevel("spielen"), lv);
     if (sp > spCap) {
       data.stages.spielen = stageId("spielen", spCap);
-      data.countFrom.spielen = now;
+      resetCount(data, "spielen", now);
       clampStart(data, "spielen");
     }
   }
