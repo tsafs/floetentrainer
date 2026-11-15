@@ -78,6 +78,8 @@ export interface FolgeOptions {
   maxDistinct?: number;
   /** dieser Ton muss vorkommen (fällige Karte, die die Folge trägt), an zufälliger Stelle */
   must?: string;
+  /** nur Schritte zum Nachbarton in der Tonhöhen-Reihe (Hören, zu Beginn) */
+  stepsOnly?: boolean;
 }
 
 export function folgeKey(notes: string[]): string {
@@ -99,7 +101,7 @@ function makeOne(pool: Note[], len: number, rng: Rng, opt: FolgeOptions): string
       const full = opt.maxDistinct !== undefined && new Set([...used, ...out]).size >= opt.maxDistinct;
       const next = pickWeighted(
         idx.filter((j) => j !== cur && (!full || used.includes(j) || out.includes(j))),
-        (j) => stepWeight(pool, cur, j) * wNote(pool[j]),
+        (j) => (opt.stepsOnly && Math.abs(j - cur) !== 1 ? 0 : stepWeight(pool, cur, j) * wNote(pool[j])),
         rng,
       );
       if (next === null) break;

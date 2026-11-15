@@ -572,6 +572,20 @@ describe("Tonfolgen", () => {
       expect(d.cards["a1|spiel"].day).toBe(TODAY);
     }
   });
+  it("Spielen: nach „Weiß nicht“ zählen nur die wirklich versuchten Griffwechsel", () => {
+    const d = onlyExtras("spielen");
+    const s = mkSession(d, "spielen", { seed: 5 });
+    let st = s.next();
+    while (st && st.type !== "folge") {
+      if (st.type === "card") s.answer(true);
+      st = s.next();
+    }
+    expect(st?.type).toBe("folge");
+    const notes = (st as Extract<Step, { type: "folge" }>).folge.notes;
+    // nur der erste Ton gespielt, dann „Weiß nicht“: kein Wechsel versucht
+    s.answerFolge(notes.map((_, i) => i === 0), false, 1);
+    expect(d.pairs).toBeUndefined();
+  });
   it("Spielen: etwa jede vierte Folge ist ein Abschnitt des Stufenlieds (nur vorgestellte Töne)", () => {
     let withSong = 0;
     for (let seed = 1; seed <= 20; seed++) {

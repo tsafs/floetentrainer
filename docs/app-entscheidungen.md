@@ -43,7 +43,8 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
      6 lang, „Wechsle ruhig hin und her.“ Das Paar: schwierige Griffwechsel zuerst (ab 2 Fehlern in den
      letzten 10 Versuchen, gemerkt in `pairs`), sonst ein Nachbarpaar (höchstens große Terz) mit
      Gegenbewegung (ein Finger hebt, ein anderer setzt auf, wie h¹ → c²). Ein Versuch ist jeder Übergang
-     in einer gespielten Folge von einem richtig gespielten Ton zum nächsten.
+     in einer gespielten Folge von einem richtig gespielten Ton zum nächsten (nach „Weiß nicht“ nur die
+     wirklich versuchten).
 - Derselbe Ton kommt nie zweimal direkt hintereinander. Sonst würde die Auflösung der einen Karte
   die Antwort der nächsten verraten.
   Das gilt auch an der Grenze zu einer Tonfolge: Die Karte danach fragt nicht ihren letzten Ton ab, und
@@ -439,7 +440,7 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   Nachklang abwarten – so geht es ohne Kopfhörer). Tippen: ab dem zweiten Ton, Namenknöpfe wie bei Folgen
   (höchstens 5, eine Zeile); Nachspielen: alle Töne, Warte-Wertung wie bei Folgen. „Anhören“ beliebig oft,
   „Weiß nicht“ löst auf. Länge 2–3 Töne zu Beginn, nach zwei richtigen +1, nach einem Fehler −1, bis 5;
-  melodisch wie die Folgen (meist Schritte). Töne: freigeschaltete der Spielen- bzw. Lesen-Spur. Zählt
+  bis 3 Töne nur Schritte zum Nachbarton, danach melodisch wie die Folgen (auch Terzen und Sprünge). Töne: freigeschaltete der Spielen- bzw. Lesen-Spur. Zählt
   **nicht** für Trefferquote, Fächer und Übungstage. Am Ende „7 von 10 richtig gehört“, „Nochmal“ und „Zur
   Startseite“. Kein Menüeintrag (die Menüreihenfolge ist abgestimmt; bei Bedarf nachtragen).
 - **Menü** (seit 14.11.2026, `docs/app-navigation.md`): Knopf mit drei feinen Strichen **immer oben rechts in

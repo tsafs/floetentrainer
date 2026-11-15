@@ -604,9 +604,10 @@ export const practiceView: View = (root, ctx) => {
 
     /** Folge fertig: werten und Rückmeldung */
     /** typed: alle Antworten getippt (nicht „Weiß nicht“, nicht gespielt) – dann gibt es „Vertippt“ */
-    const done = (head: string, typed = false) => {
+    /** judged: so viele Töne von vorn wurden wirklich gespielt bzw. versucht (nach „Weiß nicht“ weniger) */
+    const done = (head: string, typed = false, judged = n) => {
       const res = notes.map((_, k) => ok[k] === true);
-      s.answerFolge(res, typed);
+      s.answerFolge(res, typed, judged);
       if (res.every(Boolean)) {
         setPhase("ok");
         idkRow.innerHTML = `<span class="okline" data-testid="panel">${ICON_CHECK}<span>Richtig</span>${listenBtn}</span>`;
@@ -654,12 +655,14 @@ export const practiceView: View = (root, ctx) => {
       e.stopPropagation();
       if (phase !== "ask" || !pressedHere(e, idkBtn)) return;
       onFolgeFrame = null;
+      // versucht: die Töne vor der aktuellen und die aktuelle, wenn schon ein falscher Ton kam
+      const judged = wrongAt[cur] != null ? cur + 1 : cur;
       for (let k = cur; k < n; k++) {
         ok[k] = false;
         // beim Spielen: ein schon falsch gespielter Ton bleibt stehen
         mark(k, false, wrongAt[k] ?? null);
       }
-      done("Auflösung");
+      done("Auflösung", false, judged);
     });
 
     if (!playing) {

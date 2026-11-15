@@ -215,8 +215,11 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
   const fstat = q<HTMLElement>('[data-testid="follow-status"]');
   const goBtn = q<HTMLButtonElement>('[data-act="fstart"]');
   const readyBtn = q<HTMLButtonElement>('[data-act="fready"]');
-  /** Hinweis nach dem Nachstellen der Verzögerung (bis zum nächsten Start) */
-  let latNote = "";
+  /**
+   * Hinweis nach dem Nachstellen der Verzögerung (bis zum nächsten Start); gilt nur, solange Wert und
+   * Kopfhörer-Zustand noch dieselben sind (danach geändert, abgeglichen oder umgeschaltet: normale Anzeige)
+   */
+  let latNote: { ms: number; phones: boolean } | null = null;
   const goText = q<HTMLElement>('[data-testid="follow-go"]');
   const tempoBoxes = [...el.querySelectorAll<HTMLElement>(".tstep")];
   const fluteLine = q<HTMLElement>('[data-testid="flute-line"]');
@@ -349,8 +352,9 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
     }
     const lat = inputLatency(settings);
     latLine.hidden = mode !== "beat";
+    const nudged = latNote && latNote.ms === lat.ms && latNote.phones === settings.headphones;
     latLine.innerHTML =
-      (latNote ? `<span data-testid="latency-nudged">${latNote}</span> · ` : `Verzögerung ${lat.ms} ms `) +
+      (nudged ? `<span data-testid="latency-nudged">Verzögerung nachgestellt: ${lat.ms} ms</span> · ` : `Verzögerung ${lat.ms} ms `) +
       (lat.calibrated ? "" : settings.headphones ? "<span class=\"warn\">· mit Kopfhörern noch nicht abgeglichen</span> " : "(Standard) ") +
       `· <button class="clear" data-act="lat-open">${lat.calibrated ? "ändern" : "abgleichen"}</button>`;
     diagBtn.hidden = !diag.available;
@@ -616,7 +620,7 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
     if (next === null) return;
     diag.event(performance.now(), "nachgestellt", { from: lat.ms, to: next, n: onsets.length });
     setLatency(settings.headphones ? "headphones" : "speaker", next);
-    latNote = `Verzögerung nachgestellt: ${next} ms`;
+    latNote = { ms: next, phones: settings.headphones };
   };
 
   const beginBeat = (tl0: Timeline, my: number) => {
@@ -695,7 +699,7 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
     }
     const my = ++token;
     run = { tl, started: false, startMs: null };
-    latNote = "";
+    latNote = null;
     host.clearPaint();
     host.setCur([]);
     shownMidi = undefined;

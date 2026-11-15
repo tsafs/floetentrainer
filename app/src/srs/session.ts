@@ -447,8 +447,9 @@ export class Session {
    * gewertet (richtig nur, wenn er an allen Stellen richtig war); keine Fächer und Termine. Im Ergebnis
    * zählt die Folge als eine Position, richtig nur ganz fehlerfrei. Bei einem Fehler kommt sie einmal
    * wieder (ungewertet). typed wie bei answer: alle Antworten getippt (nicht „Weiß nicht“, nicht gespielt).
+   * judged: so viele Töne von vorn wurden wirklich versucht (für die Griffwechsel).
    */
-  answerFolge(ok: boolean[], typed = false): void {
+  answerFolge(ok: boolean[], typed = false, judged = ok.length): void {
     const step = this.current;
     if (!step || step.type !== "folge") return;
     const { folge, retry } = step;
@@ -465,7 +466,8 @@ export class Session {
       for (const [n, good] of per) recordAnswer(this.data, this.track, n, good, now, this.opt.today);
       // Fällige Karte, die die Folge trägt: richtig nur, wenn ihr Ton an allen Stellen richtig war
       if (cardKeyOf) this.data.cards[cardKeyOf] = applyAnswer(this.data.cards[cardKeyOf], per.get(folge.carry!)!, this.opt.today, this.sessionNo);
-      if (this.track === "spielen") recordPairs(this.data, folge.notes, ok);
+      // Griffwechsel nur, soweit wirklich gespielt (nach „Weiß nicht“ sind die übrigen nie versucht worden)
+      if (this.track === "spielen") recordPairs(this.data, folge.notes.slice(0, judged), ok.slice(0, judged));
       if (!folge.drill && !folge.song) this.folgeLen?.update(all);
       this.unlocks.push(...checkUnlocks(this.data));
       this.onChange();

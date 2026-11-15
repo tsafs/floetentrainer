@@ -57,4 +57,16 @@ test("Nachspielen: nach dem Vorspielen hört das Mikrofon zu, gespielte Töne we
   await expect(echo(page).locator(".sn.shown.hit")).toHaveCount(notes.length);
   await page.getByRole("button", { name: "Beenden" }).click();
   await expect(page.getByTestId("score")).toHaveText("1 von 1");
+  // auf der Ergebnisseite ist das Mikrofon wieder aus
+  expect(await page.evaluate(() => (window as unknown as { __micStopped: boolean }).__micStopped)).toBe(true);
+});
+
+test("Nachspielen: Doppeltippen startet nur einen Durchgang; Verlassen gibt das Mikrofon frei", async ({ page }) => {
+  await page.addInitScript(FAKE_MIC);
+  await seed(page, sampleData());
+  await page.goto("./#/hoeren");
+  await page.getByRole("button", { name: /Nachspielen/ }).dblclick();
+  await expect(page.getByTestId("count")).toHaveText("1 von 10");
+  await page.goto("./#/");
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __micStopped: boolean }).__micStopped)).toBe(true);
 });

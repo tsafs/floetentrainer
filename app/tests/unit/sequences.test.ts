@@ -265,3 +265,15 @@ describe("Pflichtton und Wechsel-Drills", () => {
     }
   });
 });
+
+describe("Nur Schritte (Hören zu Beginn)", () => {
+  it("stepsOnly: jeder Schritt geht zum Nachbarton in der Tonhöhen-Reihe", () => {
+    const rng = seeded(31);
+    const sorted = POOL8.slice().sort((a, b) => note(a).midi - note(b).midi);
+    for (let k = 0; k < 200; k++) {
+      const f = makeFolge(POOL8, 3, rng, { stepsOnly: true });
+      expect(f).toHaveLength(3);
+      for (let i = 1; i < f.length; i++) expect(Math.abs(sorted.indexOf(f[i]) - sorted.indexOf(f[i - 1]))).toBe(1);
+    }
+  });
+});

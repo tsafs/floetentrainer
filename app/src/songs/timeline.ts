@@ -262,7 +262,9 @@ export function toneTimeline(midis: number[]): Timeline {
 export function withExtraCountInBar(tl: Timeline): Timeline {
   const per = tl.countInBeats || tl.countIn.length;
   if (!per || !tl.countIn.length) return tl;
-  const step = per > 1 ? tl.countIn[1] - tl.countIn[0] : tl.countInDur;
+  // Taktlänge aus den Zählzeiten; bei einem Schlag je Takt ist der Abstand der ersten beiden Klicks ein Takt
+  // (countInDur enthielte bei einem Auftakt dessen Rest)
+  const step = tl.countIn.length > 1 ? tl.countIn[1] - tl.countIn[0] : tl.countInDur;
   const barDur = step * per;
   const first = Array.from({ length: per }, (_, k) => k * step);
   return { ...tl, countIn: [...first, ...tl.countIn.map((b) => b + barDur)], countInDur: tl.countInDur + barDur };

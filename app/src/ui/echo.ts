@@ -55,21 +55,44 @@ export const echoView: View = (root, ctx) => {
   </section>
 </main>`;
     root.querySelectorAll<HTMLButtonElement>("[data-variant]").forEach((b) =>
-      b.addEventListener("click", () => {
-        const v = b.dataset.variant as Variant;
-        // AudioContext und Mikrofon direkt aus dem Tippen heraus
-        songPlayer.prepare();
-        if (v === "tippen") return begin(v);
-        mic
-          .start()
-          .then(() => begin(v))
-          .catch((e) => {
-            ctx.micError = String(e);
-            ctx.micRetry = () => mic.start().then(() => ctx.go("#/hoeren"));
-            ctx.go("#/mikrofon");
-          });
-      }),
+      b.addEventListener("click", () => startVariant(b.dataset.variant as Variant)),
     );
+  };
+
+  /** Mikrofon wurde für „Nachspielen“ angefordert (auch wenn es noch startet): beim Aufräumen freigeben */
+  let micWanted = false;
+  /** gegen doppeltes Antippen: ein Start läuft schon */
+  let starting = false;
+
+  /** Durchgang starten; AudioContext und Mikrofon direkt aus dem Tippen heraus */
+  const startVariant = (v: Variant) => {
+    if (starting || closed) return;
+    starting = true;
+    songPlayer.prepare();
+    if (v === "tippen") return begin(v);
+    micWanted = true;
+    mic
+      .start()
+      .then(() => begin(v))
+      .catch((e) => {
+        starting = false;
+        micWanted = false;
+        if (closed) return;
+        ctx.micError = String(e);
+        ctx.micRetry = () => mic.start().then(() => ctx.go("#/hoeren"));
+        ctx.go("#/mikrofon");
+      });
+  };
+
+  /** Mikrofon und Wachhalten freigeben (Ergebnisseite, Verlassen) */
+  const releaseMic = () => {
+    unlisten?.();
+    unlisten = null;
+    if (micWanted) {
+      micWanted = false;
+      keepAwake(false);
+      mic.stop();
+    }
   };
 
   // ------------------------------------------------------------ Durchgang
@@ -82,6 +105,7 @@ export const echoView: View = (root, ctx) => {
   let last: string | null = null;
 
   const begin = (v: Variant) => {
+    starting = false;
     if (closed) return;
     variant = v;
     const track: Track = v === "spielen" ? "spielen" : "lesen";
@@ -95,6 +119,7 @@ export const echoView: View = (root, ctx) => {
     correct = 0;
     if (v === "spielen") {
       keepAwake(true);
+      unlisten?.();
       unlisten = mic.listen((f) => onFrame?.(f));
     }
     task();
@@ -110,6 +135,8 @@ export const echoView: View = (root, ctx) => {
       used,
       avoidFirst: last,
       maxDistinct: variant === "tippen" ? FOLGE_MAX_DISTINCT : undefined,
+      // zu Beginn (2–3 Töne) nur Schritte zum Nachbarton, danach auch Terzen und Sprünge
+      stepsOnly: len.len <= 3,
     });
     used.add(folgeKey(notes));
     last = notes[notes.length - 1];
@@ -278,6 +305,7 @@ export const echoView: View = (root, ctx) => {
     clearTimer();
     stopSound();
     onFrame = null;
+    releaseMic();
     root.innerHTML = `
 <main class="screen summary">
   <h1>${done > 0 && correct === done ? "Wunderbar" : "Geschafft"}</h1>
@@ -285,13 +313,7 @@ export const echoView: View = (root, ctx) => {
   <div class="spacer"></div>
   <div class="btnrow"><button class="big alt" data-act="again">Nochmal</button><button class="big" data-act="home">Zur Startseite</button></div>
 </main>`;
-    root.querySelector('[data-act="again"]')!.addEventListener("click", () => {
-      songPlayer.prepare();
-      done = 0;
-      correct = 0;
-      used = new Set();
-      task();
-    });
+    root.querySelector('[data-act="again"]')!.addEventListener("click", () => startVariant(variant));
     root.querySelector('[data-act="home"]')!.addEventListener("click", () => ctx.go("#/"));
   };
 
@@ -302,10 +324,6 @@ export const echoView: View = (root, ctx) => {
     clearTimer();
     onFrame = null;
     stopSound();
-    unlisten?.();
-    if (variant === "spielen" && unlisten) {
-      keepAwake(false);
-      mic.stop();
-    }
+    releaseMic();
   };
 };
