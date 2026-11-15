@@ -184,8 +184,11 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   Jahre wieder, 9 Innsbruck, ich muss dich lassen, 10 Greensleeves, 11 Musette; Stufe 1 und 8 haben keins
   (auf 8 kommen die Abschnitte aus dem Lied von 7). Beim Spielen ist etwa jede vierte Folge der Zusatzkarten
   ein **Abschnitt** davon („Aus „Hänschen klein“ – spiel diese Töne.“): geteilt an Atemzeichen und Pausen,
-  zu lange an Taktgrenzen, 3–8 Töne, nur vorgestellte Töne; Tonwiederholungen wie im Lied. Vorerst wie die
-  anderen Folgen als ganze Noten ohne Rhythmus. Gewertet je Ton einmal, ändert die Länge der Folgen nicht.
+  als Taktbereich von höchstens 2 Takten, 3–10 Töne, nur vorgestellte Töne; Tonwiederholungen wie im Lied.
+  Gezeigt als **Ausschnitt des Notenbilds mit Rhythmus und Liedtext** (Vorzeichnung und Taktart wie im
+  Heft, so groß, dass zwei Takte in eine Zeile passen); die aktuelle Note markiert, getroffene grün,
+  falsche rot. „Anhören“ spielt ihn im Grundtempo des Lieds. Gewertet nur die Töne (Warte-Wertung), je Ton
+  einmal; ändert die Länge der Folgen nicht.
   Fortschrittsseite (Spielen): „Lied dieser Stufe: …“ mit Link; im Ergebnis bei einer neuen Spielen-Stufe
   „Jetzt kannst du *Hänschen klein* ganz spielen.“ mit Link auf die Liedseite.
 

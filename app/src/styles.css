@@ -3130,3 +3130,16 @@ input:focus-visible + svg.ck {
   text-align: center;
   padding: 6px 0 0;
 }
+/* Abschnitt eines Stufenlieds in der Übung: kleiner Ausschnitt des Notenbilds */
+.prac .stage .snip {
+  width: 100%;
+  max-width: 600px;
+  display: flex;
+  justify-content: center;
+}
+.prac .stage .snip .score {
+  max-width: 100%;
+}
+.prac .stage .snip .score svg.sys {
+  margin: 0 auto;
+}

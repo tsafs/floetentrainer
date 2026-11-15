@@ -55,8 +55,11 @@ export interface Folge {
   carry?: string;
   /** Wechsel-Drill: zwei Töne im Wechsel */
   drill?: boolean;
-  /** Abschnitt aus diesem Lied (Titel) */
+  /** Abschnitt aus diesem Lied (Titel) … */
   song?: string;
+  /** … mit dieser Kennung, Takte von–bis (Notenbild-Reihenfolge) */
+  songId?: string;
+  bars?: [number, number];
   /** fortlaufende Nummer in der Sitzung (Wiederholung: dieselbe) */
   uid: number;
 }
@@ -298,12 +301,14 @@ export class Session {
     if (p.snippet) {
       const song = snippetSong(this.track, levelOf(this.track, this.data.stages[this.track]));
       const options = song
-        ? songSnippets(song).filter((f) => f.every((n) => pool.includes(n)) && f[0] !== this.lastNote && !this.usedFolgen.has(folgeKey(f)))
+        ? songSnippets(song).filter(
+            (sn) => sn.notes.every((n) => pool.includes(n)) && sn.notes[0] !== this.lastNote && !this.usedFolgen.has(folgeKey(sn.notes)),
+          )
         : [];
       if (song && options.length) {
-        const notes = options[Math.floor(rng() * options.length)];
-        this.usedFolgen.add(folgeKey(notes));
-        return { notes, uid: p.uid, kind: p.kind, song: song.title };
+        const sn = options[Math.floor(rng() * options.length)];
+        this.usedFolgen.add(folgeKey(sn.notes));
+        return { notes: sn.notes, uid: p.uid, kind: p.kind, song: song.title, songId: song.id, bars: [sn.from, sn.to] };
       }
     }
     const carry = p.type === "due" ? p.note : undefined;

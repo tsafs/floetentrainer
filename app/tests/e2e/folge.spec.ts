@@ -352,6 +352,23 @@ test.describe("Spielen", () => {
     expect(d.pairs["h1-c2"]).toEqual([1, 1, 1, 1, 1]);
   });
 
+  test("Abschnitt eines Stufenlieds: Notenbild mit Rhythmus, Tonwiederholungen, alle Noten grün", async ({ page }) => {
+    // Hänschen klein, Takt 1–2: d² h¹ h¹ | c² a¹ a¹
+    await setup(page, [{ kind: "spiel", song: "Hänschen klein", songId: "haenschen-klein", bars: [0, 1], notes: ["d2", "h1", "h1", "c2", "a1", "a1"] }]);
+    await toFolge(page);
+    const m = folge(page);
+    await expect(m).toHaveAttribute("data-song", "Hänschen klein");
+    await expect(m.locator(".q")).toHaveText("Aus „Hänschen klein“ – spiel diese Töne.");
+    await expect(m.locator(".snip .score svg.sys")).toHaveCount(1);
+    await expect(m.locator(".snip g.n")).toHaveCount(6);
+    await expect(m.locator(".snip g.n.cur")).toHaveCount(1);
+    if (process.env.SHOTS) await page.screenshot({ path: "shots/abschnitt.png" });
+    await page.waitForTimeout(300);
+    await playSeq(page, ["d2", "h1", "h1", "c2", "a1", "a1"]);
+    await expect(page.getByTestId("panel")).toContainText("Richtig", { timeout: 8000 });
+    await expect(m.locator(".snip g.n.hit")).toHaveCount(6);
+  });
+
   test("Folge mit Halbtonschritt und falschem Ton: Note rot, wartet weiter auf den richtigen", async ({ page }) => {
     await setup(page, [["a1", "h1", "c2"]]);
     await toFolge(page);

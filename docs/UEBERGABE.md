@@ -153,12 +153,13 @@ Silben, Atemzeichen, Seitenumbrüche.
      Meilensteinen, `STAGE_SONG_TITLES`, `snippetSong`), Abschnitte `app/src/songs/snippets.ts`
      (`songSnippets`), in der Sitzung `PlanItem.snippet`/`Folge.song`; Fortschrittsseite und Ergebnis in
      `app/src/ui/pages.ts`. Tests `chapters.test.ts`, `session.test.ts`, `play.spec.ts` („Stufe geschafft“).
-     Offen: Abschnitte mit echtem Rhythmus; Lied für Stufe 1 und 8.
+     Abschnitte seit dem 15.11.2026 mit Rhythmus: Taktbereiche (`Snippet.from/to`), in der Übung als
+     Ausschnitt `songExcerpt` mit `renderScore` gesetzt (`Folge.songId/bars`, `els()` in `renderFolge`
+     markiert die Noten über die Kennungen des Zeitplans). Offen: Lied für Stufe 1 und 8.
    - **Abschnitt 5 umgesetzt (Im Takt):** Start durch Spielen (`ReadyGate`, Knopf „Los“
      `data-testid="follow-ready"`), zwei Takte Einzählen (`withExtraCountInBar`), Verzögerung nebenbei
      (`autoLatency`, `nudgeLatency` in `song-follow.ts`). Regeln am Ende von `docs/app-lieder.md`.
      Browser-Tests im Takt-Modus tippen „Los“: `beatStarted(page)` in `tests/e2e/util.ts`.
    - **Abschnitt 4 umgesetzt (Hören/Echo):** Seite `#/hoeren` in `app/src/ui/echo.ts` (Link auf der
      Startseite, kein Menüeintrag), Tests `app/tests/e2e/echo.spec.ts`. Zählt nicht für die Lernspuren.
-   - Damit sind alle Abschnitte von `docs/app-uebungen.md` umgesetzt. Offen: Abschnitte der Stufenlieder mit
-     Rhythmus, Lied für Stufe 1 und 8, Abgleich ohne Kopfhörer per Lautsprecher-Klick, Rhythmus in Folgen.
+   - Damit sind alle Abschnitte von `docs/app-uebungen.md` umgesetzt. Offen: Lied für Stufe 1 und 8, Abgleich ohne Kopfhörer per Lautsprecher-Klick, Rhythmus in Folgen.

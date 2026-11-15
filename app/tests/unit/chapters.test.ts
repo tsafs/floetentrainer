@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { stagesOf, unlockedNotes } from "../../src/music/levels";
 import { playability } from "../../src/songs/playable";
-import { SNIPPET_MAX, SNIPPET_MIN, songSnippets } from "../../src/songs/snippets";
+import { excerptTimeline, SNIPPET_MAX, SNIPPET_MAX_BARS, SNIPPET_MIN, songExcerpt, songSnippets } from "../../src/songs/snippets";
+import { note } from "../../src/music/notes";
 import { chapterOf, chaptersOf, snippetSong, stageSong, STAGE_SONG_TITLES } from "../../src/srs/chapters";
 import { SONGS } from "../../src/songs/library";
 
@@ -39,18 +40,30 @@ describe("Stufenlieder", () => {
     expect(snippetSong("spielen", 2)?.title).toBe("Hänschen klein");
     expect(snippetSong("spielen", 8)?.title).toBe("Alle Jahre wieder");
   });
-  it("Abschnitte: 3 bis 8 Töne, nur Töne des Lieds, ohne Doppelte; Hänschen klein beginnt mit d² h¹ h¹", () => {
+  it("Abschnitte: höchstens 2 Takte, 3 bis 10 Töne, Töne passen zum Zeitplan des Ausschnitts, ohne Doppelte", () => {
     for (const title of Object.values(STAGE_SONG_TITLES)) {
       const song = SONGS.find((s) => s.title === title)!;
       const sn = songSnippets(song);
       expect(sn.length, title).toBeGreaterThanOrEqual(2);
       for (const p of sn) {
-        expect(p.length).toBeGreaterThanOrEqual(SNIPPET_MIN);
-        expect(p.length).toBeLessThanOrEqual(SNIPPET_MAX);
+        expect(p.to - p.from).toBeLessThan(SNIPPET_MAX_BARS);
+        expect(p.notes.length).toBeGreaterThanOrEqual(SNIPPET_MIN);
+        expect(p.notes.length).toBeLessThanOrEqual(SNIPPET_MAX);
+        const ex = songExcerpt(song, p.from, p.to);
+        expect(ex.bars.map((b) => b.index)).toEqual(ex.bars.map((_, k) => k));
+        expect(ex.notes.every((n) => ex.bars[n.bar].events.includes(n))).toBe(true);
+        expect(p.notes.map((n) => note(n).midi)).toEqual(excerptTimeline(ex).tones.map((t) => t.midi));
       }
-      expect(new Set(sn.map((p) => p.join(" "))).size).toBe(sn.length);
+      expect(new Set(sn.map((p) => p.notes.join(" "))).size).toBe(sn.length);
     }
     const h = songSnippets(SONGS.find((s) => s.title === "Hänschen klein")!);
-    expect(h[0].slice(0, 3)).toEqual(["d2", "h1", "h1"]);
+    expect(h[0].notes.slice(0, 3)).toEqual(["d2", "h1", "h1"]);
+    expect(h[0].from).toBe(0);
+  });
+  it("Ausschnitt lässt das Lied unverändert", () => {
+    const song = SONGS.find((s) => s.title === "Hänschen klein")!;
+    const before = JSON.stringify(song);
+    songExcerpt(song, 1, 2);
+    expect(JSON.stringify(song)).toBe(before);
   });
 });
