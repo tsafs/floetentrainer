@@ -20,7 +20,7 @@ In den Einstellungen lässt sich die Stufe mit + erhöhen. Springt man so auf St
   Sitzung nimmt höchstens 6 neue, und zwar in Stufenreihenfolge – also erst h¹ a¹ g¹ usw. Vor jedem Ton
   kommt seine Vorstellung. Das sind 9 Sitzungen nur mit neuen Karten, ehe alle durch sind, und
   17 Vorstellungen von Tönen, die man angeblich schon kann.
-- Für Stufe 9 braucht **jeder** der 17 Töne 10 Antworten mit 90 %. Zusatzkarten verteilen sich gleich auf
+- Für Stufe 9 braucht **jeder** der 17 Töne 10 Antworten mit 90 % (seit 15.11.2026: 8 Punkte Sicherheit). Zusatzkarten verteilen sich gleich auf
   alle Töne; das sind rund 170 gewertete Antworten, bevor es weitergeht.
 
 ## Entscheidungen
@@ -78,7 +78,7 @@ für „nur Spielen“ ausgegraut.
   nicht verdrängen. Wer sie richtig weiß, schiebt sie weiter nach hinten (7, 14, 30 Tage); wer sie nicht
   weiß, bekommt sie wie üblich öfter.
 - Fürs **Freischalten** zählen nur die Töne ab dem Startpunkt. Wer bei „Hohe Töne bis c³“ beginnt (Start Stufe 9), braucht für
-  die nächste Stufe also nur b¹ und es¹ mit je 10 Antworten und 90 %.
+  die nächste Stufe also nur b¹ und es¹ mit je 8 Punkten Sicherheit.
 - Hat ein Ton schon echte Antworten (z. B. nach einem Zurückgehen), bleibt seine Karte wie sie ist.
 
 ### Zurückgehen und „ganz von vorn“

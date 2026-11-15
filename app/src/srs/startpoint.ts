@@ -8,7 +8,7 @@ import { kindsForNote, levelOf, maxLevel, stageId, stagesOf, unlockedNotes, type
 import { cardKey, type AppData } from "../store/data";
 import { addDays } from "../store/dates";
 import { INTERVALS } from "./leitner";
-import { level, startLevel } from "./progress";
+import { level, resetCount, startLevel } from "./progress";
 
 export interface Milestone {
   /** feste Kennung */
@@ -95,7 +95,7 @@ function applyTrack(data: AppData, track: Track, target: number, now: number, to
   data.stages[track] = stageId(track, target);
   data.start = data.start ?? { lesen: stageId("lesen", 1), spielen: stageId("spielen", 1) };
   data.start[track] = stageId(track, target);
-  if (target < before) data.countFrom[track] = now;
+  if (target < before) resetCount(data, track, now);
 
   const intro = data.introduced[track];
   const known = unlockedNotes(track, all ? target : target - 1);

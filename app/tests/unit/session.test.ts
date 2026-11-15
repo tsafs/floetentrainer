@@ -3,6 +3,7 @@ import { buildPlan, MAX_NEW, Session, type Step } from "../../src/srs/session";
 import { cardKey, defaultData, type AppData } from "../../src/store/data";
 import { addDays } from "../../src/store/dates";
 import { note } from "../../src/music/notes";
+import { notePoints } from "../../src/srs/progress";
 import { answers, master, seeded, TODAY } from "./helpers";
 
 function mkSession(d: AppData, track: "lesen" | "spielen" = "lesen", opts: { limitCards?: number; limitMs?: number; seed?: number; clock?: { t: number } } = {}) {
@@ -108,11 +109,11 @@ describe("Zusammensetzung", () => {
     // ohne Gewicht wäre g1 ein Drittel; mit Gewicht 3 deutlich mehr (wegen „nie zweimal hintereinander“ höchstens die Hälfte)
     expect(g / total).toBeGreaterThan(0.4);
   });
-  it("Zusatzkarten: ein Ton, der die nächste Stufe aufhält (17 von 20), kommt dreifach", () => {
+  it("Zusatzkarten: ein Ton, der die nächste Stufe aufhält (unter 8 Punkten), kommt dreifach", () => {
     const d = defaultData();
     for (const n of ["h1", "a1", "g1"]) for (const k of ["name", "griff", "note"]) d.cards[`${n}|${k}`] = { box: 4, day: TODAY, session: 1 };
     master(d, "lesen", ["h1", "a1"]);
-    d.history.lesen.g1 = answers(20, 3, [TODAY]); // 85 %: nicht schwach, aber unter 90 %
+    d.history.lesen.g1 = [...answers(14, 0, [TODAY]), ...answers(3, 3, [TODAY], 5000)]; // 82 %: nicht schwach, aber nur 4 Punkte
     let g = 0;
     let total = 0;
     for (let seed = 1; seed <= 40; seed++) {
@@ -234,25 +235,26 @@ describe("Vertippt", () => {
     d.history.lesen.g1 = answers(9, 0, [TODAY]);
     const s = mkSession(d);
     untilCard(s, "g1");
-    d.history.lesen.g1 = [[0, TODAY, 1], ...answers(8, 0, [TODAY], 10)]; // 8 von 9
-    s.answer(false, true); // 8 von 10
+    d.history.lesen.g1 = answers(7, 0, [TODAY], 10); // 7 Punkte
+    s.answer(false, true); // 5
     expect(d.stages.lesen).toBe("erste-toene");
     s.undoLast();
-    s.answer(true, true); // 9 von 10
+    s.answer(true, true); // 8: sitzt
     expect(d.stages.lesen).toBe("c2-d2");
     expect(s.result().unlocks.map((u) => u.level)).toEqual([2]);
   });
-  it("eine Stufe, die erst der Fehler freigeschaltet hat, gilt danach nicht mehr", () => {
+  it("die Sicherheit kommt zurück, auch wenn sie vorher nicht gespeichert war", () => {
     const d = extrasOnly();
     master(d, "lesen", ["h1", "a1"]);
-    d.history.lesen.g1 = answers(9, 0, [TODAY]); // 9 Antworten: zu wenige
+    d.history.lesen.g1 = answers(9, 0, [TODAY]); // 9 Punkte (nachgerechnet)
+    delete d.points;
     const s = mkSession(d);
     untilCard(s, "g1");
-    s.answer(false, true); // 9 von 10 = 90 %: frei
-    expect(d.stages.lesen).toBe("c2-d2");
-    s.undoLast(); // wieder 9 von 9
-    expect(d.stages.lesen).toBe("erste-toene");
-    expect(s.result().unlocks).toEqual([]);
+    s.answer(false, true); // 9 → 7
+    expect(notePoints(d, "lesen", "g1")).toBe(7);
+    s.undoLast();
+    expect(notePoints(d, "lesen", "g1")).toBe(9);
+    expect((d as AppData).points?.lesen.g1).toBeUndefined();
   });
   it("Übungstag nur durch diese Antwort: wird wieder entfernt", () => {
     const d = extrasOnly();
