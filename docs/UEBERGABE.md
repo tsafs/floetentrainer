@@ -155,11 +155,13 @@ Silben, Atemzeichen, Seitenumbrüche.
      `app/src/ui/pages.ts`. Tests `chapters.test.ts`, `session.test.ts`, `play.spec.ts` („Stufe geschafft“).
      Abschnitte seit dem 15.11.2026 mit Rhythmus: Taktbereiche (`Snippet.from/to`), in der Übung als
      Ausschnitt `songExcerpt` mit `renderScore` gesetzt (`Folge.songId/bars`, `els()` in `renderFolge`
-     markiert die Noten über die Kennungen des Zeitplans). Offen: Lied für Stufe 1 und 8.
+     markiert die Noten über die Kennungen des Zeitplans). Die „Ersten Übungen“ des Hefts sind als Kapitel in
+     der App (`heft-songs.py` liest auch `EXERCISES`); Übung 1 ist das Stufenlied von Stufe 1. Offen: Lied für
+     Stufe 8 (das Heft hat keins mit nur a² h² c³ als neuen Tönen).
    - **Abschnitt 5 umgesetzt (Im Takt):** Start durch Spielen (`ReadyGate`, Knopf „Los“
      `data-testid="follow-ready"`), zwei Takte Einzählen (`withExtraCountInBar`), Verzögerung nebenbei
      (`autoLatency`, `nudgeLatency` in `song-follow.ts`). Regeln am Ende von `docs/app-lieder.md`.
      Browser-Tests im Takt-Modus tippen „Los“: `beatStarted(page)` in `tests/e2e/util.ts`.
    - **Abschnitt 4 umgesetzt (Hören/Echo):** Seite `#/hoeren` in `app/src/ui/echo.ts` (Link auf der
      Startseite, kein Menüeintrag), Tests `app/tests/e2e/echo.spec.ts`. Zählt nicht für die Lernspuren.
-   - Damit sind alle Abschnitte von `docs/app-uebungen.md` umgesetzt. Offen: Lied für Stufe 1 und 8, Abgleich ohne Kopfhörer per Lautsprecher-Klick, Rhythmus in Folgen.
+   - Damit sind alle Abschnitte von `docs/app-uebungen.md` umgesetzt. Offen: Lied für Stufe 8, Abgleich ohne Kopfhörer per Lautsprecher-Klick, Rhythmus in Folgen.

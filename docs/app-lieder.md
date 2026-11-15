@@ -369,3 +369,10 @@ so selten“. Plan in `docs/app-uebungen.md`, Abschnitt 5.
   „Verzögerung nachgestellt: 150 ms · ändern“. Weil die Wertung Einsätze nur bis 120 ms neben dem Notenbeginn
   zuordnet, stellt das nur fein nach; bei großen Abweichungen (z. B. neue Bluetooth-Kopfhörer) bleibt
   „abgleichen“ der schnellere Weg. Der eigene Versatz beim Spielen geht mit ein – wie beim Abgleich auch.
+
+### Erste Übungen in der Liederliste (15.11.2026)
+
+Die fünf „Ersten Übungen“ des Hefts (`EXERCISES` in `heft/songs.py`) liest `app/scripts/heft-songs.py` jetzt
+mit ein: vorn als Kapitel „Erste Übungen“, Untertitel ist der Hinweis aus dem Heft („Nur h¹, a¹ und g¹“),
+Grundtempo 72 (Übung 5 mit Achteln 66). Übung 1 ist das Stufenlied der ersten Stufe; damit gibt es schon auf
+Stufe 1 etwas in „Kannst du schon spielen“.

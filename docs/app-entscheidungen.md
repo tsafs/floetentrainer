@@ -179,10 +179,11 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   (Stufen 1–2), 2 Erste Oktave (3–6), 3 Hohe Töne (7–8), 4 Alle Töne (9–11, Lesen bis 12). Die Stufen
   bleiben die Lernschritte (wenige neue Töne auf einmal, öfter „nächste Stufe“). Fortschrittsseite: je Spur
   „Kapitel 2 von 4 · Erste Oktave: c¹ bis e², mit fis¹ (Stufe 3–6)“. Logik `app/src/srs/chapters.ts`.
-- **Stufenlieder** (seit 15.11.2026): je Stufe ein Heft-Lied, das mit ihr spielbar wird – 2 Hänschen
+- **Stufenlieder** (seit 15.11.2026): je Stufe ein Heft-Lied, das mit ihr spielbar wird – 1 Übung 1 (aus den
+  „Ersten Übungen“ des Hefts, nur h¹ a¹ g¹), 2 Hänschen
   klein, 3 Bi-Ba-Butzemann, 4 Alle Vögel sind schon da, 5 Alle meine Entchen, 6 Kling, Glöckchen, 7 Alle
-  Jahre wieder, 9 Innsbruck, ich muss dich lassen, 10 Greensleeves, 11 Musette; Stufe 1 und 8 haben keins
-  (auf 8 kommen die Abschnitte aus dem Lied von 7). Beim Spielen ist etwa jede vierte Folge der Zusatzkarten
+  Jahre wieder, 9 Innsbruck, ich muss dich lassen, 10 Greensleeves, 11 Musette; Stufe 8 hat keins
+  (dort kommen die Abschnitte aus dem Lied von 7). Beim Spielen ist etwa jede vierte Folge der Zusatzkarten
   ein **Abschnitt** davon („Aus „Hänschen klein“ – spiel diese Töne.“): geteilt an Atemzeichen und Pausen,
   als Taktbereich von höchstens 2 Takten, 3–10 Töne, nur vorgestellte Töne; Tonwiederholungen wie im Lied.
   Gezeigt als **Ausschnitt des Notenbilds mit Rhythmus und Liedtext** (Vorzeichnung und Taktart wie im

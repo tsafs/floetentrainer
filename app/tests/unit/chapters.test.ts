@@ -32,11 +32,11 @@ describe("Stufenlieder", () => {
       expect(playability(song!, unlockedNotes("spielen", lv - 1)).playable, title).toBe(false);
       expect(stageSong("spielen", lv)?.title).toBe(title);
     }
-    expect(stageSong("spielen", 1)).toBeUndefined();
+    expect(stageSong("spielen", 1)?.title).toBe("Übung 1");
     expect(stageSong("spielen", 8)).toBeUndefined();
   });
-  it("Lied für Abschnitte: Stufenlied, sonst das der Stufe davor; Stufe 1 keins", () => {
-    expect(snippetSong("spielen", 1)).toBeUndefined();
+  it("Lied für Abschnitte: Stufenlied, sonst das der Stufe davor", () => {
+    expect(snippetSong("spielen", 1)?.title).toBe("Übung 1");
     expect(snippetSong("spielen", 2)?.title).toBe("Hänschen klein");
     expect(snippetSong("spielen", 8)?.title).toBe("Alle Jahre wieder");
   });

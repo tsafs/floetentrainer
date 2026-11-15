@@ -138,7 +138,8 @@ Ab welcher Stufe die Heft-Lieder spielbar sind (Stand 15.11.2026):
 
 - Je Stufe mit Lied ein fest gewähltes **Stufenlied** (das bekannteste und einfachste, z. B. Stufe 2
   „Hänschen klein“, Stufe 3 „Bi-Ba-Butzemann“, Stufe 5 „Alle meine Entchen“); Liste im Code.
-  Stufe 1 und 8 haben keins (offen: eigene kleine Melodie oder Heft-Übung).
+  Stufe 1: „Übung 1“ aus den Ersten Übungen des Hefts (nur h¹ a¹ g¹; dafür liest die App die Übungen jetzt
+  mit ein). Stufe 8 hat keins.
 - **Abschnitte:** Phrasen (geteilt an Atemzeichen und Pausen) als Taktbereiche, höchstens 2 Takte und 10
   Töne, gezeigt als Ausschnitt des Notenbilds mit Rhythmus und Liedtext (`songExcerpt` in
   `app/src/songs/snippets.ts`, gesetzt mit `renderScore`). Beim Spielen ist etwa

@@ -37,7 +37,15 @@ def load_songs(path):
         d = {k: (list(v) if isinstance(v, tuple) else v) for k, v in s.items()}
         d["chapter"] = chapter
         out.append(d)
-    return out
+    # „Erste Übungen“ des Hefts (Seite vor den Tonleitern) vorn als eigenes Kapitel: Übung 1 ist das Stufenlied
+    # der ersten Stufe (docs/app-uebungen.md)
+    exercises = ns.get("EXERCISES") or []
+    keynames = {"C": "C-Dur", "G": "G-Dur", "D": "D-Dur", "F": "F-Dur"}
+    ex = []
+    for title, hint, key, time, music in exercises:
+        ex.append(dict(chapter="Erste Übungen", title=title, subtitle=hint, key=key, keyname=keynames.get(key, key),
+                       time=list(time), credit="", music=music))
+    return ex + out
 
 
 def load_engrave(heft_dir):

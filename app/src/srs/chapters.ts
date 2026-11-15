@@ -41,9 +41,11 @@ export function chapterOf(track: Track, level: number): Chapter {
 
 /**
  * Stufenlied je Stufe (Titel wie im Heft). Gewählt das bekannteste und einfachste unter den Liedern, die
- * mit dieser Stufe spielbar werden (Stand 15.11.2026). Stufe 1 und 8 haben keins.
+ * mit dieser Stufe spielbar werden (Stand 15.11.2026). Stufe 1 hat „Übung 1“ aus den ersten Übungen des
+ * Hefts (nur h¹, a¹, g¹); Stufe 8 hat keins.
  */
 export const STAGE_SONG_TITLES: Record<string, string> = {
+  "erste-toene": "Übung 1",
   "c2-d2": "Hänschen klein",
   "e1-d1": "Es tanzt ein Bi-Ba-Butzemann",
   fis1: "Alle Vögel sind schon da",
