@@ -500,9 +500,9 @@ export const practiceView: View = (root, ctx) => {
         .map((c) => `<button data-choice="${c}" aria-label="${nameText(c)}">${nameHtml(c)}</button>`)
         .join("")}</div>`;
     }
-    // Lesen: „Vertippt“ neben „Weiß nicht“, sichtbar sobald eine Note getippt ist (nimmt den letzten Tipp
-    // zurück). Vorher nur unsichtbar; „Weiß nicht“ steht mittig wie auf den Karten (.idkrow.three).
-    const idk = `<div class="idkrow${playing ? "" : " three"}" aria-live="polite">${playing ? "" : "<span></span>"}<button class="textbtn" data-act="idk">Weiß nicht</button>${playing ? "" : typoBtn(true)}</div>`;
+    // Lesen: „Vertippt“ links (wie im Fehlerfeld), sichtbar sobald eine Note getippt
+    // ist (nimmt den letzten Tipp zurück). Vorher nur unsichtbar; „Weiß nicht“ steht mittig wie auf den Karten.
+    const idk = `<div class="idkrow${playing ? "" : " three"}" aria-live="polite">${playing ? "" : typoBtn(true)}<button class="textbtn" data-act="idk">Weiß nicht</button>${playing ? "" : "<span></span>"}</div>`;
     const answer = playing
       ? `<div class="answer"><div class="anchor"><div class="slot" aria-live="polite"></div></div>${listenBox()}${idk}</div>`
       : `<div class="answer">${btns}${idk}<div class="slot" aria-live="polite"></div></div>`;

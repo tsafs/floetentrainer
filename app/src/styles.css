@@ -772,7 +772,7 @@ svg.acc {
   margin: -6px 0 -10px;
   min-height: 48px;
 }
-/* Tonfolge beim Lesen: „Weiß nicht“ mittig wie auf den Karten, „Vertippt“ rechts daneben */
+/* Tonfolge beim Lesen: „Weiß nicht“ mittig wie auf den Karten, „Vertippt“ ganz links (wie im Fehlerfeld) */
 .idkrow.three {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
