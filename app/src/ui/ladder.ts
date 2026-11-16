@@ -26,6 +26,8 @@ export interface LadderGeom {
   /** senkrechter Ausschnitt der Schlüssel-Spalte (nur Notenzeile, nicht was darunter steht) */
   clefTop: number;
   clefHeight: number;
+  /** Platz rechts nach der letzten Spalte (Standard 40) */
+  padRight?: number;
 }
 
 export interface LadderColumn {
@@ -86,7 +88,7 @@ export interface LadderOptions {
 
 export function ladderHtml(g: LadderGeom, cols: LadderColumn[], opt: LadderOptions): string {
   const colX = (i: number) => g.padLeft + i * g.col + g.col / 2;
-  const width = g.padLeft + cols.length * g.col + 40;
+  const width = g.padLeft + cols.length * g.col + (g.padRight ?? 40);
   let s = "";
   if (opt.band) {
     const [a, b] = opt.band;
@@ -121,9 +123,16 @@ export interface LadderHandle {
 }
 
 /**
- * Bedienung einer gezeichneten Leiste. onPick bekommt den Ton und ob er schon gewählt war (zweites Tippen).
+ * Bedienung einer gezeichneten Leiste. onPick bekommt den Ton, ob er schon gewählt war (zweites Tippen) und
+ * wie er gewählt wurde: "activate" (Tippen, Klick, Enter, Leertaste) oder "move" (Pfeiltaste – nur wählen,
+ * nie eine andere Seite öffnen).
  */
-export function wireLadder(root: HTMLElement, g: LadderGeom, onPick: (id: string, again: boolean) => void): LadderHandle {
+export type PickHow = "activate" | "move";
+export function wireLadder(
+  root: HTMLElement,
+  g: LadderGeom,
+  onPick: (id: string, again: boolean, how: PickHow) => void,
+): LadderHandle {
   const strip = root.querySelector<HTMLElement>(".ladstrip")!;
   const cols = [...strip.querySelectorAll<SVGGElement>(".lc")];
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -206,35 +215,39 @@ export function wireLadder(root: HTMLElement, g: LadderGeom, onPick: (id: string
   strip.addEventListener(
     "wheel",
     (e) => {
-      if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && strip.scrollWidth > strip.clientWidth) {
-        e.preventDefault();
-        strip.scrollLeft += e.deltaY;
-      }
+      // Mausrad quer scrollen, solange die Leiste in diese Richtung noch weiter kann; sonst scrollt die Seite
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      const max = strip.scrollWidth - strip.clientWidth;
+      if (max <= 0 || (e.deltaY < 0 && strip.scrollLeft <= 0) || (e.deltaY > 0 && strip.scrollLeft >= max - 1)) return;
+      e.preventDefault();
+      strip.scrollLeft += e.deltaY;
     },
     { passive: false },
   );
 
-  const pick = (c: SVGGElement) => {
+  const pick = (c: SVGGElement, how: PickHow) => {
     const id = c.dataset.note!;
     const again = id === current;
     select(id, "nearest");
-    onPick(id, again);
+    onPick(id, again, how);
   };
   cols.forEach((c, i) => {
-    c.addEventListener("click", () => pick(c));
+    c.addEventListener("click", () => pick(c, "activate"));
     c.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
-        pick(c);
+        pick(c, "activate");
       } else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
         e.preventDefault();
         const t = cols[i + (e.key === "ArrowRight" ? 1 : -1)];
         if (!t) return;
         t.focus({ preventScroll: true });
-        pick(t);
+        pick(t, "move");
       }
     });
   });
+  // Ohne Auswahl ist die erste Spalte mit der Tastatur erreichbar (sonst hätten alle tabindex -1)
+  if (cols.length && !cols.some((c) => c.getAttribute("tabindex") === "0")) cols[0].setAttribute("tabindex", "0");
 
   return {
     select: (id, scroll = "nearest") => select(id, scroll, false),

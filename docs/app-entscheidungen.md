@@ -194,8 +194,9 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
 - **Kapitel** (seit 15.11.2026, `docs/app-uebungen.md`; Frage: „Wieso gibt es 11 Stufen, wenn es nur 4
   Meilensteine gibt?“): Die Meilensteine des Startpunkts teilen die Stufen in vier Kapitel – 1 Linke Hand
   (Stufen 1–2), 2 Erste Oktave (3–6), 3 Hohe Töne (7–8), 4 Alle Töne (9–11, Lesen bis 12). Die Stufen
-  bleiben die Lernschritte (wenige neue Töne auf einmal, öfter „nächste Stufe“). Die Kapitel stehen beim
-  Startpunkt; die Anzeige je Spur auf der Fortschrittsseite ist mit dieser am 16.11.2026 entfallen.
+  bleiben die Lernschritte (wenige neue Töne auf einmal, öfter „nächste Stufe“). Die Anzeige der Kapitel je
+  Spur auf der Fortschrittsseite ist mit dieser am 16.11.2026 entfallen; sichtbar sind die Meilensteine nur
+  noch beim Startpunkt.
   Logik `app/src/srs/chapters.ts`.
 - **Stufenlieder** (seit 15.11.2026): je Stufe ein Heft-Lied, das mit ihr spielbar wird – 1 Übung 1 (aus den
   „Ersten Übungen“ des Hefts, nur h¹ a¹ g¹), 2 Hänschen
@@ -458,7 +459,8 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
     nächsten Stufe. Passt nicht alles, fällt erst der Griff-Tipp, dann die Karte weg.
   - Ersetzt die Stufenleisten und „Deine Töne beim Lesen“; die Spielen-Stufe steht nicht mehr als Zahl auf
     der Startseite. Steht Spielen an der Lesen-Grenze und ist nichts fällig, sagt der Spielen-Knopf
-    „Fälliges erledigt · für Stufe 5 erst beim Lesen weiterkommen“.
+    „Fälliges erledigt · für Stufe 5 erst beim Lesen weiterkommen“ – aber nur, wenn alle Spielen-Töne
+    schon sitzen; sonst zählt Weiterspielen wie bisher („zählt für Stufe 5“).
   - Unten die großen Knöpfe Üben und Spielen. Die frühere Zeile „Lieder · Stimmgerät · Grifftabelle ·
     Einstellungen“ ist seit 14.11.2026 durch das Menü ersetzt (wurde auf schmalen Handys zweizeilig).
   - Darunter klein „Hören: vorgespielte Töne erkennen“ (seit 15.11.2026) → `#/hoeren`.

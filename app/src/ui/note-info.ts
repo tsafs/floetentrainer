@@ -7,6 +7,7 @@ import { note } from "../music/notes";
 import { dueDay, isDue } from "../srs/leitner";
 import {
   blockingNotes,
+  countedNotes,
   isWeak,
   level,
   levelCap,
@@ -97,13 +98,17 @@ export function waitingText(data: AppData, id: string): string {
   return `Kommt in Stufe ${st}, also in ${WORDS[gap] ?? gap} Stufen.${only}`;
 }
 
-/** Spielen steht an der Grenze von Lesen (und könnte sonst weiter) */
+/**
+ * Spielen steht an der Grenze von Lesen und alle seine Töne sitzen: Weiter geht es erst, wenn Lesen steigt
+ * (dann zieht Spielen sofort mit). Fehlen beim Spielen noch Punkte, zählt das Weiterüben dort weiterhin.
+ */
 export function playWaitsForReading(data: AppData): boolean {
   const lv = level(data, "spielen");
-  return lv >= levelCap(data, "spielen") && lv < maxLevel("spielen");
+  if (lv < levelCap(data, "spielen") || lv >= maxLevel("spielen")) return false;
+  return countedNotes(data, "spielen").every((n) => noteMastered(data, "spielen", n));
 }
 
-/** „heute fällig“, „morgen fällig“, „in 4 Tagen fällig“ – frühester Termin der Karten des Tons in der Spur */
+/** „jetzt fällig“, „morgen fällig“, „in 4 Tagen fällig“ – frühester Termin der Karten des Tons in der Spur */
 export function dueText(data: AppData, track: Track, id: string, today: string): string | null {
   if (!hasNote(data, track, id)) return null;
   const states = kindsForNote(track, id)

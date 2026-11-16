@@ -1398,6 +1398,12 @@ svg.acc {
   color: var(--soft);
   line-height: 1.35;
 }
+/* Kapitelkarten der Liederliste (songs.ts: class="card chap") */
+.chap {
+  margin: 2px 0 0;
+  line-height: 1.35;
+}
+.chap a,
 .summary .new a {
   color: inherit;
 }
@@ -1417,6 +1423,11 @@ svg.acc {
 }
 .chartpage.land .spacer {
   display: none;
+}
+/* quer passt alles: kein Ausblenden am rechten Rand */
+.chartpage.land .ladstrip {
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 .lc .alt {
   fill: var(--soft);

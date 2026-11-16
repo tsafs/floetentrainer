@@ -71,20 +71,24 @@ export const chartView: View = (root, ctx) => {
   let lad: LadderHandle | null = null;
   let strip: HTMLElement | null = null;
 
-  const draw = () => {
-    if (strip) chartScroll = strip.scrollLeft;
-    lad?.destroy();
-    // Quer (niedriger Bildschirm): Spaltenbreite so, dass alle 25 Töne nebeneinander passen
+  /** Maße hochkant bzw. quer (niedriger Bildschirm: Spaltenbreite so, dass alle 25 Töne nebeneinander passen) */
+  const geom = (): ChartGeom => {
     const land = window.innerWidth > window.innerHeight && window.innerHeight <= 520;
-    const g: LadderGeom = land
-      ? (() => {
-          // Die Leiste reicht quer über die ganze Breite (der Seitenrand wird mit negativem Rand aufgehoben)
-          const col = Math.max(26, Math.floor((Math.min(window.innerWidth, 980) - 72 - 12) / CHART.length));
-          const flH = Math.max(80, Math.min(150, window.innerHeight - 205));
-          return { space: 8, base: 66, col, padLeft: 72, height: 66 + 42 + flH + 6, clefTop: 6, clefHeight: 80, flH, nameSize: 13.5, altSize: 9 } as ChartGeom;
-        })()
-      : ({ space: 10, base: 82, col: 46, padLeft: 72, height: 82 + 50 + 200 + 10, clefTop: 10, clefHeight: 100, flH: 200, nameSize: 16, altSize: 10.5 } as ChartGeom);
-    const cg = g as ChartGeom;
+    if (!land) return { land, space: 10, base: 82, col: 46, padLeft: 72, height: 82 + 50 + 200 + 10, clefTop: 10, clefHeight: 100, flH: 200, nameSize: 16, altSize: 10.5 };
+    // Die Leiste reicht quer über die ganze Breite (der Seitenrand wird mit negativem Rand aufgehoben)
+    const col = Math.max(26, Math.floor((Math.min(window.innerWidth, 980) - 72 - 8) / CHART.length));
+    const flH = Math.max(80, Math.min(150, window.innerHeight - 205));
+    return { land, space: 8, base: 66, col, padLeft: 72, padRight: 8, height: 66 + 42 + flH + 6, clefTop: 6, clefHeight: 80, flH, nameSize: 13.5, altSize: 9 };
+  };
+  const key = (g: ChartGeom) => `${g.land}|${g.col}|${g.flH}`;
+  let drawn = "";
+
+  const draw = (cg: ChartGeom) => {
+    if (strip) chartScroll = strip.scrollLeft;
+    const hadFocus = !!document.activeElement?.closest?.(".lc");
+    lad?.destroy();
+    drawn = key(cg);
+    const land = cg.land;
     const below = (id: string) => (x: number) => {
       const alt = alts[id];
       const ny = cg.base + (land ? 24 : 30);
@@ -102,21 +106,27 @@ export const chartView: View = (root, ctx) => {
       below: below(n.id),
       label: alts[n.id] ? `auch ${nameText(alts[n.id])}` : undefined,
     }));
-    root.innerHTML = `<main class="screen page chartpage${land ? " land" : ""}">${topbar("Grifftabelle")}<p class="help">Barocke Griffweise, Sopranflöte in C. Blasse Töne kommen in späteren Stufen. Tippe auf einen Ton für Hinweise zum Griff.</p><div class="spacer"></div>${ladderHtml(g, cols, { testid: "chart", label: "Grifftabelle, nach Tonhöhe" })}<div class="spacer"></div></main>`;
+    root.innerHTML = `<main class="screen page chartpage${land ? " land" : ""}">${topbar("Grifftabelle")}<p class="help">Barocke Griffweise, Sopranflöte in C. Blasse Töne kommen in späteren Stufen. Tippe auf einen Ton für Hinweise zum Griff.</p><div class="spacer"></div>${ladderHtml(cg, cols, { testid: "chart", label: "Grifftabelle, nach Tonhöhe" })}<div class="spacer"></div></main>`;
     strip = root.querySelector<HTMLElement>(".ladstrip");
-    lad = wireLadder(root.querySelector<HTMLElement>(".ladder")!, g, (id) => {
+    lad = wireLadder(root.querySelector<HTMLElement>(".ladder")!, cg, (id, _again, how) => {
       chartPick = id;
+      if (how === "move") return; // Pfeiltasten wählen nur
       chartScroll = strip!.scrollLeft;
       ctx.go(`#/ton/${id}?von=griffe`);
     });
     if (chartPick) lad.select(chartPick, false);
     if (chartScroll !== null) strip!.scrollLeft = chartScroll;
+    if (hadFocus) root.querySelector<SVGGElement>('.lc[tabindex="0"]')?.focus({ preventScroll: true });
   };
-  draw();
+  draw(geom());
   let t = 0;
+  // Neu zeichnen nur, wenn sich die Maße wirklich ändern (nicht bei jeder Adressleiste, die ein- und ausfährt)
   const onResize = () => {
     window.clearTimeout(t);
-    t = window.setTimeout(draw, 120);
+    t = window.setTimeout(() => {
+      const g = geom();
+      if (key(g) !== drawn) draw(g);
+    }, 120);
   };
   window.addEventListener("resize", onResize);
   return () => {
@@ -128,6 +138,7 @@ export const chartView: View = (root, ctx) => {
 };
 
 interface ChartGeom extends LadderGeom {
+  land: boolean;
   flH: number;
   nameSize: number;
   altSize: number;

@@ -31,7 +31,7 @@ export const toneView: View = (root, ctx) => {
   const d = ctx.data;
   const { id, from } = parseHash();
   if (!id) {
-    ctx.go("#/");
+    location.replace("#/"); // unbekannter Ton: ohne Verlaufseintrag, sonst führte Zurück wieder hierher
     return;
   }
   const n = note(id);

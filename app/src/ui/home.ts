@@ -156,7 +156,7 @@ export const homeView: View = (root, ctx) => {
     <div class="stat"><span class="num" data-testid="streak">${st}</span><span class="lbl">${st === 1 ? "Tag in Folge" : "Tage in Folge"}</span></div>
     <div class="week" aria-label="Übungstage dieser Woche">${dots}</div>
   </section>
-  <section class="scale" aria-label="Fortschritt">${ladder}<a class="notecard" data-testid="notecard" aria-live="polite"></a></section>
+  <section class="scale" aria-label="Fortschritt">${ladder}<a class="notecard" data-testid="notecard"></a></section>
   <div class="spacer"></div>
   <section class="actions">
     <button class="main" data-act="ueben">${lese.label}<small>${lese.sub}</small></button>
@@ -175,10 +175,10 @@ export const homeView: View = (root, ctx) => {
     card.setAttribute("aria-label", `Mehr zu ${nameText(id)}`);
     card.innerHTML = cardHtml(ctx, id);
   };
-  const lad = wireLadder(main.querySelector<HTMLElement>(".ladder")!, GEOM, (id, again) => {
+  const lad = wireLadder(main.querySelector<HTMLElement>(".ladder")!, GEOM, (id, again, how) => {
     show(id);
-    // Zweites Tippen oder keine Karte zu sehen (quer): gleich zur Tonseite
-    if (again || card.offsetParent === null) ctx.go(`#/ton/${id}`);
+    // Zweites Tippen oder keine Karte zu sehen (quer, sehr klein): gleich zur Tonseite – nie per Pfeiltaste
+    if (how === "activate" && (again || card.offsetParent === null)) ctx.go(`#/ton/${id}`);
   });
   const first = initialPick(ctx);
   show(first);
