@@ -96,9 +96,9 @@ export function staffSvg(id: string | null, opt: StaffOptions = {}): string {
   const h = range.bottom - range.top;
   const o: string[] = [];
   for (let i = 0; i < 5; i++) {
-    o.push(`<line x1="0.15" x2="${width - 0.15}" y1="${-i}" y2="${-i}" stroke-width="${LINE_W}"/>`);
+    o.push(`<line class="sline" x1="0.15" x2="${width - 0.15}" y1="${-i}" y2="${-i}" stroke-width="${LINE_W}"/>`);
   }
-  o.push(`<path d="${GLYPHS.clef.d}" transform="translate(0.45 ${CLEF_Y})"/>`);
+  o.push(`<path class="clef" d="${GLYPHS.clef.d}" transform="translate(0.45 ${CLEF_Y})"/>`);
   if (id) o.push(noteParts(note(id), nx).join(""));
   const cls = ["staff", opt.className].filter(Boolean).join(" ");
   const label = opt.label ?? "Notenzeile";
@@ -140,9 +140,9 @@ export function staffSeqSvg(ids: string[], opt: { range?: Range; label?: string;
   const h = range.bottom - range.top;
   const o: string[] = [];
   for (let i = 0; i < 5; i++) {
-    o.push(`<line x1="0.15" x2="${r(width - 0.15)}" y1="${-i}" y2="${-i}" stroke-width="${LINE_W}"/>`);
+    o.push(`<line class="sline" x1="0.15" x2="${r(width - 0.15)}" y1="${-i}" y2="${-i}" stroke-width="${LINE_W}"/>`);
   }
-  o.push(`<path d="${GLYPHS.clef.d}" transform="translate(0.45 ${CLEF_Y})"/>`);
+  o.push(`<path class="clef" d="${GLYPHS.clef.d}" transform="translate(0.45 ${CLEF_Y})"/>`);
   const ly = base.bottom + SEQ_LABEL_BASE;
   ids.forEach((id, i) => {
     const nx = seqNoteX(i);

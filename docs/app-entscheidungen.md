@@ -194,8 +194,9 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
 - **Kapitel** (seit 15.11.2026, `docs/app-uebungen.md`; Frage: „Wieso gibt es 11 Stufen, wenn es nur 4
   Meilensteine gibt?“): Die Meilensteine des Startpunkts teilen die Stufen in vier Kapitel – 1 Linke Hand
   (Stufen 1–2), 2 Erste Oktave (3–6), 3 Hohe Töne (7–8), 4 Alle Töne (9–11, Lesen bis 12). Die Stufen
-  bleiben die Lernschritte (wenige neue Töne auf einmal, öfter „nächste Stufe“). Fortschrittsseite: je Spur
-  „Kapitel 2 von 4 · Erste Oktave: c¹ bis e², mit fis¹ (Stufe 3–6)“. Logik `app/src/srs/chapters.ts`.
+  bleiben die Lernschritte (wenige neue Töne auf einmal, öfter „nächste Stufe“). Die Kapitel stehen beim
+  Startpunkt; die Anzeige je Spur auf der Fortschrittsseite ist mit dieser am 16.11.2026 entfallen.
+  Logik `app/src/srs/chapters.ts`.
 - **Stufenlieder** (seit 15.11.2026): je Stufe ein Heft-Lied, das mit ihr spielbar wird – 1 Übung 1 (aus den
   „Ersten Übungen“ des Hefts, nur h¹ a¹ g¹), 2 Hänschen
   klein, 3 Bi-Ba-Butzemann, 4 Alle Vögel sind schon da, 5 Alle meine Entchen, 6 Kling, Glöckchen, 7 Alle
@@ -207,8 +208,8 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   Heft, so groß, dass zwei Takte in eine Zeile passen); die aktuelle Note markiert, getroffene grün,
   falsche rot. „Anhören“ spielt ihn im Grundtempo des Lieds. Gewertet nur die Töne (Warte-Wertung), je Ton
   einmal; ändert die Länge der Folgen nicht.
-  Fortschrittsseite (Spielen): „Lied dieser Stufe: …“ mit Link; im Ergebnis bei einer neuen Spielen-Stufe
-  „Jetzt kannst du *Hänschen klein* ganz spielen.“ mit Link auf die Liedseite.
+  Im Ergebnis bei einer neuen Spielen-Stufe „Jetzt kannst du *Hänschen klein* ganz spielen.“ mit Link auf
+  die Liedseite (der Hinweis „Lied dieser Stufe“ auf der Fortschrittsseite ist mit dieser entfallen).
 
 ## 4. Übungsarten im Detail
 
@@ -427,8 +428,8 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   Startseite diesen Verlaufseintrag, und ist schon ein Startpunkt gewählt, gilt die Adresse als `#/startpunkt`
   mit Spurwahl und Hinweisen). Im Querformat stehen die
   Knöpfe nebeneinander. Auch nach „Neu beginnen“ bei unlesbaren Daten kommt sie.
-- **Startpunkt** (`#/startpunkt`): Erreichbar über „Startpunkt ändern“ unten auf der Fortschrittsseite und
-  „Startpunkt wählen“ in den Einstellungen unter „Stufen“. Oben der aktuelle Stand beider Spuren, darunter
+- **Startpunkt** (`#/startpunkt`): Erreichbar über „Startpunkt ändern“ in den Einstellungen unter „Stufen“
+  (seit 16.11.2026 nur noch dort; Zurück führt in die Einstellungen). Oben der aktuelle Stand beider Spuren, darunter
   die Wahl „Lesen und Spielen · nur Lesen · nur Spielen“ und die fünf Meilensteine als Karten: Name, „Start
   bei Stufe n“ bzw. „dein Startpunkt“ (stärker umrandet), alle enthaltenen Töne als Notenzeile nach Tonhöhe
   (neue schwarz, frühere blass, alle im selben Maßstab, höchstens 9 je Zeile) und „17 Töne · danach neu: b¹
@@ -437,15 +438,29 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   zusätzlich, dass ungeübte Töne wieder mit Vorstellung kommen und Antworten bleiben) mit „Hier beginnen“ und
   „Abbrechen“; danach zur Startseite. Für „nur Spielen“ sind
   Meilensteine über der Lesen-Stufe ausgegraut („Erst, wenn Lesen so weit ist.“).
-- **Startseite** (Entwurf `?s=home`):
+- **Startseite** (seit 16.11.2026 mit Tonleiter; Entwürfe abgestimmt über Artefakte, Notizen unten):
   - Titel, rechts daneben der Menüknopf; die fälligen Karten für Lesen und Spielen jeweils auf ihrem Knopf.
   - „Tage in Folge“ mit den Wochenpunkten Mo–So.
-  - Die beiden Spuren als Stufenleisten (12 bzw. 11 Abschnitte).
-  - „Deine Töne beim Lesen“: Namen mit Trefferquote-Balken. Rot ist ein Ton mit mindestens 5 Antworten
-    und unter 80 %, der noch nicht sitzt (unter 8 Punkten Sicherheit, seit 15.11.2026 wie im Fortschritt).
+  - **Tonleiter** (`app/src/ui/ladder.ts`, gemeinsam mit der Grifftabelle): alle 31 Töne c¹–c³ (mit den
+    anderen Schreibweisen) nach Tonhöhe auf einer Notenzeile. Der Violinschlüssel bleibt links stehen, die
+    Töne gleiten darunter durch: wischen mit dem Finger, mit der Maus ziehen (mit Schwung) oder Mausrad;
+    Pfeiltasten wandern von Ton zu Ton. Keine Legende, keine Übersichtspunkte, kein Anhören (Wunsch: ruhig).
+    Darüber links „Stufe 5“ (Lesen) wie eine Tempoangabe, rechts „10 von 31 Tönen“. Farben: gelernt Tinte,
+    unsicher Rot (mindestens 5 Antworten unter 80 % und unter 8 Punkten), nächste Stufe Blau (atmet leise),
+    wartend Grau; der gelernte Bereich leicht hinterlegt. Unter jedem gelernten Ton zwei kleine Balken (Lesen,
+    Spielen; Punkte 0–10 mit Strich bei 8), unter wartenden „St. 9“ bzw. „neu“.
+  - **Karte** zum gewählten Ton darunter: kleines Griffbild, Name, „seit Stufe 3“, Punkte für Lesen und
+    Spielen („5 von 10“, Balken mit Strich bei 8; ohne Antworten „noch nicht geübt“ bzw. vor dem Startpunkt
+    „gilt als bekannt“) und der Griff-Tipp. Bei wartenden Tönen: „Kommt mit der nächsten Stufe. Dafür noch:
+    e¹ 3 richtige, f¹ 6 richtige.“ (die Töne unter 8 Punkten; sitzen alle: „… sobald du wieder richtig
+    antwortest“) bzw. „Kommt in Stufe 9, also in vier Stufen.“ Die Karte führt zur Tonseite, ebenso ein
+    zweites Tippen auf den gewählten Ton. Beim Öffnen gewählt: der zuletzt gewählte Ton, sonst der erste der
+    nächsten Stufe. Passt nicht alles, fällt erst der Griff-Tipp, dann die Karte weg.
+  - Ersetzt die Stufenleisten und „Deine Töne beim Lesen“; die Spielen-Stufe steht nicht mehr als Zahl auf
+    der Startseite. Steht Spielen an der Lesen-Grenze und ist nichts fällig, sagt der Spielen-Knopf
+    „Fälliges erledigt · für Stufe 5 erst beim Lesen weiterkommen“.
   - Unten die großen Knöpfe Üben und Spielen. Die frühere Zeile „Lieder · Stimmgerät · Grifftabelle ·
-    Einstellungen“ ist seit 14.11.2026 durch das Menü ersetzt (wurde auf schmalen Handys zweizeilig);
-    der Platz kommt der Tonübersicht zugute.
+    Einstellungen“ ist seit 14.11.2026 durch das Menü ersetzt (wurde auf schmalen Handys zweizeilig).
   - Darunter klein „Hören: vorgespielte Töne erkennen“ (seit 15.11.2026) → `#/hoeren`.
 - **Hören** (`#/hoeren`, seit 15.11.2026, `docs/app-uebungen.md` Abschnitt 4; Rückmeldung: „Wenn ich einen
   Ton höre, fällt es mir schwer zu sagen, welcher das ist.“): Auswahl „Nachspielen (mit Flöte und Mikrofon)“
@@ -464,8 +479,8 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   Startseite mitten im Bild) – nicht in der Übung, auf dem Sitzungsende, der Willkommensseite, „Wo steigst du
   ein?“ und auf der Fehlerseite „Daten nicht lesbar“. Auf der Liedseite quer rückt der Umschalter „Anhören |
   Mitspielen“ dafür links neben den Knopf und zeigt nur die Wörter. Er öffnet von rechts eine Leiste (80 % der
-  Breite, höchstens 320 px; quer zwei Spalten 4 + 3, spaltenweise, bis 440 px; Rest leicht abgedunkelt) mit Startseite · Lieder · Fortschritt · Grifftabelle ·
-  Stimmgerät · Flöte einstellen · Einstellungen; die aktuelle Seite fett mit feinem Strich links (auf
+  Breite, höchstens 320 px; quer zwei Spalten 3 + 3, spaltenweise, bis 440 px; Rest leicht abgedunkelt) mit Startseite · Lieder · Grifftabelle ·
+  Stimmgerät · Flöte einstellen · Einstellungen (Fortschritt seit 16.11.2026 entfallen); die aktuelle Seite fett mit feinem Strich links (auf
   Liedseite und „Lied hinzufügen“ ist keiner markiert, „Lieder“ führt dort zur Liste). Schließen mit ×,
   Tippen daneben, Escape, Wahl eines Eintrags oder der Zurück-Geste. Das Öffnen hält nichts an (Vorspielen,
   Mitspielen, Stimmgerät); erst eine andere Seite räumt wie bisher auf, die aktuelle Seite wählen schließt
@@ -479,13 +494,18 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   „7 von 20“, darunter Notenzeile, Frage, Antworten und Rückmeldung.
 - **Sitzungsende:** wie viele richtig, welche Töne schwierig waren und gegebenenfalls die erreichte Stufe mit „Neu: …“.
   Danach zurück zur Startseite.
-- **Fortschritt:** Sicherheit je Ton („8 von 10“, Balken mit Kerbe bei 8; seit 15.11.2026, vorher
-  Trefferquote der letzten 20), getrennt nach Lesen und Spielen. Darunter „Als Nächstes: … Es fehlen
-  noch: d² (2 richtige).“ (auch wenn Spielen gerade an der Lesen-Stufe ansteht) bzw. „Alle sitzen – die
-  nächste Stufe kommt mit deiner nächsten richtigen Antwort.“ Rot ist ein schwacher Ton (hier wie auf der
-  Startseite) nur, solange er noch nicht sitzt. Erreichbar durch Tippen auf
-  die Spuren. Unten „Zu leicht oder zu schwer? …“ mit dem Knopf „Startpunkt ändern“. Mit einem
-  Startpunkt über Stufe 1 heißt es „Dafür braucht jeder Ton ab deinem Startpunkt (Stufe n) …“.
+- **Fortschritt:** eigene Seite bis 16.11.2026, dann entfallen (Startseite und Tonseite zeigen alles: Punkte je
+  Ton, was bis zur nächsten Stufe fehlt). Die Erklärung des Punktesystems steht in den Einstellungen unter
+  „Stufen“, dort auch „Startpunkt ändern“.
+- **Tonseite** (`#/ton/<Ton>`, seit 16.11.2026, `app/src/ui/tone.ts`): Titel ist der Name. Oben Notenzeile
+  und großes Griffbild, „seit Stufe 3“ bzw. „nächste Stufe“/„Stufe 9“, Knöpfe „Anhören“ (Stimmton der
+  aktiven Flöte) und, wenn freigeschaltet, „Flöte einstellen“ für diesen Ton. Abschnitte **Griff** (Griff-Tipp
+  aus `srs/hints.ts`, bisher nur bei der Vorstellung zu sehen), **Note** (Lage auf den Linien, andere
+  Schreibweise, „Kommt in 23 Liedern aus dem Heft vor.“) und **Sicherheit** (Punkte Lesen und Spielen,
+  „Lesen jetzt fällig · Spielen in 3 Tagen fällig“ aus den Fächern; bei wartenden Tönen wie die Karte, beim
+  nächsten Ton zusätzlich „Mit der nächsten Stufe kannst du 5 Lieder mehr spielen.“). Unten ‹ tieferer und
+  höherer Ton › zum Blättern; das ersetzt den Verlaufseintrag, damit Zurück zur Startseite bzw. zur
+  Grifftabelle führt (`?von=griffe`, dann blättert sie nur über die 25 Töne der Tabelle).
 - **Stimmgerät:** freies Spielen mit laufender Anzeige der gehörten Note (auf den Linien, als Name und
   Griffbild) und der Abweichung in Cent. Die Abweichung ist die echte zum Stimmton der aktiven Flöte (so
   sieht sie ehrlich, wie ihre Flöte klingt, ohne die Werte je Ton herauszurechnen); ist für den Ton auf der
@@ -493,8 +513,10 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   e¹: −15“, bei mehreren Flöten mit ihrem Namen). Oben dezent „Flöte: Kinderflöte · etwa 432,5 Hz“ (bekannt
   „· 442 Hz“, noch nicht ermittelt „· Stimmton unbekannt, 440 Hz angenommen“). Eine andere Flöte wählen
   ändert den Bezug.
-- **Grifftabelle:** alle Töne c¹–c³ mit Note, Name und Griffbild. Noch nicht freigeschaltete Töne
-  (Lesen-Spur) erscheinen blass.
+- **Grifftabelle** (seit 16.11.2026 als Notenzeile): die 25 Töne c¹–c³ auf einer Notenzeile, darunter Name,
+  andere Schreibweise („auch dis¹“) und das Griffbild, eins zu eins mitlaufend; wie die Tonleiter wischbar, der
+  Schlüssel bleibt stehen. Noch nicht freigeschaltete Töne (Lesen-Spur) erscheinen blass. Quer passen alle 25
+  ohne Wischen. Tippen öffnet die Tonseite; zurück steht die Tabelle wieder an derselben Stelle.
 - **Einstellungen:**
   - Sitzungslänge
   - Toleranz und Haltedauer (Abschnitt „Spielen“)
@@ -551,22 +573,41 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   Entwurf (`.o`: `font-size: 0.58em; position: relative; top: -0.72em; margin-left: 0.09em;
   line-height: 0`).
   - Nicht die Unicode-Zeichen ¹ ² ³: Das ¹ stößt in Garamond an den Bogen des f.
-- **Farben (hell):**
+- **Farben** (seit 16.11.2026 neu abgestimmt; Rückmeldung: wartende Töne beige neben schwarzen „passt überhaupt
+  nicht“, im Dunkelmodus zog der fast weiße Schlüssel alle Aufmerksamkeit). Grundgedanke: Noten, Linien,
+  Schlüssel und Inaktives sind **eine warme Grau-Reihe** in der Tönung der Tinte, nur nach Helligkeit
+  gestuft; Farbe tragen nur Blau, Rot, Grün und das Ocker fürs Spielen. Beige nur für Flächen (Papier,
+  Karten), Holz nur für die Flöte. Die Hintergründe blieben.
 
-  | Rolle | Wert |
-  |---|---|
-  | Papier | `#fbf6ea` |
-  | Tinte | `#2b2724` |
-  | gedämpft | `#82786d` |
-  | Linien und Rahmen | `#d6c4a3` |
-  | Leisten | `#e8dcc6` |
-  | Knopfgrund | `#fffdf8` |
-  | Richtig | `#4c7350` auf `#edf0e1` |
-  | Falsch | `#9a4b3a` auf `#f5e8de` |
+  | Rolle | Token | Hell | Dunkel |
+  |---|---|---|---|
+  | Papier | `--paper` | `#fbf6ea` | `#1e1a16` |
+  | Karten, Knöpfe | `--btn` | `#fffdf8` | `#26221e` |
+  | Hinterlegung | `--neutral-tint` | `#f3ecdc` | `#2a2521` |
+  | Tinte: Text, gelernte Noten, Lesen | `--ink` | `#2b2724` | `#e7ded3` |
+  | Nebentext | `--soft` | `#706b66` | `#a49d97` |
+  | Namen wartender Töne | `--ghost-ink` | `#908b87` | `#7f7974` |
+  | wartende Noten | `--ghost` | `#c0bdba` | `#58534f` |
+  | Notenlinien, Hilfslinien | `--staff` | `#a29e9a` | `#5f5a55` |
+  | Violinschlüssel | `--clef` | `#a8a4a0` | `#534f4b` |
+  | Rahmen, Trennstriche | `--line` | `#d7d0c4` | `#3c3732` |
+  | leere Balken | `--track` | `#e7e2da` | `#38332f` |
+  | gefüllter Knopf | `--primary` | `#2b2724` | `#cec6bc` |
+  | „jetzt dran“ (nächster Ton, klingende Note, Auswahl, Fokus) | `--mark` | `#286cab` | `#6cb2ec` |
+  | unsicher, falsch | `--err` auf `--err-tint` | `#a04034` / `#f6e6df` | `#e99989` / `#3b2620` |
+  | richtig | `--ok` auf `--ok-tint` | `#4c7350` / `#edf0e1` | `#9cc49f` / `#26301f` |
+  | Spielen | `--play` | `#9f702f` | `#cea770` |
+  | Holz, Kante, dunkel | `--wood` … | `#efe4cf`, `#a58c68`, `#cdb68f` | `#514232`, `#7b6851`, `#3c3023` |
 
-  - Holzfarben des Griffbilds wie in `heft/engrave.py`.
-  - **Dunkelmodus** folgt automatisch der Systemeinstellung: dunkler, warmer Grund, helle Tinte,
-    gedämpftes Holz. Die Werte legt die Umsetzung fest, mit gutem Kontrast.
+  - Rangfolge in beiden Modi: Noten (und ihre Zustandsfarbe) zuerst, dann Namen und Text, dann Notenlinien,
+    zuletzt Schlüssel und Wartendes. Gilt für alle Notenzeilen der App (Klassen `sline`, `ledger`, `clef` in
+    `music/staff.ts`), nicht für den Notensatz der Lieder.
+  - Lesen ist Tinte, Spielen ist Ocker. Blau heißt „jetzt dran“ – auf einem Bildschirm nur eine blaue Sache.
+    Rot heißt „unsicher“ oder „falsch“, Grün nur direkt nach einer richtigen Antwort.
+  - Schrift hält mindestens 4,5 : 1 zum Papier; nur die Namen wartender Töne sind bewusst leiser.
+  - Dunkel ist nicht einfach umgedreht: Linien, Schlüssel und Wartendes sind eigens abgestimmt, der Hauptknopf
+    ist gedämpft (überstrahlt sonst die Noten). Im Griffbild sind geschlossene Löcher wie die Tinte (hell auf
+    dunklerem Holz), offene dunkel mit hellem Rand.
 - **Notenzeile:** Violinschlüssel, Notenköpfe und Vorzeichen aus Bravura (`heft/fonts/bravura.otf`,
   SMuFL: Violinschlüssel U+E050, ganze Note U+E0A2, ♯ U+E262, ♭ U+E260).
   - Die Umrisse werden **als SVG-Pfade** in die App übernommen. Die Schrift wird nicht geladen, damit
@@ -591,7 +632,8 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
 - **Hoch- und Querformat** müssen auf allen Handygrößen gut aussehen, ohne Scrollen auf Start- und
   Übungsseite.
   - Querformat-Regel: `(orientation: landscape) and (max-height: 520px)`.
-  - Startseite quer: links Zahlen und Spuren, rechts die Knöpfe; die Tonübersicht entfällt.
+  - Startseite quer: links Zahlen und Tonleiter, rechts die Knöpfe; die Karte entfällt, Tippen auf einen Ton
+    öffnet gleich die Tonseite. Grifftabelle quer: alle 25 Töne nebeneinander.
   - Übung quer: links die Note, rechts Antworten bzw. Rückmeldung.
   - Tablet und Desktop: dieselben Seiten, mittig mit begrenzter Breite.
 - Große Tippflächen (mindestens 48 px hoch), Knöpfe für den Daumen unten.

@@ -15,7 +15,7 @@ import { inputLatency } from "../audio/follow";
 import { mic } from "../audio/mic";
 import { maxLevel, stagesOf, type Track } from "../music/levels";
 import { joinNames } from "../music/names";
-import { level, levelCap, setLevel } from "../srs/progress";
+import { level, levelCap, POINTS_MAX, POINTS_RIGHT, POINTS_UNLOCK, POINTS_WRONG, setLevel } from "../srs/progress";
 import { activeFlute, defaultData, FLUTE_NAME_MAX, newFlute, newFluteId, SETTING_LIMITS, type AppData, type Flute, type NumSetting, type Theme } from "../store/data";
 import {
   centsBetween,
@@ -236,7 +236,8 @@ export const settingsView: View = (root, ctx) => {
   </section>
   <section><h2>Stufen</h2>${lvRow("lesen")}${lvRow("spielen")}
     <p class="help">Spielen ist höchstens so hoch wie Lesen. Nach dem Senken zählen für das Freischalten nur neue Antworten; die bisherigen Daten bleiben erhalten.</p>
-    <a class="big alt" href="#/startpunkt">Startpunkt wählen</a>
+    <p class="help" data-testid="points-help">Sicherheit je Ton: richtig +${POINTS_RIGHT}, falsch −${POINTS_WRONG}, höchstens ${POINTS_MAX} Punkte. Ab ${POINTS_UNLOCK} Punkten sitzt ein Ton; sitzen alle deine Töne, kommt die nächste Stufe. Wiederholt werden sie trotzdem: am nächsten Tag, nach 3 Tagen, nach einer Woche …</p>
+    <a class="big alt" href="#/startpunkt" data-testid="to-startpoint">Startpunkt ändern</a>
     <p class="help">Bei einem benannten Abschnitt einsteigen: Die Töne davor gelten als bekannt.</p>
   </section>
   <section><h2>Sicherung</h2>

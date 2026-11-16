@@ -39,9 +39,9 @@ test("„Ich kann schon Noten“: Meilenstein wählen, die erste Sitzung kennt d
   await page.getByRole("button", { name: /^Hohe Töne bis/ }).click();
   await page.getByRole("button", { name: "Hier beginnen" }).click();
   await expect(page.getByRole("heading", { name: "Flötentrainer" })).toBeVisible();
-  await expect(page.locator(".track").first()).toContainText("Stufe 9");
-  await expect(page.locator(".track").nth(1)).toContainText("Stufe 9");
+  await expect(page.getByTestId("level")).toHaveText("Stufe 9");
   const d = await stored(page);
+  expect(d.stages).toEqual({ lesen: "b-toene", spielen: "b-toene" });
   expect(d.start).toEqual({ lesen: "b-toene", spielen: "b-toene" });
   expect(d.cards["h1|name"].box).toBe(3);
   // Die Sitzung stellt nur b¹ und es¹ vor
@@ -65,11 +65,15 @@ test("wer die App schon benutzt, sieht keine Willkommensseite", async ({ page })
   await expect(page.getByRole("heading", { name: "Flötentrainer" })).toBeVisible();
 });
 
-test("Startpunkt ändern über Fortschritt: zurück, nur Lesen, Spielen geht mit", async ({ page }) => {
+test("Startpunkt ändern über die Einstellungen: zurück, nur Lesen, Spielen geht mit", async ({ page }) => {
   await seed(page, { ...sampleData({ lesen: "fis1", spielen: "fis1" }) });
-  await page.goto("./#/fortschritt");
+  await page.goto("./#/einstellungen");
   await page.getByTestId("to-startpoint").click();
   await expect(page.getByRole("heading", { name: "Startpunkt" })).toBeVisible();
+  // Zurück führt wieder in die Einstellungen
+  await page.getByRole("link", { name: "Zurück" }).click();
+  await expect(page.getByRole("heading", { name: "Einstellungen" })).toBeVisible();
+  await page.getByTestId("to-startpoint").click();
   await expect(page.getByTestId("current")).toContainText("Lesen: Stufe 4");
   // Spielen-Meilensteine über der Lesen-Stufe sind gesperrt
   await page.getByRole("button", { name: "nur Spielen" }).click();
@@ -78,17 +82,17 @@ test("Startpunkt ändern über Fortschritt: zurück, nur Lesen, Spielen geht mit
   await page.getByRole("button", { name: "nur Lesen" }).click();
   await page.getByRole("button", { name: /^Erste Oktave/ }).click();
   await page.getByRole("button", { name: "Hier beginnen" }).click();
-  await expect(page.locator(".track").first()).toContainText("Stufe 7");
-  await expect(page.locator(".track").nth(1)).toContainText("Stufe 4");
+  await expect(page.getByTestId("level")).toHaveText("Stufe 7");
+  expect((await stored(page)).stages).toEqual({ lesen: "cis2-f2-g2", spielen: "fis1" });
   // ganz von vorn (beide): Lesen und Spielen auf 1, geübte Töne behalten ihre Karten
   await page.goto("./#/startpunkt");
   await expect(page.locator(".ms.cur")).toContainText("Erste Oktave");
   await page.getByRole("button", { name: /^Ganz von vorn/ }).click();
   await expect(page.getByTestId("confirm")).toContainText("Deine bisherigen Antworten bleiben erhalten");
   await page.getByRole("button", { name: "Hier beginnen" }).click();
-  await expect(page.locator(".track").first()).toContainText("Stufe 1");
-  await expect(page.locator(".track").nth(1)).toContainText("Stufe 1");
+  await expect(page.getByTestId("level")).toHaveText("Stufe 1");
   const d = await stored(page);
+  expect(d.stages).toEqual({ lesen: "erste-toene", spielen: "erste-toene" });
   expect(d.cards["e1|name"].box).toBe(3); // aus den Beispieldaten, geübt
   expect(d.cards["e2|name"]).toBeUndefined(); // nur angenommen → wieder neu
 });
@@ -96,7 +100,7 @@ test("Startpunkt ändern über Fortschritt: zurück, nur Lesen, Spielen geht mit
 test("Einstellungen verweisen auf den Startpunkt", async ({ page }) => {
   await seed(page, sampleData());
   await page.goto("./#/einstellungen");
-  await page.getByRole("link", { name: "Startpunkt wählen" }).click();
+  await page.getByRole("link", { name: "Startpunkt ändern" }).click();
   await expect(page.getByRole("heading", { name: "Startpunkt" })).toBeVisible();
 });
 

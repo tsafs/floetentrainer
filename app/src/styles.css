@@ -22,20 +22,33 @@
   src: url("./fonts/eb-garamond-latin-400-italic.woff2") format("woff2");
 }
 
+/* Farbpalette (docs/app-entscheidungen.md, Abschnitt 7): Noten, Notenlinien, Schlüssel und Inaktives sind eine
+   warme Grau-Reihe in der Tönung der Tinte; Farbe tragen nur Blau („jetzt dran“), Rot („unsicher“, „falsch“),
+   Grün („richtig“) und Ocker (Spielen). Beige nur für Flächen, Holz nur für die Flöte. */
 :root {
   color-scheme: light;
   --paper: #fbf6ea;
-  --ink: #2b2724;
-  --soft: #82786d;
-  --line: #d6c4a3;
-  --track: #e8dcc6;
   --btn: #fffdf8;
+  --neutral-tint: #f3ecdc;
+  /* Schrift und Noten, von laut nach leise */
+  --ink: #2b2724;
+  --soft: #706b66;
+  --ghost-ink: #908b87;
+  --ghost: #c0bdba;
+  /* Notenlinien und Violinschlüssel treten hinter die Noten zurück */
+  --staff: #a29e9a;
+  --clef: #a8a4a0;
+  --line: #d7d0c4;
+  --track: #e7e2da;
+  /* gefüllter Hauptknopf und Text darauf */
+  --primary: #2b2724;
+  --on-ink-soft: #c2bdb7;
   --ok: #4c7350;
   --ok-tint: #edf0e1;
-  --err: #9a4b3a;
-  --err-tint: #f5e8de;
-  --neutral-tint: #f3ecdc;
-  --on-ink-soft: #d9cdb9;
+  --err: #a04034;
+  --err-tint: #f6e6df;
+  /* Spielen (Fortschritt beim Spielen mit Mikrofon) */
+  --play: #9f702f;
   /* Griffbild (Holzfarben wie heft/engrave.py) */
   --wood: #efe4cf;
   --wood-line: #a58c68;
@@ -45,76 +58,90 @@
   --hole-ring: #2b2724;
   --thumb-bg: none;
   --thumb-line: none;
-  /* Notensatz der Lieder: klingende Note (samt Hinterlegung und Balken), gewählter Abschnitt */
-  --mark: #1f6fba;
-  --mark-glow: rgba(31, 111, 186, 0.26);
-  --playhead: rgba(31, 111, 186, 0.5);
-  --mark-tint: #e2e5e0;
-  --mark-sel: #d0d9d8;
+  /* „Jetzt dran“: nächster Ton, klingende Note, gewählter Abschnitt, Fokus */
+  --mark: #286cab;
+  --mark-glow: rgba(40, 108, 171, 0.26);
+  --playhead: rgba(40, 108, 171, 0.5);
+  --mark-tint: #e2ebf2;
+  --mark-sel: #cedde8;
   /* Abdunklung hinter dem Menü */
   --shade: rgba(20, 16, 12, 0.32);
 }
 
 /* Dunkelmodus: folgt dem Handy, außer in den Einstellungen ist „Hell“ oder „Dunkel“ gewählt.
-   Die beiden Blöcke unten müssen dieselben Werte haben (ein Test in tests/unit/theme.test.ts prüft das). */
+   Die beiden Blöcke unten müssen dieselben Werte haben (ein Test in tests/unit/theme.test.ts prüft das).
+   Nicht einfach umgedreht: Linien, Schlüssel und Wartendes sind eigens abgestimmt, weil Helles auf dunklem
+   Grund schwerer wirkt; geschlossene Löcher sind hell wie die Tinte, die Flöte ist dunkler als die Noten. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
     --paper: #1e1a16;
-    --ink: #ece3d2;
-    --soft: #a89b8b;
-    --line: #4e4337;
-    --track: #3a3229;
-    --btn: #27221c;
+    --btn: #26221e;
+    --neutral-tint: #2a2521;
+    --ink: #e7ded3;
+    --soft: #a49d97;
+    --ghost-ink: #7f7974;
+    --ghost: #58534f;
+    --staff: #5f5a55;
+    --clef: #534f4b;
+    --line: #3c3732;
+    --track: #38332f;
+    --primary: #cec6bc;
+    --on-ink-soft: #57514c;
     --ok: #9cc49f;
     --ok-tint: #26301f;
-    --err: #e6a08c;
+    --err: #e99989;
     --err-tint: #3b2620;
-    --neutral-tint: #2b251f;
-    --on-ink-soft: #5d5246;
-    --wood: #8d7a5f;
-    --wood-line: #b8a07c;
-    --wood-dark: #6c5b45;
-    --hole: #16120f;
-    --hole-open: #efe6d4;
-    --hole-ring: #e6dccb;
+    --play: #cea770;
+    --wood: #514232;
+    --wood-line: #7b6851;
+    --wood-dark: #3c3023;
+    --hole: #e7ded3;
+    --hole-open: #191511;
+    --hole-ring: #cac3ba;
     --thumb-bg: var(--wood);
     --thumb-line: var(--wood-line);
-    --mark: #62aef0;
-    --mark-glow: rgba(98, 174, 240, 0.3);
-    --playhead: rgba(98, 174, 240, 0.62);
-    --mark-tint: #2f3234;
-    --mark-sel: #3b444a;
-  --shade: rgba(0, 0, 0, 0.5);
+    --mark: #6cb2ec;
+    --mark-glow: rgba(108, 178, 236, 0.3);
+    --playhead: rgba(108, 178, 236, 0.62);
+    --mark-tint: #242c34;
+    --mark-sel: #2b3a47;
+    --shade: rgba(0, 0, 0, 0.5);
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
   --paper: #1e1a16;
-  --ink: #ece3d2;
-  --soft: #a89b8b;
-  --line: #4e4337;
-  --track: #3a3229;
-  --btn: #27221c;
+  --btn: #26221e;
+  --neutral-tint: #2a2521;
+  --ink: #e7ded3;
+  --soft: #a49d97;
+  --ghost-ink: #7f7974;
+  --ghost: #58534f;
+  --staff: #5f5a55;
+  --clef: #534f4b;
+  --line: #3c3732;
+  --track: #38332f;
+  --primary: #cec6bc;
+  --on-ink-soft: #57514c;
   --ok: #9cc49f;
   --ok-tint: #26301f;
-  --err: #e6a08c;
+  --err: #e99989;
   --err-tint: #3b2620;
-  --neutral-tint: #2b251f;
-  --on-ink-soft: #5d5246;
-  --wood: #8d7a5f;
-  --wood-line: #b8a07c;
-  --wood-dark: #6c5b45;
-  --hole: #16120f;
-  --hole-open: #efe6d4;
-  --hole-ring: #e6dccb;
+  --play: #cea770;
+  --wood: #514232;
+  --wood-line: #7b6851;
+  --wood-dark: #3c3023;
+  --hole: #e7ded3;
+  --hole-open: #191511;
+  --hole-ring: #cac3ba;
   --thumb-bg: var(--wood);
   --thumb-line: var(--wood-line);
-  --mark: #62aef0;
-  --mark-glow: rgba(98, 174, 240, 0.3);
-  --playhead: rgba(98, 174, 240, 0.62);
-  --mark-tint: #2f3234;
-  --mark-sel: #3b444a;
+  --mark: #6cb2ec;
+  --mark-glow: rgba(108, 178, 236, 0.3);
+  --playhead: rgba(108, 178, 236, 0.62);
+  --mark-tint: #242c34;
+  --mark-sel: #2b3a47;
   --shade: rgba(0, 0, 0, 0.5);
 }
 
@@ -150,7 +177,7 @@ button {
 }
 button:focus-visible,
 a:focus-visible {
-  outline: 2px solid var(--wood-line);
+  outline: 2px solid var(--mark);
   outline-offset: 2px;
 }
 h1,
@@ -190,6 +217,14 @@ svg.acc {
 }
 .staff path {
   stroke: none;
+}
+/* Linien und Schlüssel leiser als die Noten (Hilfslinien gehören zur Notenzeile) */
+.staff .sline,
+.staff .ledger {
+  stroke: var(--staff);
+}
+.staff .clef {
+  fill: var(--clef);
 }
 .flute {
   display: block;
@@ -376,7 +411,7 @@ svg.acc {
     transition: none;
   }
 }
-/* Querformat: zwei Spalten (4 + 3, spaltenweise), damit alles ohne Scrollen passt; Leiste dafür breiter */
+/* Querformat: zwei Spalten (3 + 3, spaltenweise), damit alles ohne Scrollen passt; Leiste dafür breiter */
 @media (orientation: landscape) and (max-height: 520px) {
   .menu {
     width: min(92vw, 440px);
@@ -384,7 +419,7 @@ svg.acc {
   .menu ul {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    grid-template-rows: repeat(4, auto);
+    grid-template-rows: repeat(3, auto);
     grid-auto-flow: column;
     column-gap: 12px;
   }
@@ -399,7 +434,7 @@ svg.acc {
   width: 100%;
   min-height: 56px;
   border-radius: 14px;
-  background: var(--ink);
+  background: var(--primary);
   color: var(--paper);
   font-size: 1.3rem;
   padding: 8px 16px;
@@ -483,49 +518,282 @@ svg.acc {
     0 0 0 2.5px var(--paper),
     0 0 0 3.8px var(--line);
 }
-.tracks {
+/* Tonleiter: alle Töne nach Höhe auf einer wischbaren Notenzeile (ui/ladder.ts), darunter die Karte zum
+   gewählten Ton. Farben je Spalte über --c: gelernt Tinte, unsicher Rot, nächste Stufe Blau, wartend Grau. */
+.scale {
   display: grid;
-  gap: 2px;
-  border-top: 1px solid var(--line);
-  padding-top: 10px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
 }
-.track {
+.ladder {
+  position: relative;
+  margin: 0 -20px;
+}
+.home .ladder::before {
+  content: "";
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  top: 0;
+  border-top: 1px solid var(--line);
+}
+.ladhead {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  top: 9px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  pointer-events: none;
+  z-index: 1;
+}
+.ladhead b {
+  font-weight: 500;
+  font-size: 1.05rem;
+}
+.ladhead .soft {
+  font-size: 0.9rem;
+}
+.ladstrip {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: pan-x;
+  overscroll-behavior-x: contain;
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 34px), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - 34px), transparent);
+}
+.ladstrip::-webkit-scrollbar {
+  display: none;
+}
+.ladstrip.grabbing {
+  cursor: grabbing;
+}
+.ladstrip svg,
+.ladclef svg {
+  display: block;
+}
+.ladclef {
+  position: absolute;
+  left: 0;
+  width: 80px;
+  pointer-events: none;
+  background: linear-gradient(90deg, var(--paper) 66%, transparent);
+}
+.ladder .sline {
+  stroke: var(--staff);
+  stroke-width: 0.8;
+}
+.ladder .clef {
+  fill: var(--clef);
+}
+.lc {
+  --c: var(--ink);
+  cursor: pointer;
+  outline: none;
+}
+.lc.weak {
+  --c: var(--err);
+}
+.lc.next {
+  --c: var(--mark);
+}
+.lc.wait {
+  --c: var(--ghost);
+}
+.lc .nh {
+  fill: var(--c);
+}
+.lc .led {
+  stroke: var(--staff);
+  stroke-width: 1;
+}
+.lc.wait .led {
+  stroke: var(--ghost);
+}
+.lc .nm {
+  fill: var(--c);
+}
+.lc.wait .nm,
+.lc .st {
+  fill: var(--ghost-ink);
+  font-style: italic;
+}
+.lc.wait .nm {
+  font-style: normal;
+}
+.lc.next .st {
+  fill: var(--mark);
+}
+.lc .bt {
+  fill: var(--track);
+}
+.lc .bl {
+  fill: var(--c);
+}
+.lc .bp {
+  fill: var(--play);
+}
+.lc .bk {
+  fill: var(--soft);
+}
+.ladder .band {
+  fill: var(--neutral-tint);
+}
+.lc .hl {
+  fill: var(--mark-tint);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+@media (hover: hover) {
+  .lc:hover .hl {
+    opacity: 0.6;
+  }
+}
+.lc.sel .hl {
+  opacity: 1;
+}
+.lc:focus-visible .hl {
+  opacity: 1;
+  stroke: var(--mark);
+  stroke-width: 2;
+}
+.lc.next .nh,
+.lc.next .nm {
+  animation: breathe 2.6s ease-in-out infinite;
+}
+@keyframes breathe {
+  50% {
+    opacity: 0.45;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lc.next .nh,
+  .lc.next .nm {
+    animation: none;
+  }
+  .lc .hl {
+    transition: none;
+  }
+}
+
+/* Karte zum gewählten Ton (führt zur Tonseite) */
+.notecard {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 12px;
+  gap: 5px 12px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 9px 12px 10px 10px;
+  background: var(--btn);
   color: inherit;
   text-decoration: none;
-  display: grid;
-  grid-template-columns: 4.6rem 1fr auto;
-  align-items: center;
-  gap: 12px;
-  min-height: 44px;
-  text-align: left;
-  width: 100%;
 }
-.track .t {
+.notecard > :not(.grip):not(.chev) {
+  grid-column: 2;
+}
+.notecard .grip {
+  grid-row: 1 / span 3;
+  height: 80px;
+  display: grid;
+  justify-items: center;
+}
+.notecard .grip.later {
+  opacity: 0.5;
+}
+.notecard .top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.notecard .top strong {
+  font-size: 1.45rem;
   font-weight: 500;
+  line-height: 1;
 }
-.steps {
+.notecard .top .soft {
+  font-size: 0.85rem;
+  text-align: right;
+}
+.notecard .chev {
+  grid-column: 3;
+  grid-row: 1 / span 3;
+  color: var(--soft);
+  font-size: 1.3rem;
+}
+.notecard .tip,
+.notecard .msg {
+  font-size: 0.86rem;
+  line-height: 1.3;
+}
+.notecard .msg {
+  color: var(--soft);
+  font-style: italic;
+}
+.notecard .msg em,
+.tonepage .msg em {
+  color: var(--ink);
+  font-style: normal;
+}
+/* Punkte-Zeilen: Balken 0–10 mit Strich bei 8 (sitzt) */
+.pts {
   display: grid;
-  gap: 3px;
+  grid-template-columns: 3.6rem minmax(0, 1fr) 3.6rem;
+  gap: 4px 8px;
+  align-items: center;
+  font-size: 0.84rem;
 }
-.steps i {
-  height: 6px;
-  border-radius: 3px;
+.pts i {
+  color: var(--soft);
+}
+.pts em {
+  font-style: normal;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.pts .none {
+  grid-column: span 2;
+  color: var(--soft);
+  font-style: italic;
+}
+.pbar {
+  position: relative;
+  height: 4px;
+  border-radius: 2px;
   background: var(--track);
 }
-.steps i.on {
+.pbar b {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
   background: var(--ink);
 }
-.track .s {
-  font-style: italic;
-  color: var(--soft);
-  white-space: nowrap;
+.pbar.weak b {
+  background: var(--err);
+}
+.pbar.play b {
+  background: var(--play);
+}
+.pbar::after {
+  content: "";
+  position: absolute;
+  left: var(--tick, 80%);
+  top: -3px;
+  bottom: -3px;
+  width: 1.5px;
+  border-radius: 1px;
+  background: var(--soft);
 }
 .spacer {
   flex: 1;
-}
-.notes {
-  display: grid;
-  gap: 10px;
 }
 .home > * {
   flex-shrink: 0;
@@ -533,61 +801,13 @@ svg.acc {
 .home > .spacer {
   flex: 1 1 0;
 }
-.notes h2 {
-  font-size: 1rem;
-  font-weight: 400;
-  font-style: italic;
-  color: var(--soft);
-}
-.chips {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
-  gap: 10px 8px;
-}
-.chip {
-  display: grid;
-  justify-items: center;
-  gap: 5px;
-  font-size: 1.35rem;
-  line-height: 1;
-  padding-top: 0.25em;
-}
-.chip i {
-  width: 34px;
-  height: 4px;
-  border-radius: 2px;
-  background: var(--track);
-  overflow: hidden;
-  display: block;
-}
-.chip i b {
-  display: block;
-  height: 100%;
-  background: var(--ink);
-}
-.chip.weak {
-  color: var(--err);
-}
-.chip.weak i b {
-  background: var(--err);
-}
 .home.dense {
   gap: 14px;
 }
-.home.dense .chips {
-  grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
-  gap: 4px 4px;
+.home.dense .notecard .tip {
+  display: none;
 }
-.home.dense .chip {
-  font-size: 1.08rem;
-  gap: 3px;
-  padding-top: 0.15em;
-}
-.home.dense .chip i {
-  width: 26px;
-  height: 3px;
-}
-.home.denser .notes {
+.home.denser .notecard {
   display: none;
 }
 .actions {
@@ -608,7 +828,7 @@ svg.acc {
   font-style: italic;
 }
 .actions .main {
-  background: var(--ink);
+  background: var(--primary);
   color: var(--paper);
 }
 .actions .main small {
@@ -898,7 +1118,7 @@ svg.acc {
   font-style: italic;
 }
 .go {
-  background: var(--ink);
+  background: var(--primary);
   color: var(--paper);
   border-radius: 14px;
   height: 56px;
@@ -1178,117 +1398,32 @@ svg.acc {
   color: var(--soft);
   line-height: 1.35;
 }
-.rows {
-  display: grid;
-  gap: 2px;
-}
-.prow {
-  display: grid;
-  grid-template-columns: 3.2rem 1fr 4.6rem;
-  align-items: center;
-  gap: 12px;
-  min-height: 40px;
-}
-.prow .nm {
-  font-size: 1.35rem;
-  padding-top: 0.2em;
-}
-.prow .pb {
-  position: relative;
-  height: 6px;
-  border-radius: 3px;
-  background: var(--track);
-  overflow: hidden;
-}
-/* Kerbe: ab hier sitzt ein Ton (8 von 10 Punkten) */
-.prow .pb::after {
-  content: "";
-  position: absolute;
-  left: var(--mark, 80%);
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: var(--paper);
-}
-.prow .pb b {
-  display: block;
-  height: 100%;
-  background: var(--ink);
-}
-.prow .cnt {
-  font-style: italic;
-  color: var(--soft);
-  text-align: right;
-  white-space: nowrap;
-}
-.prow.weak .nm,
-.prow.weak .cnt {
-  color: var(--err);
-}
-.prow.weak .pb b {
-  background: var(--err);
-}
-.chap {
-  margin: 2px 0 0;
-  line-height: 1.35;
-}
-.chap a,
 .summary .new a {
   color: inherit;
 }
-.stagebar {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 12px;
-  align-items: center;
-}
 
-/* Grifftabelle */
-.chart {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 12px;
+/* Grifftabelle: eine Notenzeile mit Griffbildern darunter (ui/ladder.ts) */
+.chartpage .ladder {
+  min-width: 0;
 }
-.cell {
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--btn);
-  padding: 8px 10px 10px;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  grid-template-rows: auto auto;
-  align-items: center;
-  column-gap: 6px;
+.chartpage.land .ladder {
+  margin: 0 -24px;
 }
-.cell .staff {
-  width: 100%;
-  height: auto;
-  grid-row: 1;
-  grid-column: 1;
+.chartpage.land .help {
+  display: none;
 }
-.cell .flute {
-  height: 104px;
-  grid-row: 1 / 3;
-  grid-column: 2;
+.chartpage.land {
+  gap: 4px;
 }
-.cell .cn {
-  grid-row: 2;
-  grid-column: 1;
-  font-size: 1.4rem;
-  line-height: 1;
-  padding-top: 0.3em;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 8px;
-  align-items: baseline;
+.chartpage.land .spacer {
+  display: none;
 }
-.cell .cn small {
-  font-size: 0.85rem;
+.lc .alt {
+  fill: var(--soft);
   font-style: italic;
-  color: var(--soft);
 }
-.cell.locked {
-  opacity: 0.38;
+.lc.wait .flute {
+  opacity: 0.45;
 }
 
 /* Stimmgerät */
@@ -1400,7 +1535,7 @@ svg.acc {
   border-left: 1px solid var(--line);
 }
 .seg button[aria-pressed="true"] {
-  background: var(--ink);
+  background: var(--primary);
   color: var(--paper);
 }
 .btnrow {
@@ -1430,6 +1565,94 @@ svg.acc {
   gap: 6px;
 }
 
+/* ---------------------------------------------------------------- Tonseite (ui/tone.ts) */
+.tonepage {
+  gap: 16px;
+}
+.thero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 18px;
+  align-items: center;
+}
+.tstaff .staff {
+  width: 100%;
+  max-width: 260px;
+  height: auto;
+}
+.tflute {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  height: 200px;
+}
+.tstatus {
+  font-size: 0.95rem;
+}
+.tbtns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 4px 15px 5px 13px;
+  border: 1.1px solid var(--line);
+  border-radius: 999px;
+  background: var(--btn);
+  color: var(--ink);
+  font-size: 0.98rem;
+  text-decoration: none;
+}
+.pill svg {
+  width: 9px;
+  height: 10px;
+  fill: currentColor;
+}
+.page section.tsec {
+  gap: 6px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.tsec h2 {
+  font-size: 0.8rem;
+  font-weight: 400;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.tsec p {
+  line-height: 1.35;
+}
+.tsec .msg {
+  color: var(--soft);
+  font-style: italic;
+}
+.tsec .extra {
+  color: var(--soft);
+  font-style: italic;
+  font-size: 0.92rem;
+}
+.tsec .pts {
+  font-size: 0.95rem;
+  grid-template-columns: 4.2rem minmax(0, 1fr) 4.2rem;
+}
+.tnav {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.tnav a {
+  color: var(--soft);
+  text-decoration: none;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px;
+}
+
 /* ---------------------------------------------------------------- Querformat (Handy) */
 @media (orientation: landscape) and (max-height: 520px) {
   .screen {
@@ -1442,7 +1665,7 @@ svg.acc {
     grid-template-columns: 1fr 1fr;
     column-gap: 36px;
     row-gap: 12px;
-    grid-template-areas: "title act" "today act" "tracks act";
+    grid-template-areas: "title act" "today act" "scale act";
     grid-template-rows: auto 1fr auto;
   }
   .homehead {
@@ -1461,12 +1684,12 @@ svg.acc {
     grid-area: today;
     align-self: start;
   }
-  .tracks {
-    grid-area: tracks;
-    padding-top: 6px;
+  .home .scale {
+    grid-area: scale;
   }
+  /* quer keine Karte: Tippen auf einen Ton führt gleich zur Tonseite */
   .home .spacer,
-  .home .notes {
+  .home .notecard {
     display: none;
   }
   .home .banner {
@@ -1717,7 +1940,7 @@ svg.bm {
   border-bottom-color: transparent;
 }
 .cardhd:focus-visible {
-  outline: 2px solid var(--wood-line);
+  outline: 2px solid var(--mark);
   outline-offset: -3px;
   border-radius: 15px;
 }
@@ -1891,7 +2114,7 @@ ul.songs li + li {
   flex: none;
 }
 .modes button[aria-selected="true"] {
-  background: var(--ink);
+  background: var(--primary);
   color: var(--paper);
 }
 /* während des Mitspielens gesperrt: die gewählte Art bleibt kräftig, die andere tritt zurück */
@@ -2047,7 +2270,7 @@ ul.songs li + li {
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: var(--ink);
+  background: var(--primary);
   color: var(--paper);
   display: grid;
   place-items: center;
@@ -2112,7 +2335,7 @@ ul.songs li + li {
   border: 1.5px solid var(--ink);
 }
 .tempo input[type="range"]:focus-visible {
-  outline: 2px solid var(--wood-line);
+  outline: 2px solid var(--mark);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -2131,7 +2354,7 @@ ul.songs li + li {
   fill: currentColor;
 }
 .metro[aria-pressed="true"] {
-  background: var(--ink);
+  background: var(--primary);
   border-color: var(--ink);
   color: var(--paper);
 }
@@ -2371,7 +2594,7 @@ ul.songs li + li {
   border-color: var(--ink);
 }
 .switch:focus-visible {
-  outline: 2px solid var(--wood-line);
+  outline: 2px solid var(--mark);
   outline-offset: -2px;
   border-radius: 16px;
 }
@@ -2505,7 +2728,7 @@ ul.songs li + li {
   opacity: 0.7;
 }
 .songadd textarea:focus-visible {
-  outline: 2px solid var(--wood-line);
+  outline: 2px solid var(--mark);
   outline-offset: 1px;
 }
 .big:disabled {
@@ -2604,7 +2827,7 @@ input:checked + svg.ck path {
   stroke: var(--paper);
 }
 input:focus-visible + svg.ck {
-  outline: 2px solid var(--wood-line);
+  outline: 2px solid var(--mark);
   outline-offset: 2px;
   border-radius: 50%;
 }

@@ -179,7 +179,7 @@ export const startpointView: View = (root, ctx) => {
     }).join("");
     root.innerHTML = `
 <main class="screen page startpoint">
-  ${topbar(fresh ? "Wo steigst du ein?" : "Startpunkt", fresh ? "#/" : "#/fortschritt", !fresh)}
+  ${topbar(fresh ? "Wo steigst du ein?" : "Startpunkt", fresh ? "#/" : "#/einstellungen", !fresh)}
   <p class="help">${
     fresh
       ? "Was kannst du schon? Kannst du die Noten eines Abschnitts lesen und greifen, beginnst du danach. Schwarz sind jeweils die Töne, die dazukommen."

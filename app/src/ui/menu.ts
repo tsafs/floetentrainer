@@ -15,7 +15,6 @@ import { ICON_MENU, ICON_X } from "./common";
 const ENTRIES: { route: string; label: string }[] = [
   { route: "", label: "Startseite" },
   { route: "lieder", label: "Lieder" },
-  { route: "fortschritt", label: "Fortschritt" },
   { route: "griffe", label: "Grifftabelle" },
   { route: "stimmgeraet", label: "Stimmgerät" },
   { route: "floete", label: "Flöte einstellen" },

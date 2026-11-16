@@ -39,9 +39,9 @@ for (const s of SIZES) {
       await page.getByRole("button", { name: /^Ganz von vorn/ }).click();
       await page.waitForTimeout(400);
       await page.screenshot({ path: p("5-zurueck"), fullPage: true });
-      await page.goto("./#/fortschritt");
-      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-      await page.screenshot({ path: p("6-fortschritt") });
+      await page.goto("./#/einstellungen");
+      await page.getByTestId("to-startpoint").scrollIntoViewIfNeeded();
+      await page.screenshot({ path: p("6-einstellungen-startpunkt") });
     });
   });
 }

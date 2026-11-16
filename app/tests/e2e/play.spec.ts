@@ -267,7 +267,7 @@ test("Mikrofon verweigert: verständliche Erklärung", async ({ page }) => {
   await expect(page.getByText("Bei „Mikrofon“ auf „Zulassen“ stellen.")).toBeVisible();
 });
 
-test("Stufe geschafft: Hinweis auf das Stufenlied; Fortschritt zeigt Kapitel und Lied der Stufe", async ({ page }) => {
+test("Stufe geschafft: Hinweis auf das Stufenlied", async ({ page }) => {
   const d = singleCards();
   const day = d.days[d.days.length - 1];
   // alle Töne der Spielen-Stufe 2 sitzen schon (12 von 12): die nächste richtige Antwort schaltet frei
@@ -283,8 +283,4 @@ test("Stufe geschafft: Hinweis auf das Stufenlied; Fortschritt zeigt Kapitel und
   await expect(page.getByTestId("unlock")).toContainText("Spielen · Stufe 3 erreicht");
   await expect(page.getByTestId("unlock-song")).toHaveText("Jetzt kannst du Hänschen klein ganz spielen.");
   await expect(page.getByTestId("unlock-song").locator("a")).toHaveAttribute("href", "#/lied/haenschen-klein");
-  await page.goto("./#/fortschritt");
-  await expect(page.getByTestId("chapter-spielen")).toContainText("Kapitel 2 von 4");
-  await expect(page.getByTestId("chapter-lesen")).toContainText("Kapitel 2 von 4");
-  await expect(page.getByTestId("stage-song")).toContainText("Es tanzt ein Bi-Ba-Butzemann");
 });
