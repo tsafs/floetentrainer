@@ -80,7 +80,7 @@ for (const s of SIZES) {
         await page.screenshot({ path: p(`4-${kind}-falsch`) });
         await page.goto("./");
       }
-      for (const [route, name] of [["#/griffe", "6-griffe"], ["#/einstellungen", "7-einstellungen"], ["#/fortschritt", "8-fortschritt"]]) {
+      for (const [route, name] of [["#/griffe", "6-griffe"], ["#/einstellungen", "7-einstellungen"], ["#/ton/e1", "8-ton"]]) {
         await page.goto("./" + route);
         await page.screenshot({ path: p(name), fullPage: false });
       }

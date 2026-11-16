@@ -20,7 +20,7 @@ test("Einträge in der abgestimmten Reihenfolge, Fokus auf dem ersten, aktuelle 
   await expect(menuBtn(page)).toHaveAttribute("aria-controls", "menu");
   await openMenu(page);
   const links = menu(page).getByRole("link");
-  await expect(links).toHaveText(["Startseite", "Lieder", "Fortschritt", "Grifftabelle", "Stimmgerät", "Flöte einstellen", "Einstellungen"]);
+  await expect(links).toHaveText(["Startseite", "Lieder", "Grifftabelle", "Stimmgerät", "Flöte einstellen", "Einstellungen"]);
   await expect(links.first()).toBeFocused();
   await expect(menu(page).locator('[aria-current="page"]')).toHaveText("Startseite");
   // Der Rest der Seite ist gesperrt
@@ -75,9 +75,9 @@ test("Eintrag führt zur Seite; Zurück danach führt zur vorigen Seite; aktuell
     new MutationObserver(() => (window as unknown as { __countRender(): void }).__countRender()).observe(app, { childList: true });
   });
 
-  await menuTo(page, "Fortschritt");
-  await expect(page).toHaveURL(/#\/fortschritt$/);
-  await expect(page.getByRole("heading", { name: "Fortschritt" })).toBeVisible();
+  await menuTo(page, "Lieder");
+  await expect(page).toHaveURL(/#\/lieder$/);
+  await expect(page.getByRole("heading", { name: "Lieder", exact: true })).toBeVisible();
   await page.waitForTimeout(150);
   expect(renders).toBe(1); // genau einmal gezeichnet
 
@@ -115,7 +115,7 @@ test("Tab läuft in der Leiste im Kreis", async ({ page }) => {
 
 test("Menüknopf auf den Unterseiten, auch Liederliste, Liedseite und Lied hinzufügen", async ({ page }) => {
   await seed(page, sampleData());
-  for (const route of ["#/lieder", "#/lied/haenschen-klein", "#/lied-hinzufuegen", "#/einstellungen", "#/fortschritt", "#/griffe", "#/stimmgeraet", "#/floete", "#/mikrofon"]) {
+  for (const route of ["#/lieder", "#/lied/haenschen-klein", "#/lied-hinzufuegen", "#/einstellungen", "#/griffe", "#/ton/fis1", "#/stimmgeraet", "#/floete", "#/mikrofon"]) {
     await page.goto("./" + route);
     await expect(menuBtn(page), route).toBeVisible();
     const box = (await menuBtn(page).boundingBox())!;
@@ -155,7 +155,7 @@ test("Stimmgerät aus dem Menü startet das Mikrofon gleich", async ({ page }) =
   await expect(page.getByRole("button", { name: "Mikrofon einschalten" })).toHaveCount(0);
 });
 
-test("Querformat 740 × 360: zwei Spalten (4 + 3, spaltenweise), alles ohne Scrollen sichtbar", async ({ page }) => {
+test("Querformat 740 × 360: zwei Spalten (3 + 3, spaltenweise), alles ohne Scrollen sichtbar", async ({ page }) => {
   await page.setViewportSize({ width: 740, height: 360 });
   await seed(page, sampleData());
   await page.goto("./");
@@ -166,18 +166,18 @@ test("Querformat 740 × 360: zwei Spalten (4 + 3, spaltenweise), alles ohne Scro
   expect(box.x + box.width).toBeCloseTo(740, 0); // rechts angedockt
   const links = menu(page).getByRole("link");
   const boxes = [];
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < 6; i++) {
     await expect(links.nth(i)).toBeInViewport({ ratio: 1 });
     boxes.push((await links.nth(i).boundingBox())!);
     expect(boxes[i].height).toBeGreaterThanOrEqual(44);
   }
   // linke Spalte Startseite … Grifftabelle, rechte Stimmgerät … Einstellungen
-  for (let i = 1; i < 4; i++) expect(boxes[i].x).toBe(boxes[0].x);
-  for (let i = 5; i < 7; i++) expect(boxes[i].x).toBe(boxes[4].x);
-  expect(boxes[4].x).toBeGreaterThan(boxes[0].x + 100);
-  expect(boxes[4].y).toBe(boxes[0].y);
+  for (let i = 1; i < 3; i++) expect(boxes[i].x).toBe(boxes[0].x);
+  for (let i = 4; i < 6; i++) expect(boxes[i].x).toBe(boxes[3].x);
+  expect(boxes[3].x).toBeGreaterThan(boxes[0].x + 100);
+  expect(boxes[3].y).toBe(boxes[0].y);
   expect(await menu(page).evaluate((el) => el.scrollHeight <= el.clientHeight)).toBe(true);
-  await links.nth(6).click();
+  await links.nth(5).click();
   await expect(page.getByRole("heading", { name: "Einstellungen" })).toBeVisible();
 });
 
@@ -256,7 +256,7 @@ test("Tastatur: der Menüknopf kommt beim Tabben vor dem Seiteninhalt", async ({
 
 test("Seitenwechsel bei offenem Menü: ein Zurück je sichtbarer Seite", async ({ page }) => {
   await seed(page, sampleData());
-  await page.goto("./#/fortschritt");
+  await page.goto("./#/lieder");
   await page.evaluate(() => (location.hash = "#/griffe"));
   await expect(page).toHaveURL(/#\/griffe$/);
   await openMenu(page);
@@ -267,6 +267,6 @@ test("Seitenwechsel bei offenem Menü: ein Zurück je sichtbarer Seite", async (
   await page.evaluate(() => history.back());
   await expect(page).toHaveURL(/#\/griffe$/);
   await page.evaluate(() => history.back());
-  await expect(page).toHaveURL(/#\/fortschritt$/);
-  await expect(page.getByRole("heading", { name: "Fortschritt" })).toBeVisible();
+  await expect(page).toHaveURL(/#\/lieder$/);
+  await expect(page.getByRole("heading", { name: "Lieder", exact: true })).toBeVisible();
 });

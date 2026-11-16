@@ -51,7 +51,7 @@ test.describe("Handy im hellen Modus", () => {
     // Griffbild: Daumenloch bekommt den Holz-Hintergrund, Browserleiste wird dunkel
     await page.goto("./#/griffe");
     const tb = await page.locator(".flute .tb").first().evaluate((e) => getComputedStyle(e).fill);
-    expect(tb).toBe("rgb(141, 122, 95)");
+    expect(tb).toBe("rgb(81, 66, 50)"); // --wood im Dunkelmodus
     const metas = await page.evaluate(() => [...document.querySelectorAll('meta[name="theme-color"]')].map((m) => (m as HTMLMetaElement).content));
     expect(metas).toEqual(["#1e1a16", "#1e1a16"]);
   });

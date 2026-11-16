@@ -123,7 +123,7 @@ Silben, Atemzeichen, Seitenumbrüche.
    Browser-Tests über `window.__folgen`. Bildschirmfotos `*-t1…t7-*.png`. Abweichungen vom Plan am Ende von
    `docs/app-tonfolgen.md`.
 5. **Startpunkt im Lernplan** (`docs/app-startpunkt.md`, umgesetzt 14.11.2026): Willkommensseite beim
-   allerersten Start, Seite `#/startpunkt` mit fünf Meilensteinen „Ich kann schon …“ (Notenzeile nach Tonhöhe, neue Töne schwarz) (über Fortschritt und
+   allerersten Start, Seite `#/startpunkt` mit fünf Meilensteinen „Ich kann schon …“ (Notenzeile nach Tonhöhe, neue Töne schwarz) (über die
    Einstellungen). Töne vor dem Startpunkt gelten als bekannt (Fach 3, gestaffelt höchstens 3 je Tag und
    Spur, keine Vorstellung), fürs Freischalten zählen nur die Töne ab dem Startpunkt. Logik
    `app/src/srs/startpoint.ts` (dazu `startLevel`/`countedNotes` in `progress.ts`), Seiten
@@ -151,8 +151,8 @@ Silben, Atemzeichen, Seitenumbrüche.
      vorgestellte Töne (`singleCards()` in `play.spec.ts`).
    - **Abschnitt 3 umgesetzt (Kapitel, Stufenlieder):** `app/src/srs/chapters.ts` (Kapitel aus den
      Meilensteinen, `STAGE_SONG_TITLES`, `snippetSong`), Abschnitte `app/src/songs/snippets.ts`
-     (`songSnippets`), in der Sitzung `PlanItem.snippet`/`Folge.song`; Fortschrittsseite und Ergebnis in
-     `app/src/ui/pages.ts`. Tests `chapters.test.ts`, `session.test.ts`, `play.spec.ts` („Stufe geschafft“).
+     (`songSnippets`), in der Sitzung `PlanItem.snippet`/`Folge.song`; Ergebnis in
+     `app/src/ui/pages.ts` (die Fortschrittsseite ist seit 16.11.2026 entfallen). Tests `chapters.test.ts`, `session.test.ts`, `play.spec.ts` („Stufe geschafft“).
      Abschnitte seit dem 15.11.2026 mit Rhythmus: Taktbereiche (`Snippet.from/to`), in der Übung als
      Ausschnitt `songExcerpt` mit `renderScore` gesetzt (`Folge.songId/bars`, `els()` in `renderFolge`
      markiert die Noten über die Kennungen des Zeitplans). Die „Ersten Übungen“ des Hefts sind als Kapitel in
@@ -165,3 +165,19 @@ Silben, Atemzeichen, Seitenumbrüche.
    - **Abschnitt 4 umgesetzt (Hören/Echo):** Seite `#/hoeren` in `app/src/ui/echo.ts` (Link auf der
      Startseite, kein Menüeintrag), Tests `app/tests/e2e/echo.spec.ts`. Zählt nicht für die Lernspuren.
    - Damit sind alle Abschnitte von `docs/app-uebungen.md` umgesetzt. Offen: Lied für Stufe 8, Abgleich ohne Kopfhörer per Lautsprecher-Klick, Rhythmus in Folgen.
+7. **Tonleiter, Tonseite, Grifftabelle, Farbpalette** (16.11.2026, abgestimmt über Entwürfe als Artefakte;
+   Regeln in `docs/app-entscheidungen.md` Abschnitte 6 und 7):
+   - Startseite: wischbare Notenzeile mit allen 31 Tönen nach Tonhöhe statt Stufenleisten und Tonübersicht,
+     darunter die Karte zum gewählten Ton (`app/src/ui/home.ts`). Gemeinsames Bauteil für Startseite und
+     Grifftabelle: `app/src/ui/ladder.ts` (Schlüssel fest, Wischen/Ziehen/Mausrad/Pfeiltasten, Farben über
+     Klassen `learned|weak|next|wait`). Texte und Zustände je Ton: `app/src/ui/note-info.ts`.
+   - Tonseite `#/ton/<Ton>` (`app/src/ui/tone.ts`), Grifftabelle als Notenzeile mit Griffbildern
+     (`chartView` in `app/src/ui/pages.ts`, quer alle 25 Töne auf einmal).
+   - Fortschrittsseite und Menüeintrag „Fortschritt“ entfallen; „Startpunkt ändern“ und die Erklärung der
+     Punkte stehen in den Einstellungen unter „Stufen“. Menü quer 3 + 3.
+   - Neue Farbpalette (Tokens in `app/src/styles.css`, beide Dunkel-Blöcke gleich halten): Grau-Reihe für
+     Noten, Linien (`--staff`), Schlüssel (`--clef`) und Wartendes (`--ghost`, `--ghost-ink`), `--play` für
+     Spielen, `--primary` für gefüllte Knöpfe. Gilt für alle Notenzeilen (`sline`/`clef` in `music/staff.ts`),
+     der Notensatz der Lieder ist unverändert.
+   - Tests `app/tests/e2e/tonleiter.spec.ts`; Bildschirmfoto `*-8-ton.png`.
+   - Offen: Ob der Notensatz der Lieder die leiseren Linien und den Schlüssel übernehmen soll.

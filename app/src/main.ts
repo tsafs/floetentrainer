@@ -5,10 +5,11 @@ import { mic } from "./audio/mic";
 import type { Ctx, View } from "./ui/common";
 import { topbar } from "./ui/common";
 import { homeView } from "./ui/home";
-import { chartView, micHelpView, progressView, summaryView } from "./ui/pages";
+import { chartView, micHelpView, summaryView } from "./ui/pages";
 import { practiceView } from "./ui/practice";
 import { fluteView } from "./ui/flute";
 import { settingsView } from "./ui/settings";
+import { toneView } from "./ui/tone";
 import { songAddView } from "./ui/own-songs";
 import { songListView, songView } from "./ui/songs";
 import { installMenu } from "./ui/menu";
@@ -27,7 +28,6 @@ const ROUTES: Record<string, View> = {
   "": homeView,
   uebung: practiceView,
   ende: summaryView,
-  fortschritt: progressView,
   griffe: chartView,
   stimmgeraet: tunerView,
   hoeren: echoView, // Echo: hören → nachspielen bzw. Namen tippen
@@ -36,6 +36,7 @@ const ROUTES: Record<string, View> = {
   mikrofon: micHelpView,
   lieder: songListView,
   lied: songView, // #/lied/<Kennung>
+  ton: toneView, // #/ton/<Ton>, aus der Grifftabelle mit ?von=griffe
   "lied-hinzufuegen": songAddView,
   startpunkt: startpointView, // #/startpunkt bzw. #/startpunkt/neu (aus der Willkommensseite)
 };

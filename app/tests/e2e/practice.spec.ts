@@ -12,9 +12,12 @@ test.describe("Startseite", () => {
     await expect(page.getByRole("heading", { name: "Flötentrainer" })).toBeVisible();
     await expect(page.getByTestId("streak")).toHaveText("0");
     await expect(page.getByRole("button", { name: /Üben/ })).toContainText("Neue Töne warten");
-    await expect(page.locator(".track")).toHaveCount(2);
-    await expect(page.locator(".track").first().locator(".steps i")).toHaveCount(12);
-    await expect(page.locator(".track").nth(1).locator(".steps i")).toHaveCount(11);
+    // Tonleiter: alle 31 Töne, gelernt h¹ a¹ g¹, als Nächstes c² und d²
+    await expect(page.getByTestId("level")).toHaveText("Stufe 1");
+    const lad = page.getByTestId("ladder");
+    await expect(lad.locator(".lc")).toHaveCount(31);
+    await expect(lad.locator(".lc.learned")).toHaveCount(3);
+    await expect(lad.locator(".lc.next")).toHaveCount(2);
   });
 
   test("fällige Karten stehen auf den Knöpfen", async ({ page }) => {
