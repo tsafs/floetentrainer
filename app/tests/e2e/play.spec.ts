@@ -1,20 +1,11 @@
-// Spielen: Das Mikrofon wird durch einen Oszillator ersetzt, den der Test steuert.
+// Stimmgerät und Mikrofon: Das Mikrofon wird durch einen Oszillator ersetzt, den der Test steuert.
+// (Spielen selbst ist das Notenband: tests/e2e/band.spec.ts)
 import { expect, test, type Page } from "@playwright/test";
 import { note, soundingFreq } from "../../src/music/notes";
 import { sampleData } from "./seed";
 import { FAKE_MIC, menuTo } from "./util";
 
-/**
- * Beispieldaten für Einzelkarten: Ab 5 vorgestellten Tönen wären fällige Spielen-Karten Folgen
- * (docs/app-uebungen.md); mit 4 vorgestellten bleiben es Karten.
- */
-function singleCards() {
-  const d = sampleData();
-  d.introduced.spielen = ["h1", "a1", "g1", "c2"];
-  return d;
-}
-
-async function setup(page: Page, data: unknown = singleCards()) {
+async function setup(page: Page, data: unknown = sampleData()) {
   await page.addInitScript(FAKE_MIC);
   await page.addInitScript((d) => {
     if (!sessionStorage.getItem("seeded")) {
@@ -25,121 +16,9 @@ async function setup(page: Page, data: unknown = singleCards()) {
   await page.goto("./");
 }
 
-const main = (page: Page) => page.locator("main");
-const target = async (page: Page) => (await main(page).getAttribute("data-note"))!;
 const play = (page: Page, id: string) => page.evaluate((f) => (window as never as { __osc: { play(f: number): void } }).__osc.play(f), soundingFreq(note(id)));
 const wobble = (page: Page, cents: number) =>
   page.evaluate((c) => (window as never as { __osc: { wobble(c: number): void } }).__osc.wobble(c), cents);
-const silence = (page: Page) => page.evaluate(() => (window as never as { __osc: { silence(): void } }).__osc.silence());
-const lastAnswer = (page: Page, id: string) =>
-  page.evaluate((n) => JSON.parse(localStorage.getItem("floetentrainer")!).history.spielen[n].at(-1)[0], id);
-
-/** ein anderer Ton der Grifftabelle, nicht in der Oktave */
-function other(id: string): string {
-  const all = ["g1", "a1", "h1", "c2", "d2", "e1", "f1"];
-  return all.find((x) => x !== id && Math.abs(note(x).midi - note(id).midi) !== 12)!;
-}
-
-async function startPlaying(page: Page) {
-  await page.getByRole("button", { name: /Spielen/ }).click();
-  await expect(main(page)).toHaveAttribute("data-kind", "spiel");
-  await page.waitForFunction(() => (window as never as { __osc: unknown }).__osc !== null);
-}
-
-test("richtig gespielt: grüne Bestätigung, geht von selbst weiter, zeigt was die App hört", async ({ page }) => {
-  await setup(page);
-  await startPlaying(page);
-  const t = await target(page);
-  await page.waitForTimeout(450);
-  await play(page, t);
-  await expect(page.locator(".listen .heard")).toContainText(note(t).name);
-  await expect(page.getByTestId("panel")).toContainText("Richtig");
-  expect(await lastAnswer(page, t)).toBe(1);
-  await expect(page.getByTestId("count")).toHaveText("2 von 20", { timeout: 4000 });
-});
-
-test("erst falsch, dann richtig: zählt als Fehler", async ({ page }) => {
-  await setup(page);
-  await startPlaying(page);
-  const t = await target(page);
-  const wrong = other(t);
-  await page.waitForTimeout(450);
-  await play(page, wrong);
-  await expect(page.getByTestId("panel")).toContainText(`Du spielst ${note(wrong).name}`);
-  // der richtige Name, kein Griffbild
-  await expect(page.locator(".panel .name")).toContainText(t);
-  await expect(page.locator(".panel .flute")).toHaveCount(0);
-  await play(page, t);
-  await expect(page.getByTestId("panel")).toContainText("Jetzt stimmt es");
-  expect(await lastAnswer(page, t)).toBe(0);
-  const hist = await page.evaluate((n) => JSON.parse(localStorage.getItem("floetentrainer")!).history.spielen[n], t);
-  await expect(page.getByTestId("count")).toHaveText("2 von 20", { timeout: 4000 });
-  // nur ein Eintrag für diese Karte
-  const after = await page.evaluate((n) => JSON.parse(localStorage.getItem("floetentrainer")!).history.spielen[n], t);
-  expect(after.length).toBe(hist.length);
-});
-
-test("Nachklang der vorigen Karte zählt nicht", async ({ page }) => {
-  await setup(page);
-  await startPlaying(page);
-  const t1 = await target(page);
-  await page.waitForTimeout(450);
-  await play(page, t1);
-  await expect(page.getByTestId("panel")).toContainText("Richtig");
-  // Ton klingt weiter, während die nächste Karte kommt
-  await expect(page.getByTestId("count")).toHaveText("2 von 20", { timeout: 4000 });
-  const t2 = await target(page);
-  expect(t2).not.toBe(t1);
-  await page.waitForTimeout(1500);
-  await expect(main(page)).not.toHaveClass(/\berr\b/);
-  await expect(page.getByTestId("panel")).toHaveCount(0);
-  // Stille, dann der richtige Ton
-  await silence(page);
-  await page.waitForTimeout(250);
-  await play(page, t2);
-  await expect(page.getByTestId("panel")).toContainText("Richtig");
-  expect(await lastAnswer(page, t2)).toBe(1);
-});
-
-test("Tonwechsel ohne Pause ist ein neuer Einsatz", async ({ page }) => {
-  await setup(page);
-  await startPlaying(page);
-  const t1 = await target(page);
-  await page.waitForTimeout(450);
-  await play(page, t1);
-  await expect(page.getByTestId("count")).toHaveText("2 von 20", { timeout: 4000 });
-  const t2 = await target(page);
-  await page.waitForTimeout(500);
-  await play(page, t2); // direkt vom alten zum neuen Ton
-  await expect(page.getByTestId("panel")).toContainText("Richtig");
-  expect(await lastAnswer(page, t2)).toBe(1);
-});
-
-test("wackelnder Ton (Vibrato ±30 Cent) wird als richtig gewertet", async ({ page }) => {
-  await setup(page);
-  await startPlaying(page);
-  const t = await target(page);
-  await wobble(page, 30);
-  await page.waitForTimeout(450);
-  await play(page, t);
-  await expect(page.locator(".listen .heard")).toContainText(note(t).name);
-  await expect(page.getByTestId("panel")).toContainText("Richtig");
-  expect(await lastAnswer(page, t)).toBe(1);
-});
-
-test("„Weiß nicht“ beim Spielen: richtiger Name, danach darf gespielt werden", async ({ page }) => {
-  await setup(page);
-  await startPlaying(page);
-  const t = await target(page);
-  await page.getByRole("button", { name: "Weiß nicht" }).click();
-  await expect(page.getByTestId("panel")).toContainText("Auflösung");
-  // der richtige Name, kein Griffbild
-  await expect(page.locator(".panel .name")).toContainText(t);
-  await expect(page.locator(".panel .flute")).toHaveCount(0);
-  await play(page, t);
-  await expect(page.getByTestId("panel")).toContainText("Jetzt stimmt es");
-  expect(await lastAnswer(page, t)).toBe(0);
-});
 
 test("Stimmgerät zeigt die gehörte Note", async ({ page }) => {
   await setup(page);
@@ -265,22 +144,4 @@ test("Mikrofon verweigert: verständliche Erklärung", async ({ page }) => {
   await page.getByRole("button", { name: /Spielen/ }).click();
   await expect(page.getByRole("heading", { name: "Das Mikrofon ist nicht erlaubt" })).toBeVisible();
   await expect(page.getByText("Bei „Mikrofon“ auf „Zulassen“ stellen.")).toBeVisible();
-});
-
-test("Stufe geschafft: Hinweis auf das Stufenlied", async ({ page }) => {
-  const d = singleCards();
-  const day = d.days[d.days.length - 1];
-  // alle Töne der Spielen-Stufe 2 sitzen schon (12 von 12): die nächste richtige Antwort schaltet frei
-  for (const n of ["h1", "a1", "g1", "c2", "d2"] as const) d.history.spielen[n] = Array.from({ length: 12 }, (_, i) => [1, day, Date.now() - 100000 + i]);
-  await setup(page, d);
-  await startPlaying(page);
-  const t = await target(page);
-  await page.waitForTimeout(450);
-  await play(page, t);
-  await expect(page.getByTestId("panel")).toContainText("Richtig");
-  await silence(page);
-  await page.getByRole("button", { name: "Sitzung beenden" }).click();
-  await expect(page.getByTestId("unlock")).toContainText("Spielen · Stufe 3 erreicht");
-  await expect(page.getByTestId("unlock-song")).toHaveText("Jetzt kannst du Hänschen klein ganz spielen.");
-  await expect(page.getByTestId("unlock-song").locator("a")).toHaveAttribute("href", "#/lied/haenschen-klein");
 });

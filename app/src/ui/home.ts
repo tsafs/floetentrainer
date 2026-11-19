@@ -11,6 +11,7 @@ import { GRIP_TIPS } from "../srs/hints";
 import { dueCount } from "../srs/leitner";
 import { level, notePoints, POINTS_MAX, POINTS_UNLOCK, streak, weekDots } from "../srs/progress";
 import { hasWork, Session } from "../srs/session";
+import { BandSession } from "../srs/band";
 import { menuSlot, plural, type Ctx, type View } from "./common";
 import { ladderHtml, ladderName, wireLadder, type LadderColumn, type LadderGeom } from "./ladder";
 import { hasNote, noteState, playWaitsForReading, pointsRow, waitingText } from "./note-info";
@@ -95,13 +96,27 @@ function buttonText(ctx: Ctx, track: Track): { label: string; sub: string } {
           : `Fälliges erledigt · zählt für Stufe ${lv + 1}`;
     return { label: `Weiter ${verb.toLowerCase()}`, sub };
   }
-  const mins = ctx.data.settings.sessionMinutes;
+  const mins = track === "lesen" ? ctx.data.settings.sessionMinutes : ctx.data.settings.bandMinutes;
   if (due > 0) return { label: verb, sub: `${plural(due, "Karte", "Karten")} fällig · etwa ${mins} Minuten` };
   return { label: verb, sub: track === "lesen" ? "Neue Töne warten" : "Neue Töne · mit Flöte und Mikrofon" };
 }
 
 export function startSession(ctx: Ctx, track: Track): void {
   const s = ctx.data.settings;
+  if (track === "spielen") {
+    // Spielen ist das Notenband (docs/app-notenband.md)
+    ctx.band = new BandSession(ctx.data, {
+      today: ctx.today(),
+      rng: Math.random,
+      now: () => Date.now(),
+      limitMs: s.bandMinutes * 60_000,
+      limitNotes: s.bandNotes,
+    });
+    ctx.band.onChange = () => ctx.save();
+    ctx.save();
+    ctx.go("#/notenband");
+    return;
+  }
   ctx.session = new Session(ctx.data, {
     track,
     today: ctx.today(),

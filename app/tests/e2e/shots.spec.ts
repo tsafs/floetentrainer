@@ -129,21 +129,33 @@ for (const s of SIZES) {
     });
     test("Spielen und Stimmgerät", async ({ page }) => {
       await page.addInitScript(FAKE_MIC);
-      // mit 4 vorgestellten Tönen bleiben fällige Spielen-Karten Einzelkarten (ab 5 wären es Folgen)
-      const d = sampleData();
-      d.introduced.spielen = ["h1", "a1", "g1", "c2"];
-      await seed(page, d);
+      // Spielen ist das Notenband (docs/app-notenband.md)
+      await seed(page, sampleData());
       const p = (x: string) => `${OUT}/${scheme}-${s.name}-${x}.png`;
       const osc = (id: string) => page.evaluate((f) => (window as never as { __osc: { play(f: number): void } }).__osc.play(f), soundingFreq(note(id)));
       await page.goto("./");
       await page.getByRole("button", { name: /Spielen/ }).click();
       await page.waitForFunction(() => (window as never as { __osc: unknown }).__osc !== null);
-      const t = (await info(page)).note;
+      const cur = async () => (await page.locator("main").getAttribute("data-note"))!;
+      await expect(page.locator("main")).toHaveAttribute("data-step", "band");
       await page.waitForTimeout(500);
-      await osc(t === "g1" ? "a1" : "g1");
+      // drei Töne richtig: grün, das Band gleitet weiter
+      for (let k = 0; k < 3; k++) {
+        const i = await page.locator("main").getAttribute("data-i");
+        await osc(await cur());
+        await expect(page.locator("main")).not.toHaveAttribute("data-i", i!, { timeout: 4000 });
+        await page.evaluate(() => (window as never as { __osc: { silence(): void } }).__osc.silence());
+        await page.waitForTimeout(200);
+      }
+      await osc(await cur());
       await page.waitForTimeout(150);
       await page.screenshot({ path: p("a-spielen-hoeren") });
-      await expect(page.getByTestId("panel")).toBeVisible();
+      await page.evaluate(() => (window as never as { __osc: { silence(): void } }).__osc.silence());
+      await page.waitForTimeout(700);
+      const t = await cur();
+      await osc(["g1", "d2", "a1"].find((x) => x !== t && Math.abs(note(x).midi - note(t).midi) > 2)!);
+      await expect(page.locator(".prac.band .q.warn")).toBeVisible({ timeout: 4000 });
+      await page.waitForTimeout(500);
       await page.screenshot({ path: p("b-spielen-falsch") });
       await page.goto("./");
       await menuTo(page, "Stimmgerät");
@@ -220,42 +232,7 @@ for (const s of SIZES) {
       await tap("g1");
       await tap("a1");
       await page.screenshot({ path: p("t11-griffbilder-mitten") });
-      // Spielen
-      await page.goto("./");
-      await page.evaluate(() => ((window as never as { __folgen: string[][] }).__folgen = [["g1", "a1", "g1", "h1", "c2"]]));
-      await page.getByRole("button", { name: /Weiter spielen/ }).click();
-      await page.waitForFunction(() => (window as never as { __osc: unknown }).__osc !== null);
-      const osc = (id: string | null) =>
-        page.evaluate((f) => {
-          const o = (window as never as { __osc: { play(f: number): void; silence(): void } }).__osc;
-          if (f === null) o.silence();
-          else o.play(f);
-        }, id ? soundingFreq(note(id)) : null);
-      const first = await info(page);
-      await page.waitForTimeout(450);
-      await osc(first.note);
-      await expect(page.locator("main.ok")).toBeVisible();
-      await osc(null);
-      await next(page);
-      for (const id of ["g1", "a1"]) {
-        await page.waitForTimeout(150);
-        await osc(id);
-        await page.waitForTimeout(650);
-        await osc(null);
-      }
-      await page.waitForTimeout(150);
-      await osc("d2"); // falsch
-      await page.waitForTimeout(900);
-      await page.screenshot({ path: p("t6-spielen-mitten") });
-      await osc(null);
-      for (const id of ["g1", "h1", "c2"]) {
-        await page.waitForTimeout(150);
-        await osc(id);
-        await page.waitForTimeout(650);
-        await osc(null);
-      }
-      await expect(page.getByTestId("panel")).toBeVisible();
-      await page.screenshot({ path: p("t7-spielen-ende") });
+      // (Spielen ist seit 19.11.2026 das Notenband: Bildschirmfotos in „Spielen und Stimmgerät“)
     });
     test("Lieder", async ({ page }) => {
       await page.addInitScript(FAKE_AUDIO);

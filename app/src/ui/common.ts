@@ -1,5 +1,6 @@
 // Gemeinsame Bausteine der Oberfläche.
 
+import type { BandResult, BandSession } from "../srs/band";
 import type { Session, SessionResult } from "../srs/session";
 import type { AppData } from "../store/data";
 
@@ -9,7 +10,9 @@ export interface Ctx {
   go(hash: string): void;
   today(): string;
   session: Session | null;
-  lastResult: SessionResult | null;
+  /** Spielen: laufendes Notenband (docs/app-notenband.md) */
+  band: BandSession | null;
+  lastResult: SessionResult | BandResult | null;
   /** Vom Stimmgerät/Spielen: Mikrofon-Fehler für die Hilfeseite */
   micError: string | null;
   /** Wohin nach erteilter Mikrofon-Erlaubnis */

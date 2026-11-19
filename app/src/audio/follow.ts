@@ -545,12 +545,19 @@ export class WaitFollower {
     return summarize(this.tl, this.results);
   }
 
-  private hit(t: number): void {
-    const result: WaitNoteResult = this.wrongMidi === null ? { ok: true } : { ok: false, wrongMidi: this.wrongMidi };
+  /** Aktuelle Note überspringen (Notenband, „Überspringen“): zählt als falsch, weiter zur nächsten */
+  skip(t: number): void {
+    if (this.done) return;
+    this.hit(t, true);
+  }
+
+  private hit(t: number, skipped = false): void {
+    const result: WaitNoteResult =
+      this.wrongMidi === null ? (skipped ? { ok: false } : { ok: true }) : { ok: false, wrongMidi: this.wrongMidi };
     if (this.cents.length) result.cents = Math.round(this.cents.reduce((a, b) => a + b, 0) / this.cents.length);
     const i = this.index;
     this.results[i] = result;
-    this.lastTarget = this.tl.tones[i].midi;
+    this.lastTarget = skipped ? null : this.tl.tones[i].midi;
     this.armedAt = t;
     this.inTolStart = null;
     this.wrongMidi = null;

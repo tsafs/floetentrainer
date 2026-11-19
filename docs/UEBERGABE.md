@@ -181,3 +181,9 @@ Silben, Atemzeichen, Seitenumbrüche.
      der Notensatz der Lieder ist unverändert.
    - Tests `app/tests/e2e/tonleiter.spec.ts`; Bildschirmfoto `*-8-ton.png`.
    - Offen: Ob der Notensatz der Lieder die leiseren Linien und den Schlüssel übernehmen soll.
+8. **Notenband beim Spielen und längere Tonfolgen beim Lesen** (19.11.2026, `docs/app-notenband.md`): Spielen
+   ist jetzt ein durchlaufendes Notenband (erzeugte Abschnitte mit Notenwerten, Stufenlied-Stücke mit Übergang,
+   ein Wechsel), das auf jeden Ton wartet; Ende nach `settings.bandMinutes` (3) oder `settings.bandNotes` (50).
+   Lesen-Folgen beginnen mit 4 und werden bis 8 lang. Wo was liegt und Tests: Ende von `docs/app-notenband.md`.
+   Offen: Rückmeldung der Nutzerin am Gerät (Tempo des Gleitens, wie viele Noten sichtbar, Anteil Liedstücke),
+   tote Spielen-Teile in `session.ts`/`practice.ts` aufräumen, später Band im Tempo.

@@ -737,13 +737,15 @@ describe("Tonfolgen", () => {
     const lens: number[] = [];
     for (let st = s.next(); st; st = s.next()) {
       if (st.type === "folge") {
-        if (!st.retry) lens.push(st.folge.notes.length);
+        // Griffbilder → Namen: höchstens 5, darum hier nur die übrigen Arten
+        if (!st.retry && st.folge.kind !== "note") lens.push(st.folge.notes.length);
         s.answerFolge(st.folge.notes.map(() => true));
       } else if (st.type === "card") s.answer(true);
     }
-    expect(lens[0]).toBe(3);
-    expect(lens[2]).toBe(4);
-    expect(Math.max(...lens)).toBe(5);
+    // Lesen beginnt mit 4 und wird bis 8 lang (docs/app-notenband.md)
+    expect(lens[0]).toBe(4);
+    expect(Math.max(...lens)).toBe(8);
+    expect(lens.every((l, i) => i === 0 || l >= lens[i - 1])).toBe(true);
   });
   it("keine Folge zweimal in einer Sitzung", () => {
     const s = mkSession(onlyExtras(), "lesen", { limitCards: 40 });
