@@ -30,13 +30,14 @@ import {
   restGlyph,
   textWidth,
   timeSigWidth,
+  type BandOptions,
   type BarLayout,
   type KeySwitch,
   type ScoreLayout,
   type SystemLayout,
 } from "./layout";
 
-export { layoutScore } from "./layout";
+export { layoutScore, type BandOptions } from "./layout";
 
 const LINE_W = 0.13;
 const STEM_W = 0.12;
@@ -99,13 +100,15 @@ export interface EngravedScore {
 }
 
 /** Notenbild eines Lieds als SVG-Zeichenketten, eine je Zeile. width = verfügbare Breite in CSS-Pixeln. */
-export function engraveScore(song: Song, opts: { width: number; sp?: number }): EngravedScore {
+export function engraveScore(song: Song, opts: { width: number; sp?: number; band?: BandOptions }): EngravedScore {
   const L = layoutScore(song, opts);
   const { metrics: M, systems, stems } = L;
   const W = L.width;
+  const band = opts.band;
   const out: string[][] = systems.map(() => []);
-  const top = systems.map(() => -4);
-  const bottom = systems.map(() => 0);
+  // Notenband: feste senkrechte Ausdehnung (yTop = top, Unterkante der Noten = bottom)
+  const top = systems.map(() => (band ? band.top + 0.6 : -4));
+  const bottom = systems.map(() => (band ? band.bottom : 0));
   const ext = (k: number, y0: number, y1: number) => {
     top[k] = Math.min(top[k], y0);
     bottom[k] = Math.max(bottom[k], y1);
@@ -124,10 +127,13 @@ export function engraveScore(song: Song, opts: { width: number; sp?: number }): 
   systems.forEach((sy, k) => {
     const o = out[k];
     const right = sy.justified ? W - BAR_W / 2 : sy.right;
-    for (let i = 0; i < 5; i++) o.push(line(0, -i, sy.justified ? W : right + BAR_W / 2, -i, LINE_W, "sl"));
-    ext(k, -5.4, 0); // Schlüssel oben (unten reicht er nicht bis unter den Text)
-    o.push(glyph(GLYPHS.clef, CLEF_X, -1));
-    o.push(keySig(sy.key.signature, sy.keyX));
+    // Notenband: Linien, Schlüssel und Vorzeichnung zeichnet die Oberfläche (feststehend)
+    if (!band) {
+      for (let i = 0; i < 5; i++) o.push(line(0, -i, sy.justified ? W : right + BAR_W / 2, -i, LINE_W, "sl"));
+      ext(k, -5.4, 0); // Schlüssel oben (unten reicht er nicht bis unter den Text)
+      o.push(glyph(GLYPHS.clef, CLEF_X, -1));
+      o.push(keySig(sy.key.signature, sy.keyX));
+    }
     if (sy.time) o.push(timeSig(sy.time.num, sy.time.den, sy.timeX + 0.1));
     if (k > 0) {
       const no = sy.bars[0].index + 1;
@@ -638,7 +644,7 @@ export interface Score {
  * aufrufen und das alte Element ersetzen. Ereignisse behandelt die Oberfläche selbst (z. B. Klick auf
  * [data-bar] im Element el).
  */
-export function renderScore(song: Song, opts: { width: number; sp?: number }): Score {
+export function renderScore(song: Song, opts: { width: number; sp?: number; band?: BandOptions }): Score {
   const eng = engraveScore(song, opts);
   const el = document.createElement("div");
   el.className = "score";

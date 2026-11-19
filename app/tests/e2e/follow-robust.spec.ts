@@ -186,7 +186,7 @@ test("Diagnose: nach einem Durchgang „Diagnose speichern“ – JSON mit Kopf,
   expect(dl.suggestedFilename()).toMatch(/^floetentrainer-diagnose-\d{4}-\d{2}-\d{2}-\d{4}\.json$/);
   const f = JSON.parse(readFileSync((await dl.path())!, "utf8"));
   expect(f.info).toContain("kein Ton und keine Aufnahme");
-  expect(f).toMatchObject({ format: 1, kind: "warten" });
+  expect(f).toMatchObject({ format: 2, kind: "warten" });
   expect(f.meta).toMatchObject({ songId: SONG, tuningHz: 440, tuningKnown: false, headphones: false, latencyMs: 120, latencyCalibrated: false });
   expect(f.meta.flute).toMatchObject({ name: "Meine Flöte" });
   expect(f.meta.tones.map((t: { midi: number }) => t.midi)).toEqual(MELODY);
@@ -287,4 +287,45 @@ test("Stimmgerät: Abweichung zum Stimmton der Flöte, dazu klein der Wert des T
   await page.evaluate((f) => (window as unknown as { __osc: { play(f: number): void } }).__osc.play(f), hz(71));
   await expect(page.getByTestId("tuner-name")).toHaveText("h1");
   await expect(page.getByTestId("tuner-flute")).toHaveText("");
+});
+
+test("Testboard: aus den Einstellungen erreichbar; Mitspielen einer Folge, Diagnose enthält den Ton", async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.addInitScript(FAKE_AUDIO);
+  await page.addInitScript(FAKE_MIC);
+  await seed(page, data());
+  await page.goto("./#/einstellungen");
+  await page.getByTestId("testboard-link").click();
+  await expect(page.getByRole("heading", { name: "Testboard" })).toBeVisible();
+  await expect(page.getByTestId("testboard-audio")).toContainText("auch den Ton auf");
+  await page.getByRole("link", { name: /Test 6 · Schneller Wechsel/ }).click();
+  await expect(page.locator(".score svg.sys").first()).toBeVisible();
+  await expect(page.locator(".songhead .iconbtn")).toHaveAttribute("href", "#/testboard");
+  await start(page, "Wartet auf mich");
+  const tones = (await dbg(page)).timeline!.tones;
+  expect(tones.length).toBe(26);
+  const now = await page.evaluate(() => performance.now());
+  const list: [number, number | null][] = [];
+  let t = now + 150;
+  for (const n of tones) {
+    list.push([t, hz(n.midi)], [t + 220, null]);
+    t += 280;
+  }
+  await schedule(page, list);
+  await finished(page, 20000);
+  const [dl] = await Promise.all([page.waitForEvent("download"), page.getByTestId("diag").click()]);
+  const f = JSON.parse(readFileSync((await dl.path())!, "utf8"));
+  // zum Ausprobieren des Nachrechnens (tests/unit/replay.test.ts): SAVE_DIAG=<pfad>
+  if (process.env.SAVE_DIAG) await dl.saveAs(process.env.SAVE_DIAG);
+  expect(f.info).toContain("auch der Ton enthalten");
+  expect(f.meta.audio).toBe(true);
+  expect(f.meta.mic.worklet).toBe(true);
+  expect(f.audio).toMatchObject({ encoding: "pcm16le-base64" });
+  expect(f.audio.sampleRate).toBeGreaterThan(0);
+  // etwa die Spieldauer (26 × 280 ms) und mehr
+  expect(f.audio.samples / f.audio.sampleRate).toBeGreaterThan(7);
+  expect(f.events.filter((e: { type: string; ok?: boolean }) => e.type === "note" && e.ok).length).toBe(26);
+  // feine Messungen: etwa alle 5 ms
+  const ts = f.frames.slice(100, 200).map((x: { t: number }) => x.t);
+  expect((ts[ts.length - 1] - ts[0]) / (ts.length - 1)).toBeLessThan(7);
 });

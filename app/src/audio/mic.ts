@@ -1,6 +1,20 @@
-// Mikrofon und Tonhöhenerkennung (pitchy). Ein Mikrofon für die ganze App.
+// Mikrofon und Tonhöhenerkennung (pitchy bzw. ./mpm.ts). Ein Mikrofon für die ganze App.
+//
+// Seit dem 19.11.2026 misst ein AudioWorklet (./capture-worklet.ts) im Audio-Thread, lückenlos und mit
+// der Zeit jedes Samples, in zwei Takten (./analyze.ts):
+// - listen(): alle 25 ms wie bisher (Stimmgerät, Üben, Hören, Flöte einstellen, Bereit-Erkennung);
+// - listenFine(): alle 256 Samples (≈ 5,3 ms) samt NSDF-Ausschnitt, fürs Mitspielen und den Abgleich der
+//   Verzögerung.
+// Ohne AudioWorklet (sehr alte Browser) bleibt es beim früheren Weg (setInterval + AnalyserNode); dann
+// bekommt listenFine() dieselben 25-ms-Frames.
+//
+// Zeit der Frames: performance.now()-Uhr wie bisher. Das Worklet zählt Samples; die Seite rechnet die
+// Sample-Nummer mit dem kleinsten bisher gesehenen Abstand „Ankunft − Sample-Zeit“ um (verspätet
+// zugestellte Nachrichten verschieben so nichts), mit langsamem Nachführen gegen Uhrendrift.
 
 import { PitchDetector } from "pitchy";
+import workletUrl from "./capture-worklet.ts?worker&url";
+import { FINE_HOP, type RawMeasure } from "./analyze";
 import type { Frame } from "./judge";
 
 /**
@@ -26,8 +40,29 @@ type Listener = (f: Frame) => void;
 
 export type MicError = "denied" | "unsupported" | "other";
 
+/** Rohe Aufnahme (nur Testboard): Samples und Zeit des ersten Samples (performance.now-Uhr) */
+export interface Recording {
+  sampleRate: number;
+  t0: number;
+  samples: Float32Array;
+}
+
+/** höchstens so lange wird aufgenommen (≈ 23 MB bei 48 kHz) */
+const MAX_REC_SEC = 120;
+
 class Mic {
   private ctx: AudioContext | null = null;
+  private node: AudioWorkletNode | null = null;
+  private sink: GainNode | null = null;
+  private fineListeners = new Set<Listener>();
+  /** Abstand performance.now() − Sample-Zeit (ms), siehe Kopfkommentar */
+  private offset: number | null = null;
+  private lastMsg = 0;
+  private rec: { chunks: Float32Array[]; n: number; start: number | null } | null = null;
+  /** Messtakt von listenFine() in ms */
+  fineMs = 25;
+  /** misst das AudioWorklet (sonst der frühere Weg)? */
+  worklet = false;
   private stream: MediaStream | null = null;
   private analyser: AnalyserNode | null = null;
   private detector: PitchDetector<Float32Array> | null = null;
@@ -91,9 +126,15 @@ class Mic {
       this.stream = stream;
       const ctx = this.ctx!;
       const src = ctx.createMediaStreamSource(this.stream);
+      if (await this.startWorklet(ctx, src)) {
+        // läuft: running prüft timer; hier ein Platzhalter, damit stop() und running gleich bleiben
+        this.timer = window.setInterval(() => this.watch(), 1000);
+        return;
+      }
       this.analyser = ctx.createAnalyser();
       src.connect(this.analyser);
       this.setWindow(this.size);
+      this.fineMs = INTERVAL_MS;
       this.timer = window.setInterval(() => this.tick(), INTERVAL_MS);
     })().finally(() => {
       this.starting = null;
@@ -125,7 +166,109 @@ class Mic {
     this.stream?.getTracks().forEach((t) => t.stop());
     this.stream = null;
     this.analyser = null;
+    this.node?.disconnect();
+    this.node = null;
+    this.sink?.disconnect();
+    this.sink = null;
+    this.worklet = false;
+    this.rec = null;
     this.ctx?.suspend().catch(() => {});
+  }
+
+  /** Worklet anlegen; false, wenn es nicht geht (dann der frühere Weg) */
+  private async startWorklet(ctx: AudioContext, src: MediaStreamAudioSourceNode): Promise<boolean> {
+    if (!ctx.audioWorklet || typeof AudioWorkletNode === "undefined" || (window as unknown as { __noWorklet?: boolean }).__noWorklet) return false;
+    try {
+      await ctx.audioWorklet.addModule(workletUrl);
+      if (!this.wanted || this.stream === null) return false;
+      const node = new AudioWorkletNode(ctx, "floete-capture", { numberOfInputs: 1, numberOfOutputs: 1, channelCount: 1, channelCountMode: "explicit" });
+      node.port.onmessage = (e) => this.onMessage(e.data);
+      src.connect(node);
+      // ohne Verbindung zum Ausgang rechnen manche Browser den Knoten nicht; stumm angeschlossen
+      const sink = ctx.createGain();
+      sink.gain.value = 0;
+      node.connect(sink).connect(ctx.destination);
+      this.node = node;
+      this.sink = sink;
+      this.offset = null;
+      this.worklet = true;
+      this.fineMs = (FINE_HOP / ctx.sampleRate) * 1000;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Worklet-Nachricht: Uhr nachführen, Frames verteilen, Aufnahme sammeln */
+  private onMessage(d: { fine: RawMeasure[]; coarse: RawMeasure[]; end: number; sr: number; audio?: Float32Array; audioStart?: number }): void {
+    const now = performance.now();
+    const cand = now - (d.end / d.sr) * 1000;
+    // kleinster Abstand; langsam (1 ms je Sekunde) nachgeben, falls die Uhren auseinanderlaufen
+    if (this.offset === null) this.offset = cand;
+    else this.offset = Math.min(cand, this.offset + (now - this.lastMsg) * 0.001);
+    this.lastMsg = now;
+    const at = (end: number) => this.offset! + (end / d.sr) * 1000;
+    const frame = (m: RawMeasure, fine: boolean): Frame => {
+      const t = at(m.end);
+      if (!(m.freq > 0)) return { t, freq: null, clarity: 0, rms: m.rms };
+      const f: Frame = { t, freq: m.freq, clarity: m.clarity, rms: m.rms };
+      if (fine && m.nsdf) {
+        f.nsdf = m.nsdf;
+        f.lag0 = m.lag0;
+        f.sr = d.sr;
+      }
+      return f;
+    };
+    for (const m of d.coarse) {
+      const f = frame(m, false);
+      for (const l of this.listeners) l(f);
+    }
+    for (const m of d.fine) {
+      const f = frame(m, true);
+      for (const l of this.fineListeners) l(f);
+    }
+    if (d.audio && this.rec) {
+      this.rec.start ??= at(d.audioStart ?? 0);
+      if (this.rec.n < MAX_REC_SEC * d.sr) {
+        this.rec.chunks.push(d.audio);
+        this.rec.n += d.audio.length;
+      }
+    }
+  }
+
+  /** Läuft das Worklet noch? (Kontext von Android angehalten: fortsetzen) */
+  private watch(): void {
+    if (this.ctx?.state === "suspended" && this.wanted) this.ctx.resume().catch(() => {});
+  }
+
+  /** Feine Messungen (≈ 5 ms, ohne Worklet 25 ms) */
+  listenFine(fn: Listener): () => void {
+    this.fineListeners.add(fn);
+    return () => this.fineListeners.delete(fn);
+  }
+
+  /** Rohe Aufnahme beginnen (nur mit Worklet; Testboard). false, wenn nicht möglich. */
+  startRecording(): boolean {
+    if (!this.node) return false;
+    this.rec = { chunks: [], n: 0, start: null };
+    this.node.port.postMessage({ type: "record", on: true });
+    return true;
+  }
+
+  /** Aufnahme beenden und zurückgeben (null ohne Aufnahme) */
+  stopRecording(): Recording | null {
+    const r = this.rec;
+    this.rec = null;
+    this.node?.port.postMessage({ type: "record", on: false });
+    if (!r || !this.ctx || r.start === null) return null;
+    const samples = new Float32Array(r.n);
+    let o = 0;
+    for (const c of r.chunks) {
+      samples.set(c.subarray(0, Math.min(c.length, r.n - o)), o);
+      o += c.length;
+      if (o >= r.n) break;
+    }
+    return { sampleRate: this.ctx.sampleRate, t0: r.start, samples };
   }
 
   /**
@@ -147,7 +290,7 @@ class Mic {
    */
   info(): Record<string, unknown> {
     const track = this.stream?.getAudioTracks()[0];
-    const out: Record<string, unknown> = { windowSamples: this.size, intervalMs: INTERVAL_MS, minRms: MIN_RMS };
+    const out: Record<string, unknown> = { windowSamples: this.size, intervalMs: INTERVAL_MS, minRms: MIN_RMS, worklet: this.worklet, fineMs: this.fineMs };
     try {
       if (track) {
         out.trackSettings = track.getSettings();
@@ -177,6 +320,8 @@ class Mic {
 
   private tick(): void {
     if (!this.analyser || !this.detector || !this.ctx) return;
+    // ohne Worklet: dieselben Frames für beide Takte
+    const fine = this.fineListeners;
     this.analyser.getFloatTimeDomainData(this.buf);
     let sum = 0;
     for (let i = 0; i < this.buf.length; i++) sum += this.buf[i] * this.buf[i];
@@ -188,6 +333,7 @@ class Mic {
       if (pitch > 0) frame = { t, freq: pitch, clarity, rms };
     }
     for (const l of this.listeners) l(frame);
+    for (const l of fine) l(frame);
   }
 }
 

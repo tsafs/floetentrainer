@@ -25,6 +25,7 @@ import { nameHtml } from "../music/names";
 import { renderScore, type Score } from "../songs/engrave";
 import { chapters, SONGS, songById } from "../songs/library";
 import { ownEntries, ownEntryById } from "../songs/own";
+import { testSongById } from "../songs/testboard";
 import type { NoteEvent, Song, TimeSig } from "../songs/model";
 import { missingHtml, playabilityFor } from "../songs/playable";
 import { baseTempo, clampPercent, secPerQuarter, TEMPO_MAX, TEMPO_MIN } from "../songs/tempo";
@@ -297,8 +298,9 @@ type SongMode = "listen" | "follow";
 
 export const songView: View = (root, ctx) => {
   const id = decodeURIComponent(location.hash.replace(/^#\/?lied\/?/, "").split("?")[0]);
-  const ownEntry = songById(id) ? undefined : ownEntryById(ctx.data, id);
-  const found = songById(id) ?? ownEntry?.song;
+  const test = testSongById(id);
+  const ownEntry = songById(id) || test ? undefined : ownEntryById(ctx.data, id);
+  const found = songById(id) ?? test ?? ownEntry?.song;
   if (ownEntry && !ownEntry.song) {
     brokenSongPage(root, ctx, ownEntry);
     return;
@@ -317,7 +319,7 @@ export const songView: View = (root, ctx) => {
   root.innerHTML = `
 <main class="screen songpage" data-song="${song.id}" data-mode="listen">
   <header class="topbar songhead">
-    <a class="iconbtn" href="#/lieder" aria-label="Zurück">${ICON_BACK}</a>
+    <a class="iconbtn" href="${test ? "#/testboard" : "#/lieder"}" aria-label="Zurück">${ICON_BACK}</a>
     <div class="ttl">
       <h1>${esc(song.title)}</h1>
       <p class="meta">${song.subtitle ? `${esc(song.subtitle)} · ` : ""}${esc(song.keyName)} · ${timeHtml(song.time)} · <span class="nb">Grundtempo ${tempoMark(song, 100)}</span></p>

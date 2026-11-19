@@ -1,9 +1,9 @@
-// Tonfolgen in den Sitzungen (docs/app-tonfolgen.md): Lesen durchtippen, Spielen mit der Mikrofon-Attrappe.
+// Tonfolgen in den Sitzungen (docs/app-tonfolgen.md): Lesen durchtippen. (Spielen ist das Notenband: band.spec.ts)
 import { expect, test, type Page } from "@playwright/test";
-import { note, soundingFreq } from "../../src/music/notes";
+import { note } from "../../src/music/notes";
 import { dayKey } from "../../src/store/dates";
 import { sampleData } from "./seed";
-import { answer, FAKE_MIC, info, next, seed, stored, waitNext } from "./util";
+import { answer, info, next, seed, stored, waitNext } from "./util";
 
 /** Beispieldaten, in denen nichts fällig und nichts neu ist: Sitzung nur aus Zusatzkarten („Weiter üben“) */
 function extrasOnly() {
@@ -274,126 +274,6 @@ test.describe("Lesen", () => {
     expect(after).toEqual(staff);
     // kein Scrollen
     expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight + 1)).toBe(true);
-  });
-});
-
-test.describe("Spielen", () => {
-  async function setup(page: Page, folgen: unknown[]) {
-    await page.addInitScript(FAKE_MIC);
-    await seed(page, extrasOnly());
-    await page.addInitScript((f) => ((window as never as { __folgen: unknown[] }).__folgen = f), folgen);
-    await page.goto("./");
-    await page.getByRole("button", { name: /Weiter spielen/ }).click();
-    await page.waitForFunction(() => (window as never as { __osc: unknown }).__osc !== null);
-  }
-  const playNow = (page: Page, id: string) =>
-    page.evaluate((f) => (window as never as { __osc: { play(f: number): void } }).__osc.play(f), soundingFreq(note(id)));
-  /** Töne der Reihe nach, je 600 ms mit 100 ms Absetzen (neuer Einsatz auch bei Tonwiederholung) */
-  async function playSeq(page: Page, ids: (string | null)[]) {
-    const list: [number, number | null][] = [];
-    const t0 = await page.evaluate(() => performance.now() + 100);
-    ids.forEach((id, k) => {
-      list.push([t0 + k * 700, id ? soundingFreq(note(id)) : null]);
-      list.push([t0 + k * 700 + 600, null]);
-    });
-    await page.evaluate((l) => (window as never as { __osc: { schedule(l: [number, number | null][]): void } }).__osc.schedule(l), list);
-    return t0 + ids.length * 700;
-  }
-  /** Spielen-Karte vorn (fällig ist nichts, die erste ist eine Zusatzkarte) richtig spielen */
-  async function toFolge(page: Page) {
-    for (let k = 0; k < 4; k++) {
-      const i = await info(page);
-      if (i.step === "folge") return i;
-      await page.waitForTimeout(450);
-      await playNow(page, i.note);
-      await expect(page.locator(`main[data-seq="${i.seq}"]`)).toHaveClass(/\bok\b/);
-      await page.evaluate(() => (window as never as { __osc: { silence(): void } }).__osc.silence());
-      await page.locator(`main[data-seq="${i.seq}"] .bar`).click();
-      await waitNext(page, i.seq);
-    }
-    throw new Error("keine Tonfolge");
-  }
-
-  test("Folge richtig gespielt (ein Ton kommt wieder), „Anhören“", async ({ page }) => {
-    await setup(page, [["g1", "a1", "g1", "h1"]]);
-    const s = await toFolge(page);
-    const m = folge(page);
-    await expect(m.locator(".q")).toHaveText("Spiel diese Töne nacheinander.");
-    await expect(m.locator(".listen")).toBeVisible();
-    await page.waitForTimeout(300);
-    // erst nur zwei Töne: die Markierung steht auf der dritten
-    await playSeq(page, ["g1", "a1"]);
-    await expect(m.locator(".sn.hit")).toHaveCount(2);
-    await page.waitForTimeout(600);
-    await expect(m.locator(".sn.cur")).toHaveAttribute("data-i", "2");
-    await playSeq(page, ["g1", "h1"]);
-    await expect(page.getByTestId("panel")).toContainText("Richtig");
-    await expect(m.locator(".sn.hit")).toHaveCount(4);
-    const d = await stored(page);
-    expect(d.history.spielen.a1.at(-1)[0]).toBe(1);
-    expect(d.history.spielen.h1.at(-1)[0]).toBe(1);
-    // „Anhören“ hält das automatische Weitergehen an
-    await m.getByRole("button", { name: "Anhören" }).click();
-    await page.waitForTimeout(2500);
-    await expect(page.locator(`main[data-seq="${s.seq}"]`)).toHaveCount(1);
-  });
-
-  test("Wechsel-Drill: eigene Frage, Griffwechsel werden gemerkt", async ({ page }) => {
-    await setup(page, [{ kind: "spiel", drill: true, notes: ["h1", "c2", "h1", "c2", "h1", "c2"] }]);
-    await toFolge(page);
-    const m = folge(page);
-    await expect(m).toHaveAttribute("data-drill", "true");
-    await expect(m.locator(".q")).toHaveText("Wechsle ruhig hin und her.");
-    await expect(m.locator(".sn")).toHaveCount(6);
-    await page.waitForTimeout(300);
-    await playSeq(page, ["h1", "c2", "h1", "c2", "h1", "c2"]);
-    await expect(page.getByTestId("panel")).toContainText("Richtig");
-    const d = await stored(page);
-    expect(d.pairs["h1-c2"]).toEqual([1, 1, 1, 1, 1]);
-  });
-
-  test("Abschnitt eines Stufenlieds: Notenbild mit Rhythmus, Tonwiederholungen, alle Noten grün", async ({ page }) => {
-    // Hänschen klein, Takt 1–2: d² h¹ h¹ | c² a¹ a¹
-    await setup(page, [{ kind: "spiel", song: "Hänschen klein", songId: "haenschen-klein", bars: [0, 1], notes: ["d2", "h1", "h1", "c2", "a1", "a1"] }]);
-    await toFolge(page);
-    const m = folge(page);
-    await expect(m).toHaveAttribute("data-song", "Hänschen klein");
-    await expect(m.locator(".q")).toHaveText("Aus „Hänschen klein“ – spiel diese Töne.");
-    await expect(m.locator(".snip .score svg.sys")).toHaveCount(1);
-    await expect(m.locator(".snip g.n")).toHaveCount(6);
-    await expect(m.locator(".snip g.n.cur")).toHaveCount(1);
-    if (process.env.SHOTS) await page.screenshot({ path: "shots/abschnitt.png" });
-    await page.waitForTimeout(300);
-    await playSeq(page, ["d2", "h1", "h1", "c2", "a1", "a1"]);
-    await expect(page.getByTestId("panel")).toContainText("Richtig", { timeout: 8000 });
-    await expect(m.locator(".snip g.n.hit")).toHaveCount(6);
-  });
-
-  test("Folge mit Halbtonschritt und falschem Ton: Note rot, wartet weiter auf den richtigen", async ({ page }) => {
-    await setup(page, [["a1", "h1", "c2"]]);
-    await toFolge(page);
-    const m = folge(page);
-    await page.waitForTimeout(300);
-    await playSeq(page, ["a1"]);
-    await expect(m.locator(".sn.hit")).toHaveCount(1);
-    await page.waitForTimeout(500);
-    // statt h¹ ein deutlich falscher Ton, lange gehalten
-    await playNow(page, "d1");
-    await expect(m.locator('.sn[data-i="1"]')).toHaveClass(/miss/);
-    await expect(m.locator(".q")).toContainText("Du spielst d1");
-    await expect(m.locator(".sn.cur")).toHaveAttribute("data-i", "1");
-    await page.evaluate(() => (window as never as { __osc: { silence(): void } }).__osc.silence());
-    await page.waitForTimeout(150);
-    await playSeq(page, ["h1", "c2"]);
-    await expect(page.getByTestId("panel")).toContainText("Nicht ganz");
-    await expect(m.locator('.sn[data-i="1"] .sl')).toHaveText("d1"); // der falsch gespielte Ton
-    await expect(page.getByTestId("panel")).toContainText("a1 h1 c2");
-    await expect(m.locator('.sn[data-i="2"]')).toHaveClass(/hit/);
-    await expect(m.getByRole("button", { name: "Anhören" })).toBeVisible();
-    const d = await stored(page);
-    expect(d.history.spielen.h1.at(-1)[0]).toBe(0);
-    expect(d.history.spielen.a1.at(-1)[0]).toBe(1);
-    expect(d.history.spielen.c2.at(-1)[0]).toBe(1);
   });
 });
 

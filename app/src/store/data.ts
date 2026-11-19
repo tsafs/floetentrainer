@@ -18,6 +18,10 @@ export const THEMES: Theme[] = ["auto", "light", "dark"];
 export interface Settings {
   sessionMinutes: number;
   sessionCards: number;
+  /** Notenband beim Spielen (docs/app-notenband.md): endet nach dieser Zeit … */
+  bandMinutes: number;
+  /** … oder nach so vielen Tönen (am Ende des Abschnitts) */
+  bandNotes: number;
   toleranceCents: number;
   holdMs: number;
   // (Bis 14.11.2026 stand hier der Stimmton für alle Flöten, tuningHz. Er gehört jetzt zur Flöte,
@@ -201,6 +205,8 @@ export interface AppData {
 export const DEFAULT_SETTINGS: Settings = {
   sessionMinutes: 5,
   sessionCards: 20,
+  bandMinutes: 3,
+  bandNotes: 50,
   toleranceCents: 40,
   holdMs: 300,
   theme: "auto",
@@ -212,6 +218,8 @@ export const DEFAULT_SETTINGS: Settings = {
 export const SETTING_LIMITS: Record<NumSetting, [number, number]> = {
   sessionMinutes: [1, 30],
   sessionCards: [5, 60],
+  bandMinutes: [1, 15],
+  bandNotes: [20, 200],
   toleranceCents: [10, 50],
   holdMs: [100, 1000],
 };

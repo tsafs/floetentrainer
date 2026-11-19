@@ -55,8 +55,8 @@ describe("Glätter", () => {
       DEFAULT_JUDGE.maxFreq,
     ]);
     expect(DEFAULT_JUDGE.medianFrames).toBe(5);
-    expect(DEFAULT_FOLLOW.medianFrames).toBe(3);
-    expect(DEFAULT_FOLLOW.tauMs).toBe(0);
+    // das Mitspielen nutzt seit dem 19.11.2026 den Lauf-Glätter (./run-smoother.test.ts)
+    expect(DEFAULT_FOLLOW.minRunMs).toBe(35);
   });
 
   it("Vibrato und Rauschen (±25 Cent): Anzeige deutlich ruhiger", () => {
@@ -95,7 +95,7 @@ describe("Glätter", () => {
   it("Tonwechsel wird schnell übernommen und bleibt an seiner Stelle", () => {
     const fs = [...held(G1, 0, 500), ...held(A1, 500, 1000)];
     // knapp: der erste a¹-Frame kommt 25 ms später heraus, mit seinem eigenen Zeitpunkt
-    const knapp = run(fs, DEFAULT_FOLLOW);
+    const knapp = run(fs, { medianFrames: 3 });
     const first = knapp.find((o) => Math.round(freqToWrittenMidi(o.f.freq!)) === A1)!;
     expect(first.f.t).toBe(500);
     expect(fs[first.at].t - 500).toBeLessThan(80);

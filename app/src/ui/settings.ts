@@ -47,8 +47,10 @@ const FIELDS: { title: string; fields: NumField[] }[] = [
   {
     title: "Sitzung",
     fields: [
-      { key: "sessionMinutes", label: "Länge", help: "endet nach dieser Zeit …", step: 1, fmt: (v) => `${v} Min.` },
+      { key: "sessionMinutes", label: "Länge", help: "Üben endet nach dieser Zeit …", step: 1, fmt: (v) => `${v} Min.` },
       { key: "sessionCards", label: "Karten", help: "… oder nach so vielen Karten", step: 5, fmt: (v) => `${v}` },
+      { key: "bandMinutes", label: "Notenband", help: "Spielen endet nach dieser Zeit …", step: 1, fmt: (v) => `${v} Min.` },
+      { key: "bandNotes", label: "Töne", help: "… oder nach so vielen Tönen", step: 10, fmt: (v) => `${v}` },
     ],
   },
   {
@@ -228,6 +230,7 @@ export const settingsView: View = (root, ctx) => {
         : "Ohne Kopfhörer bleibt beim Mitspielen die Melodie aus, sonst würde das Mikrofon das Handy mithören."
     }</small></span><button class="switch" role="switch" aria-checked="${s.headphones}" aria-labelledby="phones-lab" data-act="phones"><i></i></button></div>
     <p class="help" data-testid="latency-info">Verzögerung im Takt: ohne Kopfhörer ${latencyText(d, false)}, mit Kopfhörern ${latencyText(d, true)}. Abgleichen kannst du sie beim Mitspielen „Im Takt“; sie gilt nur für dieses Gerät.</p>
+    <p class="help"><a href="#/testboard" data-testid="testboard-link">Testboard: Erkennung prüfen</a> – kurze Tonfolgen zum Mitspielen, mit Diagnose samt Ton.</p>
   </section>
   <section><h2>Darstellung</h2>
     <div class="seg" role="group" aria-label="Darstellung">${THEME_OPTIONS.map(
@@ -483,5 +486,6 @@ export function replaceData(ctx: Ctx, data: ReturnType<typeof defaultData>): voi
   Object.assign(ctx.data, data);
   applyTheme(ctx.data.settings.theme);
   ctx.session = null;
+  ctx.band = null;
   ctx.save();
 }

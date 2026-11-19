@@ -23,12 +23,14 @@
 // Werte hat). Alles – Wertung, Klicks, mitklingende Melodie – gilt im Stimmton der aktiven Flöte. Im
 // Takt-Modus die Verzögerung
 // mit „abgleichen“ (Abgleich-Feld .fcal, ../audio/latency.ts; je Kopfhörer-Zustand ein Wert) und nach
-// einem Durchgang „Diagnose speichern“ (../audio/diagnose.ts: nur Messwerte, kein Ton).
+// einem Durchgang „Diagnose speichern“ (../audio/diagnose.ts: nur Messwerte, kein Ton – außer bei den
+// Folgen des Testboards, ../songs/testboard.ts: dort nimmt die App auch den Ton auf).
 // Mikrofon und AudioContext starten erst beim Tippen auf „Mitspielen“; nach dem Durchgang, beim Stopp,
 // beim Wechsel in den Hintergrund und beim Verlassen der Seite gehen Mikrofon und Klicks wieder aus.
 // Die Lernspuren bleiben unberührt; gespeichert werden nur Art, Kopfhörer und Tempo.
 
 import { diag, offerDiag } from "../audio/diagnose";
+import { isTestSong } from "../songs/testboard";
 import { LiveTuning } from "../audio/flute-profile";
 import { BeatFollower, DEFAULT_FOLLOW, followConfig, inputLatency, LATENCY_MAX, LATENCY_MIN, WaitFollower } from "../audio/follow";
 import { autoLatency, CAL_CLICKS, CAL_COUNT_IN, CAL_SPQ, DEFAULT_LATENCY, latencyFromOnsets, OnsetDetector, ReadyGate } from "../audio/latency";
@@ -416,6 +418,8 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
     if (diag.recording) {
       diag.end({ t: diag.rel(performance.now()), mic: mic.info(), tuning: r.tuning ? { ...r.tuning.values } : null });
     }
+    const rec = mic.stopRecording();
+    if (rec) diag.setAudio(rec);
     diagMsg = "";
     if (songPlayer.playing) songPlayer.stop();
     else songPlayer.idle();
@@ -518,6 +522,8 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
       screen: { w: screen.width, h: screen.height, dpr: devicePixelRatio },
     });
     diag.setMeta({ t0perf: t0 });
+    // Testboard: Ton mit aufnehmen (nur beim Mitspielen, nicht beim Abgleich)
+    if (kind !== "abgleich" && isTestSong(song.id)) diag.setMeta({ audio: mic.startRecording() });
   };
 
   const beginWait = (tl: Timeline, my: number) => {
@@ -530,7 +536,7 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
     };
     const tuning = startTuning(r);
     const w = new WaitFollower(tl, {
-      cfg: followConfig(settings, tuningHz(ctx.data)),
+      cfg: { ...followConfig(settings, tuningHz(ctx.data)), frameMs: mic.fineMs },
       tuning,
       onFrame: (j) => diag.judged(j),
       onNote: (i, nr) => {
@@ -577,7 +583,7 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
     const t0 = performance.now();
     w.arm(t0);
     beginDiag("warten", t0, tl, null);
-    r.unlisten = mic.listen((f) => {
+    r.unlisten = mic.listenFine((f) => {
       if (!ok()) return;
       diag.frame(f);
       w.push(f);
@@ -665,7 +671,7 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
     const b = new BeatFollower(tl, {
       secPerQuarter: spq,
       startMs,
-      cfg: followConfig(settings, tuningHz(ctx.data)),
+      cfg: { ...followConfig(settings, tuningHz(ctx.data)), frameMs: mic.fineMs },
       tuning,
       onFrame: (j) => diag.judged(j),
       onNote: (i, nr) => {
@@ -678,7 +684,7 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
     r.beat = b;
     r.startMs = startMs;
     beginDiag("takt", performance.now(), tl, { startMs, spq });
-    r.unlisten = mic.listen((f) => {
+    r.unlisten = mic.listenFine((f) => {
       if (!ok()) return;
       diag.frame(f);
       b.push(f);
@@ -818,11 +824,11 @@ export function mountFollow(main: HTMLElement, host: FollowHost): Follow {
       const ac = songPlayer.context!;
       const t0 = songPlayer.timelineStart!;
       c.clicks = Array.from({ length: CAL_CLICKS }, (_, k) => heardAt(ac, t0 + k * CAL_SPQ));
-      const det = new OnsetDetector(DEFAULT_LATENCY, { tuning: tuningHz(ctx.data) });
+      const det = new OnsetDetector(DEFAULT_LATENCY, { tuning: tuningHz(ctx.data), frameMs: mic.fineMs });
       c.det = det;
       beginDiag("abgleich", performance.now(), null, null);
       diag.setMeta({ clicks: c.clicks.map((x) => diag.rel(x)), which, spq: CAL_SPQ });
-      c.unlisten = mic.listen((f) => {
+      c.unlisten = mic.listenFine((f) => {
         if (my !== token || cal !== c) return;
         diag.frame(f);
         const n = det.onsets.length;

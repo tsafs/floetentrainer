@@ -22,10 +22,16 @@ export const FOLGE_MAX_DISTINCT = FOLGE_CHOICES - FOLGE_DECOYS;
 /** Griffbilder → Namen: höchstens so viele Griffbilder (passen bequem in eine Zeile) */
 export const FOLGE_MAX_GRIPS = 5;
 
-/** Längste Folge: 5, ab Stufe 8 der Spur 6. */
+/**
+ * Längste Folge beim Lesen: 6, ab Stufe 3 der Spur 8 (bis 19.11.2026: 5, ab Stufe 8 6 – „man kann beim Tippen
+ * prinzipiell längere Tonfolgen darstellen, damit es interessanter wird“, docs/app-notenband.md).
+ */
 export function folgeMaxLen(level: number): number {
-  return level >= 8 ? 6 : 5;
+  return level >= 3 ? 8 : 6;
 }
+
+/** Erste Länge der Folgen beim Lesen (bei genau 5 Tönen eins weniger oder so) */
+export const FOLGE_START_LEN = 4;
 
 /**
  * Töne für Tonfolgen in einer Spur: freigeschaltet *und* in dieser Spur schon vorgestellt, ohne andere
@@ -80,6 +86,17 @@ export interface FolgeOptions {
   must?: string;
   /** nur Schritte zum Nachbarton in der Tonhöhen-Reihe (Hören, zu Beginn) */
   stepsOnly?: boolean;
+  /**
+   * Notenband: der Ton davor. Der erste Ton schließt melodisch an (Schritt, Terz, selten ein Sprung) und ist
+   * nie derselbe (ersetzt avoidFirst).
+   */
+  from?: string;
+  /** Notenband: Der letzte Ton liegt nahe bei diesem (höchstens eine große Terz), ist aber nicht derselbe. */
+  toward?: string;
+  /** Notenband: möglichst auf einem dieser Töne enden (Grundakkord der Tonart) */
+  endOn?: string[];
+  /** Notenband: melodischer Verlauf (weniger Hin und Her, Läufe, Sprünge werden ausgeglichen) */
+  contour?: boolean;
 }
 
 export function folgeKey(notes: string[]): string {
@@ -95,16 +112,28 @@ function makeOne(pool: Note[], len: number, rng: Rng, opt: FolgeOptions): string
   // Von einem Ton aus weitergehen. Nie derselbe Ton zweimal direkt hintereinander (zu leicht); später in der
   // Folge darf er wiederkommen. Genug verschiedene Töne: nur noch schon benutzte (der vorige ist immer
   // erreichbar, also nie leer). Die Schrittgewichte sind symmetrisch, also gilt das auch rückwärts.
+  // Notenband (contour): melodischer – eher in derselben Richtung weiter, selten gleich wieder zurück zum
+  // Ton davor (sonst pendelt die Melodie e¹ f¹ e¹ f¹), nach einem Sprung eher zurück in die Gegenrichtung
+  const contour = (prev: number | undefined, cur: number, j: number) => {
+    if (!opt.contour || prev === undefined) return 1;
+    if (j === prev) return 0.25;
+    const d0 = cur - prev;
+    const d1 = j - cur;
+    if (Math.abs(d0) >= 2) return Math.sign(d0) !== Math.sign(d1) ? 1.6 : 0.6;
+    return Math.sign(d0) === Math.sign(d1) ? 1.5 : 1;
+  };
   const walk = (out: number[], from: number, steps: number, used: number[]) => {
     let cur = from;
+    let prev: number | undefined = out.length >= 2 ? out[out.length - 2] : undefined;
     for (let k = 0; k < steps; k++) {
       const full = opt.maxDistinct !== undefined && new Set([...used, ...out]).size >= opt.maxDistinct;
       const next = pickWeighted(
         idx.filter((j) => j !== cur && (!full || used.includes(j) || out.includes(j))),
-        (j) => (opt.stepsOnly && Math.abs(j - cur) !== 1 ? 0 : stepWeight(pool, cur, j) * wNote(pool[j])),
+        (j) => (opt.stepsOnly && Math.abs(j - cur) !== 1 ? 0 : stepWeight(pool, cur, j) * wNote(pool[j]) * contour(prev, cur, j)),
         rng,
       );
       if (next === null) break;
+      prev = cur;
       cur = next;
       out.push(cur);
     }
@@ -121,8 +150,12 @@ function makeOne(pool: Note[], len: number, rng: Rng, opt: FolgeOptions): string
       if (pool[out[0]].id !== opt.avoidFirst || tries === 9) return out.map((i) => pool[i].id);
     }
   }
-  const startFrom = idx.filter((i) => pool[i].id !== opt.avoidFirst);
-  const first = pickWeighted(startFrom.length ? startFrom : idx, (i) => wNote(pool[i]), rng)!;
+  const avoid = opt.from ?? opt.avoidFirst;
+  const startFrom = idx.filter((i) => pool[i].id !== avoid);
+  const fromAt = opt.from !== undefined ? nearestIndex(pool, opt.from) : -1;
+  const first =
+    (fromAt >= 0 ? pickWeighted(startFrom, (i) => stepWeight(pool, fromAt, i) * wNote(pool[i]), rng) : null) ??
+    pickWeighted(startFrom.length ? startFrom : idx, (i) => wNote(pool[i]), rng)!;
   return walk([first], first, len - 1, []).map((i) => pool[i].id);
 }
 
@@ -134,6 +167,7 @@ function makeOne(pool: Note[], len: number, rng: Rng, opt: FolgeOptions): string
  */
 export function makeFolge(poolIds: string[], len: number, rng: Rng, opt: FolgeOptions = {}): string[] {
   const pool = poolIds.map(note).sort((a, b) => a.midi - b.midi);
+  if (opt.toward !== undefined || opt.endOn || opt.from !== undefined || opt.contour) return makeBandFolge(pool, len, rng, opt);
   let f: string[] = [];
   let fallback: string[] | null = null;
   for (let k = 0; k < 30; k++) {
@@ -145,9 +179,45 @@ export function makeFolge(poolIds: string[], len: number, rng: Rng, opt: FolgeOp
   return fallback ?? f;
 }
 
+/** Index des Tons im Pool, sonst des nächstgelegenen (nach Tonhöhe) */
+function nearestIndex(pool: Note[], id: string): number {
+  const m = note(id).midi;
+  let best = -1;
+  for (let i = 0; i < pool.length; i++) if (best < 0 || Math.abs(pool[i].midi - m) < Math.abs(pool[best].midi - m)) best = i;
+  return best;
+}
+
+/** Notenband: Ziel nah genug (höchstens große Terz), aber nicht derselbe Ton */
+export const nearTo = (a: string, b: string) => a !== b && Math.abs(note(a).midi - note(b).midi) <= DRILL_MAX_SEMIS;
+
 /**
- * Länge der Folgen innerhalb einer Sitzung (wird nicht gespeichert): Beginn mit 3 (bei genau 5 Tönen 2
- * oder 3), nach zwei fehlerfreien Folgen in Reihe +1, nach einer fehlerhaften −1; 2 bis folgeMaxLen.
+ * Folge fürs Notenband: wie makeFolge, dazu Anschluss an den Ton davor (from), Übergang zum nächsten
+ * (toward, fast immer erfüllt) und Schlusston im Grundakkord (endOn, wenn es sich ergibt). Die beste von
+ * bis zu 60 Versuchen.
+ */
+function makeBandFolge(pool: Note[], len: number, rng: Rng, opt: FolgeOptions): string[] {
+  let best: string[] = [];
+  let bestCost = Infinity;
+  for (let k = 0; k < 60; k++) {
+    const f = makeOne(pool, len, rng, opt);
+    const last = f[f.length - 1];
+    let cost = 0;
+    if (opt.used?.has(folgeKey(f))) cost += 2;
+    if (opt.avoidLast?.includes(last)) cost += 2;
+    if (opt.toward !== undefined && !nearTo(last, opt.toward)) cost += 8;
+    if (opt.endOn?.length && !opt.endOn.includes(last)) cost += 1;
+    if (cost < bestCost) {
+      best = f;
+      bestCost = cost;
+    }
+    if (cost === 0) break;
+  }
+  return best;
+}
+
+/**
+ * Länge der Folgen innerhalb einer Sitzung (wird nicht gespeichert): Beginn mit start (Standard 3; bei genau 5
+ * Tönen eins weniger oder start), nach zwei fehlerfreien Folgen in Reihe +1, nach einer fehlerhaften −1; 2 bis folgeMaxLen.
  */
 export class FolgeLength {
   len: number;
@@ -157,8 +227,9 @@ export class FolgeLength {
     poolSize: number,
     readonly max: number,
     rng: Rng,
+    start = 3,
   ) {
-    this.len = poolSize <= FOLGE_MIN_NOTES ? (rng() < 0.5 ? 2 : 3) : 3;
+    this.len = poolSize <= FOLGE_MIN_NOTES ? (rng() < 0.5 ? start - 1 : start) : start;
     this.len = Math.min(this.len, max);
   }
 

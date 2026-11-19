@@ -7,6 +7,7 @@ import {
   followConfig,
   summarize,
   WaitFollower,
+  type FollowConfig,
   type BeatNoteResult,
   type FollowSummary,
 } from "../../src/audio/follow";
@@ -14,6 +15,9 @@ import { soundingFreq } from "../../src/music/notes";
 import { songById } from "../../src/songs/library";
 import { buildTimeline, sectionTimeline, type Timeline } from "../../src/songs/timeline";
 import { song } from "./songs-helpers";
+
+/** ohne Glättung: jeder Frame zählt für sich (keine Läufe, kein Überbrücken, keine Hinweise) */
+const RAW: Partial<FollowConfig> = { minRunMs: 0, bridgeMs: 0, medianMs: 0, hintCents: 0 };
 import { fastChanges, UP_DOWN, type Played } from "./transition-helpers";
 
 const STEP = 25;
@@ -171,10 +175,14 @@ describe("Mitspielen: Warte-Modus", () => {
       noise.push({ t, freq: 500 + (x % 1500), clarity: 0.3 + (x % 50) / 100 });
     }
     feed(w, noise);
-    feed(w, frames([tone(G, 1000, { clarity: 0.8 })], 2000)); // richtiger Ton, aber zu unklar (Schwelle beim Mitspielen 0,85)
+    feed(w, frames([tone(G, 1000, { clarity: 0.65 })], 2000)); // richtiger Ton, aber zu unklar (auch für den Hinweis)
     feed(w, frames([{ freq: 200, ms: 500 }], 3000)); // außerhalb des Bereichs
+    feed(w, frames([tone(A, 1000, { clarity: 0.8 })], 3500)); // anderer Ton, unklar: kein Hinweis, zählt nicht
     expect(w.index).toBe(0);
     expect(w.wrongMidi).toBeNull();
+    // der erwartete Ton mit Klarheit 0,8 (hauchig) zählt seit dem 19.11.2026 (Hinweis im Lauf-Glätter)
+    feed(w, frames([tone(G, 400, { clarity: 0.8 })], 4600));
+    expect(w.index).toBe(1);
   });
 
   it("Pausen werden übersprungen", () => {
@@ -294,10 +302,11 @@ describe("Mitspielen: Warte-Modus", () => {
       const w = new WaitFollower(tl);
       feed(w, unclear(frames(playAll(tl, 300, 60))));
       expect(w.results.map((r) => r?.ok)).toEqual([true, true, true, true, true]);
-      // ohne Überbrücken (kein Median) wäre jede Note an den Aussetzern hängen geblieben
-      const raw = new WaitFollower(tl, { cfg: { medianFrames: 1 } });
+      // auch ohne Überbrücken: Die Haltedauer zählt die Zeit des Zieltons zusammen, ein unklarer Frame
+      // unterbricht sie nicht (früher begann sie neu, und jede Note blieb an den Aussetzern hängen)
+      const raw = new WaitFollower(tl, { cfg: RAW });
       feed(raw, unclear(frames(playAll(tl, 300, 60))));
-      expect(raw.index).toBe(0);
+      expect(raw.index).toBe(5);
       // Einzelaussetzer im gehaltenen Ton sind kein neuer Einsatz, auch mit Lautstärke-Einbruch
       const rep = buildTimeline(song("g'4 g'4 a'2 ||"));
       const held = new WaitFollower(rep);
@@ -309,11 +318,19 @@ describe("Mitspielen: Warte-Modus", () => {
       expect(twice.done).toBe(true);
     });
 
-    it("ohne Glättung hätte jeder Ausreißer die Haltedauer neu beginnen lassen", () => {
+    it("ohne Glättung beginnt die Haltedauer bei jedem Ausreißer neu (Ausreißer seltener als die Haltedauer: geht noch)", () => {
       const tl = melody();
-      const w = new WaitFollower(tl, { cfg: { medianFrames: 1 } });
-      feed(w, wobbly(tl));
-      expect(w.index).toBe(0);
+      const w = new WaitFollower(tl, { cfg: RAW });
+      feed(w, wobbly(tl, 300, 60, 12));
+      expect(w.index).toBe(5);
+      // jeder 4. Frame ein Ausreißer (75 ms Zielton am Stück): ohne Glättung nie 120 ms, mit Glättung alles
+      const often = (fs: Frame[]) => fs.map((f, k) => (f.freq !== null && k % 4 === 3 ? { ...f, freq: f.freq * 2 > DEFAULT_FOLLOW.maxFreq ? f.freq / 2 : f.freq * 2 } : f));
+      const raw = new WaitFollower(tl, { cfg: RAW });
+      feed(raw, often(frames(playAll(tl, 300, 60))));
+      expect(raw.index).toBe(0);
+      const smooth = new WaitFollower(tl);
+      feed(smooth, often(frames(playAll(tl, 300, 60))));
+      expect(smooth.index).toBe(5);
     });
 
     it("Tonwiederholung braucht weiterhin einen neuen Einsatz (Stille und Lautstärke-Einbruch kommen durch)", () => {
@@ -559,7 +576,7 @@ describe("Mitspielen: Takt-Modus", () => {
     const spq = 0.6; // Sechzehntel = 150 ms
     const fs = beatFrames(tl, { spq, gap: 0 });
     const smooth = new BeatFollower(tl, { secPerQuarter: spq, startMs: START });
-    const raw = new BeatFollower(tl, { secPerQuarter: spq, startMs: START, cfg: { medianFrames: 1 } });
+    const raw = new BeatFollower(tl, { secPerQuarter: spq, startMs: START, cfg: RAW });
     feed(smooth, fs);
     feed(raw, fs);
     expect(smooth.passes[0].hits).toBe(9);
@@ -698,7 +715,7 @@ describe("Mitspielen: schneller Tonwechsel mit Übergangswerten (Rückmeldung: �
     }
     // früher (ohne Stabilitätsprüfung) hörte die App bei jedem Wechsel kurz einen Zwischenton
     const p = fastChanges(UP_DOWN, 5, { count: 9 });
-    const old = new WaitFollower(tl, { cfg: { stableCents: 0 } });
+    const old = new WaitFollower(tl, { cfg: RAW });
     expect(p.frames.map((f) => old.push(f)?.midi).filter((m) => m !== undefined && between(m)).length).toBeGreaterThan(4);
   });
 
@@ -728,13 +745,13 @@ describe("Mitspielen: schneller Tonwechsel mit Übergangswerten (Rückmeldung: �
       const spq = 60 / bpm;
       for (const late of [-30, 0, 30]) {
         const p = fastChanges(UP_DOWN, 4 / spq, { t0: START - 300, start: START + LAT + late, count: 16, t1: START + 4 * spq * 1000 + 600 });
-        const cov = (stableCents: number) => {
-          const b = new BeatFollower(tl, { secPerQuarter: spq, startMs: START, cfg: { stableCents } });
+        const cov = (cfg: Partial<FollowConfig>) => {
+          const b = new BeatFollower(tl, { secPerQuarter: spq, startMs: START, cfg });
           feed(b, p.frames);
           b.finish(START + 8 * spq * 1000);
           return b.passResults[0].map((r) => r!.coverage);
         };
-        expect(cov(DEFAULT_FOLLOW.stableCents)).toEqual(cov(0));
+        expect(cov({})).toEqual(cov({ minRunMs: 0 }));
       }
     }
   });

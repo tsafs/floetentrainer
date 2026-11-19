@@ -11,7 +11,11 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
 
 - Zwei Knöpfe auf der Startseite:
   - **Üben:** Note→Name, Note→Griff und Griff→Note gemischt.
-  - **Spielen:** nur Spielen-Karten mit Mikrofon.
+  - **Spielen:** mit Mikrofon. **Seit 19.11.2026 das Notenband** (`docs/app-notenband.md`): neue Töne
+    einzeln vorgestellt, danach eine durchlaufende Notenzeile, die auf jeden Ton wartet. Endet nach 3 Minuten
+    oder 50 Tönen (einstellbar, „Notenband“/„Töne“), am Ende des laufenden Abschnitts. Was unten zu
+    Sitzungen, Karten und Folgen beim Spielen steht, gilt seitdem nur noch, soweit es das Notenband übernimmt
+    (Vorstellung, Wertung je Ton und Abschnitt, Wechsel, Stufenlied-Abschnitte, Erkennung).
 - Jeder Knopf zeigt die Zahl der fälligen Karten seiner Art.
 - Eine Sitzung endet nach **5 Minuten oder 20 Karten**, je nachdem, was zuerst eintritt (beides
   einstellbar). Die angefangene Karte wird noch zu Ende gespielt.
@@ -250,8 +254,9 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
     zweimal direkt hintereinander (zu leicht; später in der Folge darf er wiederkommen, z. B. d¹ g¹ d¹ –
     geändert am 14.11.2026, vorher gab es Tonwiederholungen); schwache und aufhaltende Töne häufiger (wie bei Zusatzkarten); in
     einer Sitzung keine Folge zweimal. Erzeugt in `app/src/srs/sequences.ts`.
-  - Länge: Beginn mit 3 Tönen (bei genau 5 Tönen 2 oder 3), nach zwei fehlerfreien Folgen in Reihe +1,
-    nach einer fehlerhaften −1, 2 bis 5 Töne (ab Stufe 8 bis 6). Gilt nur innerhalb der Sitzung.
+  - Länge: Beginn mit 4 Tönen (bei genau 5 Tönen 3 oder 4), nach zwei fehlerfreien Folgen in Reihe +1,
+    nach einer fehlerhaften −1, 2 bis 6 Töne, ab Stufe 3 bis 8 (seit 19.11.2026; vorher Beginn 3, bis 5,
+    ab Stufe 8 bis 6). Griffbilder → Namen höchstens 5. Gilt nur innerhalb der Sitzung.
   - Oben eine breite Notenzeile mit allen Noten (ganze Notenköpfe ohne Takt und Hals), **Vorzeichen an
     jeder Note**. Die aktuelle Note hat einen feinen Strich darunter; darunter wachsen die Namen mit.
   - **Lesen** („Wie heißen diese Noten? Der Reihe nach.“): Namenknöpfe nach Tonhöhe, alle Töne der Folge
@@ -298,6 +303,8 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   - **Erkennung, damit nichts ungerecht gewertet wird:**
     - Tonhöhe nur, wenn pitchy eine Klarheit von mindestens etwa 0,9 meldet und die Lautstärke über
       einer Schwelle liegt.
+    - Beim Mitspielen seit 19.11.2026 feiner gemessen (≈ 5 ms) und notengestützt: Nahe dem erwarteten
+      Ton genügt eine Klarheit ab 0,7 (`docs/erkennung.md`). Die Übung bleibt bei 25 ms und 0,9.
     - Messfenster (`app/src/audio/mic.ts`): die jüngsten 1024 Samples (≈ 21 ms bei 48 kHz), Messung
       alle 25 ms. Bis zum 14.11.2026 waren es 2048 Samples (≈ 43 ms); Rückmeldung: „Wenn ich G, A und H
       schnell im Wechsel spiele, wird oft GIS oder eine andere Zwischennote erkannt“ (im Stimmgerät kurz
@@ -645,7 +652,8 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
 - **Ort und Werkzeuge:**
   - Alles im Ordner `app/`. **`heft/` nicht verändern.**
   - Vite + TypeScript ohne UI-Framework.
-  - Laufzeit-Bibliothek nur `pitchy`; als Entwicklungswerkzeuge Vitest und Playwright, dazu
+  - Laufzeit-Bibliothek nur `pitchy` (beim Mitspielen deren Autokorrelation im AudioWorklet, seit
+    19.11.2026, siehe `docs/erkennung.md`); als Entwicklungswerkzeuge Vitest und Playwright, dazu
     `vite-plugin-pwa` oder ein kleiner eigener Service Worker.
 - **Hauptgerät: Android-Handy mit Chrome.**
 - **Mikrofon:**

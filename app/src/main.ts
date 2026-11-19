@@ -7,6 +7,7 @@ import { topbar } from "./ui/common";
 import { homeView } from "./ui/home";
 import { chartView, micHelpView, summaryView } from "./ui/pages";
 import { practiceView } from "./ui/practice";
+import { bandView } from "./ui/band";
 import { fluteView } from "./ui/flute";
 import { settingsView } from "./ui/settings";
 import { toneView } from "./ui/tone";
@@ -17,6 +18,7 @@ import { startpointView, welcomeView } from "./ui/startpoint";
 import { needsWelcome } from "./srs/startpoint";
 import { applyTheme } from "./ui/theme";
 import { tunerView } from "./ui/tuner";
+import { testboardView } from "./ui/testboard";
 import { echoView } from "./ui/echo";
 import { defaultData } from "./store/data";
 import { dayKey } from "./store/dates";
@@ -27,6 +29,7 @@ const root = document.getElementById("app")!;
 const ROUTES: Record<string, View> = {
   "": homeView,
   uebung: practiceView,
+  notenband: bandView, // Spielen: das Notenband
   ende: summaryView,
   griffe: chartView,
   stimmgeraet: tunerView,
@@ -39,6 +42,7 @@ const ROUTES: Record<string, View> = {
   ton: toneView, // #/ton/<Ton>, aus der Grifftabelle mit ?von=griffe
   "lied-hinzufuegen": songAddView,
   startpunkt: startpointView, // #/startpunkt bzw. #/startpunkt/neu (aus der Willkommensseite)
+  testboard: testboardView, // Erkennung prüfen (aus den Einstellungen)
 };
 
 function routeName(): string {
@@ -118,6 +122,7 @@ function start() {
     },
     today: () => dayKey(),
     session: null,
+    band: null,
     lastResult: null,
     micError: null,
     micRetry: null,
@@ -129,7 +134,7 @@ function start() {
   installMenu(root);
   window.addEventListener("hashchange", () => render(ctx));
   // Nach einem Neuladen gibt es keine laufende Sitzung mehr
-  if (["uebung", "ende"].includes(routeName())) history.replaceState(null, "", location.pathname + location.search);
+  if (["uebung", "notenband", "ende"].includes(routeName())) history.replaceState(null, "", location.pathname + location.search);
   render(ctx);
   setupServiceWorker();
   // Für automatische Tests

@@ -114,6 +114,11 @@ Silben, Atemzeichen, Seitenumbrüche.
      Mikrofon- und Browserangaben), keinen Ton. Auswerten: `node app/scripts/diagnose.mjs <datei>` (je Note
      erwartet/erkannt, Cent, Einsatz-Versatz, Grund für Rot, Median-Versatz, Anteil unklarer Messungen).
      Aufnahme `app/src/audio/diagnose.ts`. Bildschirmfotos `*-r1…r12-*.png`.
+   - **Erkennung beim Mitspielen umgebaut (19.11.2026, `docs/erkennung.md`):** Messung im AudioWorklet
+     (lückenlos, fein alle ≈ 5 ms), Lauf-Glätter mit Hinweis auf den erwarteten Ton
+     (`app/src/audio/run-smoother.ts`), Prüfstand `app/tests/unit/erkennung.test.ts`. **Testboard**
+     (Einstellungen → Testboard): Tonfolgen zum Mitspielen, Diagnose dort *mit Ton* (Format 2);
+     nachrechnen mit `REPLAY=<datei> npx vitest run tests/unit/replay.test.ts` in `app/`.
 4. **Tonfolgen in den Sitzungen** (`docs/app-tonfolgen.md`, umgesetzt am 14.11.2026): Etwa jede zweite
    Zusatzkarte ist eine Folge von 2–6 Tönen zum Lesen bzw. Spielen, sobald in der Spur 5 Töne vorgestellt
    sind. Erzeugen `app/src/srs/sequences.ts`, Ablauf und Wertung `app/src/srs/session.ts`
@@ -181,3 +186,9 @@ Silben, Atemzeichen, Seitenumbrüche.
      der Notensatz der Lieder ist unverändert.
    - Tests `app/tests/e2e/tonleiter.spec.ts`; Bildschirmfoto `*-8-ton.png`.
    - Offen: Ob der Notensatz der Lieder die leiseren Linien und den Schlüssel übernehmen soll.
+8. **Notenband beim Spielen und längere Tonfolgen beim Lesen** (19.11.2026, `docs/app-notenband.md`): Spielen
+   ist jetzt ein durchlaufendes Notenband (erzeugte Abschnitte mit Notenwerten, Stufenlied-Stücke mit Übergang,
+   ein Wechsel), das auf jeden Ton wartet; Ende nach `settings.bandMinutes` (3) oder `settings.bandNotes` (50).
+   Lesen-Folgen beginnen mit 4 und werden bis 8 lang. Wo was liegt und Tests: Ende von `docs/app-notenband.md`.
+   Offen: Rückmeldung der Nutzerin am Gerät (Tempo des Gleitens, wie viele Noten sichtbar, Anteil Liedstücke),
+   tote Spielen-Teile in `session.ts`/`practice.ts` aufräumen, später Band im Tempo.

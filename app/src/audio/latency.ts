@@ -16,7 +16,8 @@
 import { ClickFilter, DEFAULT_FOLLOW, LATENCY_MAX, LATENCY_MIN, type FollowConfig } from "./follow";
 import { median } from "./flute-profile";
 import type { Frame } from "./judge";
-import { pitched, Smoother } from "./smooth";
+import { RunSmoother } from "./run-smoother";
+import { pitched } from "./smooth";
 
 export interface LatencyConfig {
   /** Einsatz frühestens so viel vor dem Klick … */
@@ -47,7 +48,7 @@ export type LatencyResult =
 /** Einsätze (Zeitpunkt des ersten gültigen Frames eines Tons) aus rohen Frames */
 export class OnsetDetector {
   readonly onsets: number[] = [];
-  private smoother: Smoother;
+  private smoother: RunSmoother;
   private clicks: ClickFilter;
   private cfg: FollowConfig;
   private run: { start: number; last: number; counted: boolean } | null = null;
@@ -58,13 +59,12 @@ export class OnsetDetector {
     cfg: Partial<FollowConfig> = {},
   ) {
     this.cfg = { ...DEFAULT_FOLLOW, ...cfg };
-    this.smoother = new Smoother(this.cfg);
+    this.smoother = new RunSmoother(this.cfg);
     this.clicks = new ClickFilter(this.cfg);
   }
 
   push(raw: Frame): void {
-    const f = this.smoother.push(raw);
-    if (f) for (const g of this.clicks.push(f)) this.take(g);
+    for (const f of this.smoother.push(raw)) for (const g of this.clicks.push(f)) this.take(g);
   }
 
   flush(): void {
