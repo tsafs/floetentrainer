@@ -32,8 +32,11 @@ langsamer.
   Wer schnell spielt, lässt es schnell laufen. Kein Zeitdruck, keine Wertung des Rhythmus.
 - **Falscher Ton:** Note rot, darunter „Du spielst …“; das Band wartet auf den richtigen Ton (wie bisher bei
   Folgen). Mit Kopfhörern kurz der richtige Ton. Oktave zu hoch: nur ein Hinweis.
-- Erkennung wie bisher bei Folgen (Warte-Wertung, Tonwiederholung braucht neuen Einsatz, Toleranz und
-  Haltedauer aus den Einstellungen, Stimmton und Werte der aktiven Flöte). Ein einziger Durchgang über das
+- Erkennung wie beim Mitspielen „Wartet auf mich“ (seit 19.11.2026, `docs/erkennung.md`): feine Messungen
+  (≈ 5 ms) im AudioWorklet, nächster Halbton relativ zur Flöte, Haltedauer 120 ms (Zielton-Zeit
+  zusammengezählt), Klarheit ab 0,85 und nahe der erwarteten Note ab 0,7; Tonwiederholung braucht einen
+  neuen Einsatz; Stimmton und Werte der aktiven Flöte. Toleranz und Haltedauer der Einstellungen gelten nur
+  noch für die Vorstellung neuer Töne (wie beim Üben). Ein einziger Durchgang über das
   ganze Band, damit der gehaltene Ton am Übergang zweier Abschnitte nicht als falsch zählt.
 
 ## Was im Band steht

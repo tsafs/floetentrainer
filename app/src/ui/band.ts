@@ -5,7 +5,7 @@
 
 import { LiveTuning, offsetFor } from "../audio/flute-profile";
 import { WaitFollower } from "../audio/follow";
-import { DEFAULT_JUDGE, PlayJudge, type Frame, type Heard, type JudgeOutput } from "../audio/judge";
+import { PlayJudge, type Frame, type Heard, type JudgeOutput } from "../audio/judge";
 import { keepAwake, mic } from "../audio/mic";
 import { songPlayer } from "../audio/song-player";
 import { GLYPHS } from "../music/bravura";
@@ -52,12 +52,19 @@ export const bandView: View = (root, ctx) => {
   let closed = false;
   let lastHeardAt = 0;
   let onFrame: ((f: Frame) => Heard | null) | null = null;
+  /** Band: feine Messungen (≈ 5 ms) für die Wertung, siehe docs/erkennung.md */
+  let onFine: ((f: Frame) => Heard | null) | null = null;
   let timer: number | null = null;
 
   keepAwake(true);
+  // grob (25 ms): Vorstellung neuer Töne und die Anzeige „Ich höre“, solange das Band nicht läuft
   const unlisten = mic.listen((f) => {
     const h = onFrame ? onFrame(f) : null;
     showHeard(h, f.t);
+  });
+  const unlistenFine = mic.listenFine((f) => {
+    const h = onFine ? onFine(f) : null;
+    if (h) showHeard(h, f.t);
   });
 
   function showHeard(h: Heard | null, t: number) {
@@ -349,13 +356,11 @@ export const bandView: View = (root, ctx) => {
       setCur(cur);
     }
 
+    // Erkennung wie beim Mitspielen „Wartet auf mich“ (seit 19.11.2026, docs/erkennung.md): feine
+    // Messungen, nächster Halbton relativ zur Flöte, Haltedauer 120 ms, Klarheit ab 0,85 und nahe der
+    // erwarteten Note ab 0,7. Toleranz und Haltedauer der Einstellungen gelten fürs Üben (Vorstellung).
     const w = new WaitFollower(live, {
-      cfg: {
-        tuning: myFlute.tuning.hz,
-        toleranceCents: d.settings.toleranceCents,
-        holdMs: d.settings.holdMs,
-        minClarity: DEFAULT_JUDGE.minClarity,
-      },
+      cfg: { tuning: myFlute.tuning.hz, frameMs: mic.fineMs },
       tuning: new LiveTuning(fluteOffsets, {}, myFlute.tuning.known),
       onNote: (k, res) => noteDone(k, res.ok),
       onWrong: (k, midi) => {
@@ -387,7 +392,8 @@ export const bandView: View = (root, ctx) => {
     window.addEventListener("resize", onResize);
     cleanups.push(() => window.removeEventListener("resize", onResize));
     w.arm(performance.now());
-    onFrame = (f) => w.push(f);
+    onFrame = null;
+    onFine = (f) => w.push(f);
   }
 
   const cleanups: (() => void)[] = [];
@@ -397,10 +403,12 @@ export const bandView: View = (root, ctx) => {
     closed = true;
     if (timer !== null) window.clearTimeout(timer);
     onFrame = null;
+    onFine = null;
     judge.stop();
     if (songPlayer.playing) songPlayer.stop();
     for (const c of cleanups) c();
     unlisten();
+    unlistenFine();
     keepAwake(false);
     mic.stop();
   };
