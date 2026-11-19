@@ -47,8 +47,10 @@ const FIELDS: { title: string; fields: NumField[] }[] = [
   {
     title: "Sitzung",
     fields: [
-      { key: "sessionMinutes", label: "Länge", help: "endet nach dieser Zeit …", step: 1, fmt: (v) => `${v} Min.` },
+      { key: "sessionMinutes", label: "Länge", help: "Üben endet nach dieser Zeit …", step: 1, fmt: (v) => `${v} Min.` },
       { key: "sessionCards", label: "Karten", help: "… oder nach so vielen Karten", step: 5, fmt: (v) => `${v}` },
+      { key: "bandMinutes", label: "Notenband", help: "Spielen endet nach dieser Zeit …", step: 1, fmt: (v) => `${v} Min.` },
+      { key: "bandNotes", label: "Töne", help: "… oder nach so vielen Tönen", step: 10, fmt: (v) => `${v}` },
     ],
   },
   {
@@ -484,5 +486,6 @@ export function replaceData(ctx: Ctx, data: ReturnType<typeof defaultData>): voi
   Object.assign(ctx.data, data);
   applyTheme(ctx.data.settings.theme);
   ctx.session = null;
+  ctx.band = null;
   ctx.save();
 }

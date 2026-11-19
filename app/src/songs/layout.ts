@@ -495,12 +495,33 @@ const LINE_COST = 1;
 /** Bis zu dieser Dehnung wird auch die letzte Zeile auf volle Breite gebracht. */
 const LAST_MAX = 1.45;
 
+/**
+ * Notenband (docs/app-notenband.md): alles in einer Zeile mit fester Dehnung, ohne Zeilenkopf (Schlüssel,
+ * Vorzeichnung und Taktangabe zeichnet die Oberfläche fest am linken Rand). Die Lage eines Takts hängt nur
+ * von den Takten davor ab – hängt man Takte an, bleibt alles Frühere, wo es war. top/bottom: feste
+ * senkrechte Ausdehnung in Zwischenräumen (wie yTop/Unterkante), damit das Band beim Anhängen nicht springt.
+ */
+export interface BandOptions {
+  stretch: number;
+  top: number;
+  bottom: number;
+}
+
+/** Zeilenkopf des Notenbands: nur ein kleiner Rand */
+const BAND_HEAD = 0.6;
+
 /** Takte auf Zeilen verteilen und waagerecht anordnen. width in CSS-Pixeln. */
-export function layoutScore(song: Song, opts: { width: number; sp?: number }): ScoreLayout {
+export function layoutScore(song: Song, opts: { width: number; sp?: number; band?: BandOptions }): ScoreLayout {
+  const stems = stemsOf(song);
+  if (opts.band) {
+    const metrics = metricsFor(opts.width, opts.sp);
+    const ms = measureBars(song, metrics, stems);
+    const sys = placeSystem(song, ms, 0, ms.length, opts.band.stretch, false, 1, Infinity, true);
+    return { metrics, width: sys.right + 1, systems: [sys], stems };
+  }
   const metrics = metricsFor(opts.width, opts.sp);
   const width = opts.width / metrics.sp;
   const avail = width - BAR_W / 2;
-  const stems = stemsOf(song);
   const ms = measureBars(song, metrics, stems);
   const n = ms.length;
   // Umbruch wie bei einem Absatz im Blocksatz: kleinste Summe der Unschönheiten über alle Zeilen
@@ -558,10 +579,11 @@ function placeSystem(
   justified: boolean,
   scale: number,
   avail: number,
+  bare = false,
 ): SystemLayout {
-  const time = headerTime(song, i);
+  const time = bare ? null : headerTime(song, i);
   const key = headerKey(song, ms, i);
-  const head = headerWidth(key, time);
+  const head = bare ? { keyX: 0, timeX: 0, end: BAND_HEAD } : headerWidth(key, time);
   const cw = courtesyWidth(ms, j);
   const target = avail - cw;
   let x = head.end;

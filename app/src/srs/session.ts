@@ -13,6 +13,7 @@ import {
   FOLGE_MAX_DISTINCT,
   FOLGE_MAX_GRIPS,
   FolgeLength,
+  FOLGE_START_LEN,
   folgeKey,
   folgeMaxLen,
   folgePool,
@@ -314,7 +315,7 @@ export class Session {
       }
     }
     const carry = p.type === "due" ? p.note : undefined;
-    this.folgeLen ??= new FolgeLength(pool.length, folgeMaxLen(levelOf(this.track, this.data.stages[this.track])), rng);
+    this.folgeLen ??= new FolgeLength(pool.length, folgeMaxLen(levelOf(this.track, this.data.stages[this.track])), rng, FOLGE_START_LEN);
     const weight = noteWeight(this.data, this.track);
     const reading = this.track === "lesen";
     // Griffbilder → Namen: nicht mehr Griffbilder, als bequem in eine Zeile passen

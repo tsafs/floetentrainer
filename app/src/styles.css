@@ -3388,3 +3388,91 @@ input:focus-visible + svg.ck {
 .prac .stage .snip .score svg.sys {
   margin: 0 auto;
 }
+
+/* ---------------------------------------------------------------- Notenband (Spielen, docs/app-notenband.md)
+   .bandview: Fenster über die ganze Breite. Darin liegen übereinander: .bandbg (Notenlinien über die ganze
+   Breite), .bandtrack (das gesetzte Band, wird per transform verschoben), .bandhead (feststehender Kopf mit
+   Schlüssel und Taktangabe auf Papier, läuft nach rechts sanft aus) und .bandmark (Lesemarke). */
+.prac.band .stage {
+  flex: 1 1 auto;
+  justify-content: center;
+}
+/* Das Band läuft über die ganze Bildschirmbreite (höchstens 960 px), mittig über die schmale Spalte hinaus */
+.bandview {
+  position: relative;
+  width: min(100vw, 960px);
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+.bandview > * {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.bandbg .sline,
+.bandhead .sline {
+  stroke: var(--staff);
+}
+.bandhead .paper {
+  fill: var(--paper);
+}
+.bandhead .fade0 {
+  stop-color: var(--paper);
+  stop-opacity: 1;
+}
+.bandhead .fade1 {
+  stop-color: var(--paper);
+  stop-opacity: 0;
+}
+.bandhead .clef {
+  fill: var(--clef);
+}
+.bandhead .tsig {
+  fill: var(--ink);
+}
+.bandtrack {
+  will-change: transform;
+}
+.bandtrack .score svg.sys {
+  overflow: visible;
+}
+.bandmark {
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--mark);
+  opacity: 0.28;
+  pointer-events: none;
+}
+.bandtrack .blabel {
+  position: absolute;
+  top: 0;
+  white-space: nowrap;
+  font-style: italic;
+  font-size: 0.95rem;
+  color: var(--soft);
+  pointer-events: none;
+}
+.bandtrack .blabel.song {
+  color: var(--play);
+}
+/* quer: eine Spalte (das Band braucht die Breite), „Ich höre“ und „Überspringen“ nebeneinander darunter */
+@media (orientation: landscape) and (max-height: 520px) {
+  .prac.band {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .prac.band .answer {
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 16px;
+  }
+}
+.prac.band .q.warn {
+  color: var(--err);
+}
+.prac.band .q.hint {
+  color: var(--soft);
+  font-style: italic;
+}

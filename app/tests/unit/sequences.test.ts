@@ -148,9 +148,14 @@ describe("Länge", () => {
     const at5 = new Set(Array.from({ length: 40 }, (_, i) => new FolgeLength(5, 5, seeded(i)).len));
     expect([...at5].sort()).toEqual([2, 3]);
   });
-  it("nach zwei fehlerfreien +1, nach einer fehlerhaften −1, Bereich 2 bis 5 (ab Stufe 8: 6)", () => {
-    expect(folgeMaxLen(7)).toBe(5);
-    expect(folgeMaxLen(8)).toBe(6);
+  it("Lesen beginnt mit 4 (bei genau 5 Tönen 3 oder 4)", () => {
+    expect(new FolgeLength(8, 8, seeded(1), 4).len).toBe(4);
+    const at5 = new Set(Array.from({ length: 40 }, (_, i) => new FolgeLength(5, 6, seeded(i), 4).len));
+    expect([...at5].sort()).toEqual([3, 4]);
+  });
+  it("nach zwei fehlerfreien +1, nach einer fehlerhaften −1, Bereich 2 bis max (Lesen 6, ab Stufe 3: 8)", () => {
+    expect(folgeMaxLen(2)).toBe(6);
+    expect(folgeMaxLen(3)).toBe(8);
     const l = new FolgeLength(8, 5, seeded(1));
     l.update(true);
     expect(l.len).toBe(3);
@@ -165,9 +170,9 @@ describe("Länge", () => {
     expect(l.len).toBe(5);
     for (let i = 0; i < 20; i++) l.update(false);
     expect(l.len).toBe(2);
-    const l6 = new FolgeLength(14, folgeMaxLen(8), seeded(1));
-    for (let i = 0; i < 20; i++) l6.update(true);
-    expect(l6.len).toBe(6);
+    const l8 = new FolgeLength(14, folgeMaxLen(8), seeded(1));
+    for (let i = 0; i < 20; i++) l8.update(true);
+    expect(l8.len).toBe(8);
   });
 });
 

@@ -32,7 +32,9 @@ export const summaryView: View = (root, ctx) => {
   root.innerHTML = `
 <main class="screen summary">
   <h1>${allRight ? "Wunderbar" : "Geschafft"}</h1>
-  <section class="block"><span class="num" data-testid="score">${r.correct} von ${r.graded}</span><span class="lbl">richtig</span></section>
+  <section class="block"><span class="num" data-testid="score">${r.correct} von ${r.graded}</span><span class="lbl">${
+    "unit" in r ? "Tönen gleich richtig" : "richtig"
+  }</span></section>
   <section class="block">${
     r.difficult.length
       ? `<span class="lbl">Schwierig waren</span><span class="v" data-testid="difficult">${joinNames(r.difficult)}</span>`
