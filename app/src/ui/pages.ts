@@ -149,7 +149,7 @@ export const micHelpView: View = (root, ctx) => {
   root.innerHTML = `<main class="screen page">${topbar("Mikrofon")}
   <section>
     <h2>${denied ? "Das Mikrofon ist nicht erlaubt" : "Das Mikrofon lässt sich nicht starten"}</h2>
-    <p class="help">Zum Spielen hört die App über das Mikrofon zu. Die Töne werden nur im Gerät ausgewertet, nichts wird aufgenommen oder verschickt.</p>
+    <p class="help">Zum Spielen hört die App über das Mikrofon zu. Die Töne werden nur im Gerät ausgewertet, nichts wird aufgenommen oder verschickt – außer auf dem Testboard (Einstellungen): Dort steckt der Ton in der Diagnose, die du selbst speicherst.</p>
   </section>
   <section>
     <h2>So erlaubst du es in Chrome auf Android</h2>

@@ -60,13 +60,14 @@
 // Schleife: Beide Arten werten je Durchgang getrennt (Ergebnis je Durchgang). Die Liedseite nutzt die
 // Schleife seit der Nachsteuerung vom 14.11.2026 nicht mehr; die Wertung kann es weiterhin.
 
-import { freqToWrittenMidi } from "../music/notes";
+import { freqToWrittenMidi, soundingFreq } from "../music/notes";
 import type { Settings } from "../store/data";
 import type { Timeline } from "../songs/timeline";
 import { CLICK_ACCENT_FREQ, CLICK_FREQ } from "./flute-synth";
 import { correctPitch, LiveTuning } from "./flute-profile";
 import { DEFAULT_JUDGE, type Frame, type Heard } from "./judge";
-import { Smoother, type SmoothedFrame } from "./smooth";
+import { DEFAULT_RUN, RunSmoother, type RunFrame } from "./run-smoother";
+import type { SmoothedFrame } from "./smooth";
 
 export interface FollowConfig {
   tuning: number;
@@ -109,14 +110,20 @@ export interface FollowConfig {
   clickFreqs: number[];
   /** … „auf der Höhe eines Klicks“ heißt: höchstens so viele Cent daneben … */
   clickCents: number;
-  /** … und höchstens so viele Frames lang */
-  clickFrames: number;
-  /** Glättung (./smooth.ts): Median über so viele Frames (ungerade, 1 = keiner) … */
-  medianFrames: number;
-  /** … und Zeitkonstante in ms (0 = keine) */
-  tauMs: number;
-  /** Stabilitätsprüfung vor dem Median (./smooth.ts): Nachbar höchstens so viele Cent entfernt; 0 = aus */
-  stableCents: number;
+  /** … und höchstens so lange (ms, erster bis letzter Frame plus ein Frame-Intervall) */
+  clickMs: number;
+  /** Lauf-Glätter (./run-smoother.ts): Klarheit, ab der ein Frame nahe dem erwarteten Ton noch zählt … */
+  hintClarity: number;
+  /** … und so nah (Cent) muss er an ihm liegen; 0 = ohne Hinweise */
+  hintCents: number;
+  /** … ein Lauf zählt ab dieser Dauer (ms; 0 = jeder Frame, „roh“) … */
+  minRunMs: number;
+  /** … Abweichung innerhalb eines Laufs (Cent) … */
+  joinCents: number;
+  /** … Lücken bis knapp darunter (ms) werden überbrückt (0 = keine) … */
+  bridgeMs: number;
+  /** … Median über ± so viele ms */
+  medianMs: number;
 }
 
 /** Eingangs-Verzögerung (Mikrofon und Erkennung) ohne Abgleich am Gerät */
@@ -174,10 +181,13 @@ export const DEFAULT_FOLLOW: FollowConfig = {
   frameMs: 25,
   clickFreqs: [CLICK_FREQ, CLICK_ACCENT_FREQ],
   clickCents: 40,
-  clickFrames: 2,
-  medianFrames: 3,
-  tauMs: 0,
-  stableCents: DEFAULT_JUDGE.stableCents,
+  clickMs: 70,
+  hintClarity: DEFAULT_RUN.hintClarity,
+  hintCents: DEFAULT_RUN.hintCents,
+  minRunMs: DEFAULT_RUN.minRunMs,
+  joinCents: DEFAULT_RUN.joinCents,
+  bridgeMs: DEFAULT_RUN.bridgeMs,
+  medianMs: DEFAULT_RUN.medianMs,
 };
 
 /** Grenzen der Eingangs-Verzögerung (Abgleich und Schieber) */
@@ -272,8 +282,18 @@ export function summarize(tl: Timeline, results: ({ ok: boolean } | undefined)[]
 
 // ---------------------------------------------------------------- gemeinsame Bausteine
 
-function isValid(cfg: FollowConfig, f: Frame): f is Frame & { freq: number } {
-  return f.freq !== null && f.clarity >= cfg.minClarity && f.freq >= cfg.minFreq && f.freq <= cfg.maxFreq;
+/**
+ * Gültiger Ton nach dem Lauf-Glätter: Klarheit wie verlangt, oder der Glätter hat ihn nahe dem erwarteten
+ * Ton gerettet (hinted) bzw. eine Lücke in einem solchen Lauf überbrückt (filled).
+ */
+function isValid(cfg: FollowConfig, f: RunFrame): f is RunFrame & { freq: number } {
+  if (f.freq === null || f.freq < cfg.minFreq || f.freq > cfg.maxFreq) return false;
+  return f.clarity >= cfg.minClarity || !!f.hinted || !!f.filled;
+}
+
+/** Klingende Frequenz eines notierten Tons auf *ihrer* Flöte (Stimmton und Wert des Tons im Profil) */
+function expectedHz(cfg: Pick<FollowConfig, "tuning">, tuning: LiveTuning, midi: number): number {
+  return soundingFreq(midi, cfg.tuning) * Math.pow(2, tuning.offsetOf(midi) / 1200);
 }
 
 /** Unter dieser Lautstärke gilt ein Frame als Stille (wie die Schwelle des Mikrofons, ./mic.ts) */
@@ -286,13 +306,16 @@ function sounding(f: SmoothedFrame & { click?: boolean }): boolean {
 
 /**
  * Fängt Metronom-Klicks ab (siehe Kopfkommentar): Frames auf der Höhe eines Klicks werden zurückgehalten;
- * bleibt es bei höchstens clickFrames, kommen sie als unklar heraus (click), sonst unverändert.
+ * bleibt es bei höchstens clickMs, kommen sie als unklar heraus (click), sonst unverändert.
  */
 export class ClickFilter {
   private held: SmoothedFrame[] = [];
   private pass = false;
 
-  constructor(private cfg: Pick<FollowConfig, "clickFreqs" | "clickCents" | "clickFrames">) {}
+  private dt = 25;
+  private lastT: number | null = null;
+
+  constructor(private cfg: Pick<FollowConfig, "clickFreqs" | "clickCents" | "clickMs">) {}
 
   private clicky(f: Frame): boolean {
     const freq = f.freq;
@@ -301,10 +324,12 @@ export class ClickFilter {
 
   push(f: SmoothedFrame): (SmoothedFrame & { click?: boolean })[] {
     if (!this.cfg.clickFreqs.length) return [f];
+    if (this.lastT !== null && f.t > this.lastT) this.dt = Math.min(30, f.t - this.lastT);
+    this.lastT = f.t;
     if (this.clicky(f)) {
       if (this.pass) return [f];
       this.held.push(f);
-      if (this.held.length <= this.cfg.clickFrames) return [];
+      if (f.t - this.held[0].t + this.dt <= this.cfg.clickMs) return [];
       this.pass = true;
       const out = this.held;
       this.held = [];
@@ -452,8 +477,13 @@ export class WaitFollower {
   octaveHinted = false;
   done = false;
   private onsets: Onsets;
-  private smoother: Smoother;
-  private inTolStart: number | null = null;
+  private smoother: RunSmoother;
+  /**
+   * Zielton bisher (ms) im laufenden Einsatz. Zählt die Zeit der Zielton-Frames zusammen: kurze Frames ohne
+   * gültigen Ton (unklar, Aussetzer des Mikrofons) unterbrechen nicht, erst ein anderer Ton setzt zurück.
+   */
+  private tolMs = 0;
+  private lastT: number | null = null;
   /** Zeitpunkt des letzten Treffers: nur spätere Einsätze zählen */
   private armedAt = -Infinity;
   private cents: number[] = [];
@@ -467,25 +497,37 @@ export class WaitFollower {
     this.cfg = { ...DEFAULT_FOLLOW, ...opts.cfg };
     this.tuning = opts.tuning ?? new LiveTuning();
     this.onsets = new Onsets(this.cfg);
-    this.smoother = new Smoother(this.cfg);
+    this.smoother = new RunSmoother(this.cfg);
     this.done = tl.tones.length === 0;
   }
 
   /** Erst ab diesem Zeitpunkt beginnende Töne werten (z. B. beim Start des Mitspielens). */
   arm(t: number): void {
     this.armedAt = t;
-    this.inTolStart = null;
+    this.tolMs = 0;
   }
 
-  /** Roher Frame vom Mikrofon; gibt den gehörten (geglätteten) Ton zurück. */
+  /**
+   * Roher Frame vom Mikrofon; gibt den zuletzt gehörten (geglätteten) Ton zurück (null: keiner oder noch
+   * keine Entscheidung des Glätters).
+   */
   push(raw: Frame): Heard | null {
+    // Hinweis für den Glätter: der Zielton auf *ihrer* Flöte
+    this.smoother.expect(this.done || !this.cfg.hintCents ? [] : [expectedHz(this.cfg, this.tuning, this.tl.tones[this.index].midi)]);
+    let heard: Heard | null = null;
+    for (const f of this.smoother.push(raw)) heard = this.take(f);
+    return heard;
+  }
+
+  private take(f: SmoothedFrame): Heard | null {
     const cfg = this.cfg;
-    const f = this.smoother.push(raw);
-    if (!f) return null;
     const note = this.done ? undefined : this.index;
+    const dt = this.lastT === null ? cfg.frameMs : Math.min(Math.max(f.t - this.lastT, 0), 2 * cfg.frameMs);
+    this.lastT = f.t;
     if (!isValid(cfg, f)) {
       this.onsets.gap(f.t);
-      this.inTolStart = null;
+      // längere Stille: neuer Anlauf (wie bisher ab silenceMs ohne Ton – siehe Onsets)
+      if (!sounding(f)) this.tolMs = 0;
       this.opts.onFrame?.({ t: f.t, freq: null, unstable: f.unstable, note, cls: sounding(f) ? "unklar" : "still" });
       return null;
     }
@@ -502,7 +544,7 @@ export class WaitFollower {
     if (target === null || seg.start <= this.armedAt || old) {
       // Nachklang der vorigen Note bzw. Ton ohne neuen Einsatz. Hält sie die eben getroffene Note weiter,
       // sind das gute Messungen dieses Tons fürs Nachführen.
-      this.inTolStart = null;
+      this.tolMs = 0;
       report("alt");
       const lt = this.lastTarget;
       if (lt !== null && !f.filled && Math.abs((m - lt) * 100 - this.tuning.offsetOf(lt)) < cfg.toleranceCents) {
@@ -517,11 +559,11 @@ export class WaitFollower {
         this.tuning.observe(target, (m - target) * 100);
         this.cents.push((m - target) * 100);
       }
-      this.inTolStart ??= f.t;
-      if (f.t - this.inTolStart >= cfg.holdMs) this.hit(f.t);
+      this.tolMs += dt;
+      if (this.tolMs >= cfg.holdMs) this.hit(f.t);
       return heard;
     }
-    this.inTolStart = null;
+    this.tolMs = 0;
     if (heard.midi === target + 12) {
       report("oktave");
       if (!this.octaveHinted && f.t - seg.start >= cfg.holdMs) {
@@ -552,7 +594,7 @@ export class WaitFollower {
     this.results[i] = result;
     this.lastTarget = this.tl.tones[i].midi;
     this.armedAt = t;
-    this.inTolStart = null;
+    this.tolMs = 0;
     this.wrongMidi = null;
     this.octaveHinted = false;
     this.cents = [];
@@ -645,7 +687,7 @@ export class BeatFollower {
   private cur: PassState;
   private lastTc: number | null = null;
   private readonly L: number;
-  private smoother: Smoother;
+  private smoother: RunSmoother;
   private clicks: ClickFilter;
   /** laufender Einsatz (gehörter Ton, Beginn und letzter Frame in korrigierter Zeit) */
   private run: { midi: number; start: number; last: number; used: boolean } | null = null;
@@ -658,7 +700,7 @@ export class BeatFollower {
     this.tuning = opts.tuning ?? new LiveTuning();
     this.anchor = { t: opts.startMs, g: 0, spq: opts.secPerQuarter };
     this.L = tl.total;
-    this.smoother = new Smoother(this.cfg);
+    this.smoother = new RunSmoother(this.cfg);
     this.clicks = new ClickFilter(this.cfg);
     this.cur = this.newPass();
     this.done = tl.tones.length === 0 || this.L <= 0;
@@ -695,11 +737,29 @@ export class BeatFollower {
 
   /** Roher Frame vom Mikrofon; gibt den gehörten (geglätteten) Ton zurück. */
   push(raw: Frame): Heard | null {
-    const f = this.smoother.push(raw);
-    if (!f) return null;
+    this.smoother.expect(this.cfg.hintCents ? this.expectedAt(raw.t) : []);
     let heard: Heard | null = null;
-    for (const g of this.clicks.push(f)) heard = this.take(g) ?? heard;
+    for (const f of this.smoother.push(raw)) for (const g of this.clicks.push(f)) heard = this.take(g) ?? heard;
     return heard;
+  }
+
+  /**
+   * Hinweis für den Glätter: die Töne der Noten, die um den Zeitpunkt t (Uhr der Frames) dran sind –
+   * die Note selbst und ihre Nachbarn (zu früh oder zu spät gespielt), auf *ihrer* Flöte.
+   */
+  private expectedAt(t: number): number[] {
+    if (this.done) return [];
+    let g = this.quarterAt(t - this.cfg.latencyMs);
+    if (this.opts.loop) g = ((g % this.L) + this.L) % this.L;
+    const tones = this.tl.tones;
+    let i = tones.findIndex((n) => n.start + n.dur > g);
+    if (i < 0) i = tones.length - 1;
+    const out: number[] = [];
+    for (let k = Math.max(0, i - 1); k <= Math.min(tones.length - 1, i + 1); k++) {
+      const hz = expectedHz(this.cfg, this.tuning, tones[k].midi);
+      if (!out.includes(hz)) out.push(hz);
+    }
+    return out;
   }
 
   private take(f: SmoothedFrame & { click?: boolean }): Heard | null {

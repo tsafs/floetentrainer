@@ -180,6 +180,8 @@ test("Stimmgerät: wackelnder Ton nahe der Mitte zwischen zwei Halbtönen lässt
 
 test("Stimmgerät: schneller Wechsel g¹–a¹–h¹ auf- und abwärts (Flötenklang) zeigt nur g¹, a¹, h¹; kürzeres Fenster, weniger Zwischenwerte", async ({ page }) => {
   test.setTimeout(60_000);
+  // Vergleich der Messfenster über setWindow: nur auf dem früheren Weg ohne AudioWorklet (dort umstellbar)
+  await page.addInitScript(() => ((window as unknown as { __noWorklet: boolean }).__noWorklet = true));
   await setup(page);
   await menuTo(page, "Stimmgerät");
   await page.waitForFunction(() => (window as never as { __osc: unknown }).__osc !== null);

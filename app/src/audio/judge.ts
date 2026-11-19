@@ -19,6 +19,13 @@ export interface Frame {
    * Klarheit von den Nachbarn. Seine Lautstärke zählt nicht für die Einsatz-Erkennung (../follow.ts).
    */
   filled?: boolean;
+  /**
+   * Feine Messung (../audio/analyze.ts): Ausschnitt der NSDF ab Lag lag0 bei Abtastrate sr. Damit prüft
+   * der Lauf-Glätter (./run-smoother.ts), wie gut das Fenster zu einem erwarteten Ton passt.
+   */
+  nsdf?: Float32Array;
+  lag0?: number;
+  sr?: number;
 }
 
 export interface JudgeConfig {

@@ -17,6 +17,7 @@ import { startpointView, welcomeView } from "./ui/startpoint";
 import { needsWelcome } from "./srs/startpoint";
 import { applyTheme } from "./ui/theme";
 import { tunerView } from "./ui/tuner";
+import { testboardView } from "./ui/testboard";
 import { echoView } from "./ui/echo";
 import { defaultData } from "./store/data";
 import { dayKey } from "./store/dates";
@@ -39,6 +40,7 @@ const ROUTES: Record<string, View> = {
   ton: toneView, // #/ton/<Ton>, aus der Grifftabelle mit ?von=griffe
   "lied-hinzufuegen": songAddView,
   startpunkt: startpointView, // #/startpunkt bzw. #/startpunkt/neu (aus der Willkommensseite)
+  testboard: testboardView, // Erkennung prüfen (aus den Einstellungen)
 };
 
 function routeName(): string {

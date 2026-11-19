@@ -8,8 +8,11 @@
 import type { Frame } from "./judge";
 import type { JudgedFrame } from "./follow";
 
-/** Format der Datei (bei Änderungen erhöhen; das Auswerte-Skript prüft es) */
-export const DIAG_FORMAT = 1;
+/**
+ * Format der Datei (bei Änderungen erhöhen). 2 (19.11.2026): Beim Mitspielen kommen die feinen Messungen
+ * (≈ alle 5 ms, ../audio/analyze.ts); auf dem Testboard optional der Ton (audio).
+ */
+export const DIAG_FORMAT = 2;
 
 /** Erklärung am Anfang der Datei */
 export const DIAG_INFO =
@@ -20,8 +23,8 @@ export const DIAG_INFO =
   "Werte der Flöte sowie Angaben zu Browser, Mikrofon und Audio-Ausgabe. Es ist kein Ton und keine Aufnahme " +
   "enthalten. Auswertung: node app/scripts/diagnose.mjs <Datei>";
 
-/** Höchstens so viele Messungen (≈ 6 Minuten) und Ereignisse je Durchgang */
-export const DIAG_MAX_FRAMES = 15000;
+/** Höchstens so viele Messungen (≈ 5 Minuten bei feinen Messungen) und Ereignisse je Durchgang */
+export const DIAG_MAX_FRAMES = 60000;
 export const DIAG_MAX_EVENTS = 3000;
 
 export type DiagKind = "warten" | "takt" | "abgleich";
@@ -57,6 +60,38 @@ export interface DiagFile {
   events: DiagEvent[];
   frames: DiagFrame[];
   end?: Record<string, unknown>;
+  /**
+   * Nur Testboard: der Ton des Durchgangs, 16 Bit, als Base64 (little endian), Beginn t0 relativ zum
+   * Durchgang (ms). Damit lässt sich die Erkennung später mit genau diesem Ton nachrechnen
+   * (scripts/replay.ts).
+   */
+  audio?: { sampleRate: number; t0: number; encoding: "pcm16le-base64"; samples: number; data: string };
+}
+
+/** Erklärung, wenn der Ton dabei ist (Testboard) */
+export const DIAG_INFO_AUDIO = DIAG_INFO.replace("Es ist kein Ton und keine Aufnahme enthalten.", "Weil es eine Übung des Testboards war, ist auch der Ton enthalten (audio, 16 Bit).");
+
+/** Samples (−1…1) → 16 Bit little endian → Base64 */
+export function pcm16Base64(x: Float32Array): string {
+  const bytes = new Uint8Array(x.length * 2);
+  const v = new DataView(bytes.buffer);
+  for (let i = 0; i < x.length; i++) v.setInt16(2 * i, Math.max(-32768, Math.min(32767, Math.round(x[i] * 32767))), true);
+  let s = "";
+  const CH = 0x8000;
+  for (let i = 0; i < bytes.length; i += CH) s += String.fromCharCode(...bytes.subarray(i, i + CH));
+  return btoa(s);
+}
+
+/** Umkehrung von pcm16Base64 */
+export function base64Pcm16(data: string): Float32Array {
+  const bin = atob(data);
+  const out = new Float32Array(bin.length >> 1);
+  for (let i = 0; i < out.length; i++) {
+    let v = bin.charCodeAt(2 * i) | (bin.charCodeAt(2 * i + 1) << 8);
+    if (v >= 32768) v -= 65536;
+    out[i] = v / 32767;
+  }
+  return out;
 }
 
 const r1 = (x: number) => Math.round(x * 10) / 10;
@@ -132,6 +167,13 @@ export class DiagRecorder {
     if (!this.open || !this.file) return;
     this.file.end = data;
     this.open = false;
+  }
+
+  /** Ton anhängen (Testboard; siehe DiagFile.audio) */
+  setAudio(rec: { sampleRate: number; t0: number; samples: Float32Array }): void {
+    if (!this.file) return;
+    this.file.audio = { sampleRate: rec.sampleRate, t0: this.rel(rec.t0), encoding: "pcm16le-base64", samples: rec.samples.length, data: pcm16Base64(rec.samples) };
+    this.file.info = DIAG_INFO_AUDIO;
   }
 
   /** Inhalt der Datei (null ohne Durchgang) */

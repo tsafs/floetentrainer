@@ -298,6 +298,8 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
   - **Erkennung, damit nichts ungerecht gewertet wird:**
     - Tonhöhe nur, wenn pitchy eine Klarheit von mindestens etwa 0,9 meldet und die Lautstärke über
       einer Schwelle liegt.
+    - Beim Mitspielen seit 19.11.2026 feiner gemessen (≈ 5 ms) und notengestützt: Nahe dem erwarteten
+      Ton genügt eine Klarheit ab 0,7 (`docs/erkennung.md`). Die Übung bleibt bei 25 ms und 0,9.
     - Messfenster (`app/src/audio/mic.ts`): die jüngsten 1024 Samples (≈ 21 ms bei 48 kHz), Messung
       alle 25 ms. Bis zum 14.11.2026 waren es 2048 Samples (≈ 43 ms); Rückmeldung: „Wenn ich G, A und H
       schnell im Wechsel spiele, wird oft GIS oder eine andere Zwischennote erkannt“ (im Stimmgerät kurz
@@ -645,7 +647,8 @@ Text abweicht, gilt der Text (z. B. Zahl der Stufen, zwei getrennte Fälligkeits
 - **Ort und Werkzeuge:**
   - Alles im Ordner `app/`. **`heft/` nicht verändern.**
   - Vite + TypeScript ohne UI-Framework.
-  - Laufzeit-Bibliothek nur `pitchy`; als Entwicklungswerkzeuge Vitest und Playwright, dazu
+  - Laufzeit-Bibliothek nur `pitchy` (beim Mitspielen deren Autokorrelation im AudioWorklet, seit
+    19.11.2026, siehe `docs/erkennung.md`); als Entwicklungswerkzeuge Vitest und Playwright, dazu
     `vite-plugin-pwa` oder ein kleiner eigener Service Worker.
 - **Hauptgerät: Android-Handy mit Chrome.**
 - **Mikrofon:**

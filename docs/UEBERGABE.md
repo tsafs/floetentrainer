@@ -114,6 +114,11 @@ Silben, Atemzeichen, Seitenumbrüche.
      Mikrofon- und Browserangaben), keinen Ton. Auswerten: `node app/scripts/diagnose.mjs <datei>` (je Note
      erwartet/erkannt, Cent, Einsatz-Versatz, Grund für Rot, Median-Versatz, Anteil unklarer Messungen).
      Aufnahme `app/src/audio/diagnose.ts`. Bildschirmfotos `*-r1…r12-*.png`.
+   - **Erkennung beim Mitspielen umgebaut (19.11.2026, `docs/erkennung.md`):** Messung im AudioWorklet
+     (lückenlos, fein alle ≈ 5 ms), Lauf-Glätter mit Hinweis auf den erwarteten Ton
+     (`app/src/audio/run-smoother.ts`), Prüfstand `app/tests/unit/erkennung.test.ts`. **Testboard**
+     (Einstellungen → Testboard): Tonfolgen zum Mitspielen, Diagnose dort *mit Ton* (Format 2);
+     nachrechnen mit `REPLAY=<datei> npx vitest run tests/unit/replay.test.ts` in `app/`.
 4. **Tonfolgen in den Sitzungen** (`docs/app-tonfolgen.md`, umgesetzt am 14.11.2026): Etwa jede zweite
    Zusatzkarte ist eine Folge von 2–6 Tönen zum Lesen bzw. Spielen, sobald in der Spur 5 Töne vorgestellt
    sind. Erzeugen `app/src/srs/sequences.ts`, Ablauf und Wertung `app/src/srs/session.ts`
